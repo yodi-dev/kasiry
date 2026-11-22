@@ -1,10 +1,12 @@
-# Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry
+# Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry (Habiba Store)
 
-**Versi Dokumen:** 2.1 (Konsolidasi PWA, Google Ecosystem, Dexie DB, & UX Warung Pedesaan)  
+**Versi Dokumen:** 2.2 (Final Prototype Sign-Off, Ergonomi Terbalik, & Desain Glassmorphism Modern)  
 **Status:** Approved for Implementation  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
+**Identitas Toko:** Habiba Store (Pemilik: Habiba | WA: 081234567890)  
 **Platform Target:** Progressive Web App (PWA) Mobile-First & Desktop POS  
-**Repository:** `d:\web\kasiryy`  
+**Repository GitHub:** `https://github.com/yodi-dev/kasiry.git`  
+**Workspace:** `d:\web\kasiryy`  
 
 ---
 
@@ -12,303 +14,166 @@
 
 | Versi | Tanggal | Penulis | Ringkasan Perubahan Utama |
 | :---: | :---: | :---: | :--- |
-| **v2.1** | 22 November 2026 | Yodi & AI Assistant | **Evolusi ke Progressive Web App (PWA) & Ekosistem Google ($0 Cost):**<br>1. **Adopsi Stack PWA Teruji:** Mengadopsi fondasi dari *Dailyy* dan *Trainyy* (Vue 3, Tailwind CSS v4, Lucide Icons, Dexie.js IndexedDB, Vite-Plugin-PWA).<br>2. **Integrasi Google Identity Services (GIS):** Autentikasi 1-klik tanpa password untuk menghubungkan Google Drive & Google Sheets pribadi pemilik warung.<br>3. **Buku Kas Otomatis Google Sheets:** Sinkronisasi multi-tab (Rekap Penjualan, Rincian Barang Terjual, Buku Utang) yang bisa dipantau jarak jauh dari laptop/HP pemilik.<br>4. **Ekspor Excel (.xlsx) Offline:** Kemampuan mengunduh pembukuan kasir dalam format Excel kapan saja meski tanpa internet.<br>5. **Optimasi Barcode Scanner Fisik (HID):** Rekayasa `inputmode="none"` dan global keydown listener untuk mencegah keyboard virtual menutupi layar kasir.<br>6. **Desain Sistem & Bahasa Warung:** Penerapan token visual, ergonomi tombol raksasa ($\ge 48\text{dp}$–$64\text{dp}$), kontras tinggi, dan penghapusan total istilah akuntansi teknis. |
-| **v2.0** | 22 November 2026 | Yodi | Konsolidasi konsep awal, branding, UX warung kelontong, dan model bisnis beli-putus. |
+| **v2.2** | 22 November 2026 | Yodi & AI Assistant | **Penyelarasan Ergonomi Inverted & Identitas Toko Habiba Store:**<br>1. **Identitas Toko Resmi:** Diselaraskan menjadi **Habiba Store** (Owner: Habiba).<br>2. **Ergonomi Tata Letak Terbalik (*Inverted Ergonomic Flow*):**<br>&nbsp;&nbsp;&nbsp;• **Glance Zone (Atas):** *Struk Belanjaan (Cart)* ditempatkan di paling atas layar agar kasir leluasa membaca barang tanpa tertutup tangan/jempol.<br>&nbsp;&nbsp;&nbsp;• **Quick Tap Zone (Tengah):** *Barang Sering Terjual* (6–8 barang terlaris warung, tanpa ikon berlebihan, harga lugas).<br>&nbsp;&nbsp;&nbsp;• **Floating Sticky Bottom Console (Bawah / Thumb Zone):** Konsol melayang di jangkauan jempol bawah terdiri dari dua lapis:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Lapis Atas: Form Input Barcode & Pencarian Barang (dengan **Autofocus tangguh**, *ring glow*, dan pop-up hasil pencarian mengambang ke **atas** / `bottom-full`).<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Lapis Bawah: Bar Total Tagihan & tombol **"Pembayaran"**, bersifat kondisional (hanya muncul saat ada barang di keranjang).<br>3. **Desain Visual Glassmorphism Modern:** Mengadopsi palet ethereal soft light-blue (`#e2effb` ke `#edf5fd`), kartu frosted glass putih (`bg-white/90 rounded-3xl`), dan tombol Deep Midnight Navy (`#0a193d`) dengan aksen Azure Sky Blue (`#0284c7`).<br>4. **Pembersihan Anti-Slop & Anti-Jargon:** Menghapus seluruh teks teknis dan jargon akuntansi rumit (*COGS, Gross Profit, Accordion slop*). Menggunakan bahasa pasar murni (*Uang Masuk, Perkiraan Untung, Buku Utang, Pembayaran*). |
+| **v2.1** | 22 November 2026 | Yodi & AI Assistant | Evolusi ke Progressive Web App (PWA) & Ekosistem Google ($0 Cost): Vue 3, Tailwind CSS v4, Dexie.js IndexedDB, Google Sheets & GIS auth, dan ekspor Excel offline. |
+| **v2.0** | 22 November 2026 | Yodi | Konsolidasi konsep awal, branding warung kelontong, dan model bisnis beli-putus. |
 
 ---
 
 ## 1. Ringkasan Eksekutif & Identitas Brand
 
 ### 1.1 Filosofi Produk
-**Kasiry** adalah aplikasi kasir (*Point of Sale*) Progressive Web App (PWA) yang dirancang khusus untuk **warung kelontong dan pedagang mikro di pedesaan Indonesia**.
+**Kasiry** adalah aplikasi kasir (*Point of Sale*) Progressive Web App (PWA) yang dirancang khusus untuk **warung kelontong dan pedagang UMKM mikro di Indonesia**.
 
-Banyak aplikasi kasir modern gagal diadopsi di warung desa karena:
-1. **Wajib Internet:** Sinyal pedesaan sering hilang/mati lampu.
-2. **Mental Block Input Data:** Pemilik warung enggan menginput manual 500+ barang sebelum mulai berjualan.
-3. **Penjaga Pengganti Tidak Hafal Harga:** Anggota keluarga (anak, kakek/nenek) yang menjaga warung saat pemilik pergi sering bingung harga barang.
-4. **UI Terlalu Rumit:** Menu bertingkat, istilah akuntansi asing (*Revenue, COGS, Inventory*), dan tombol kecil yang sulit ditekan jempol orang tua.
-
-**Kasiry membalik paradigma tersebut:**
-> *"Buka aplikasi langsung jualan. Tanpa login awal, tanpa pusing input data berhari-hari, dan 100% jalan secepat kilat tanpa internet."*
+**Prinsip Inti:**
+1. **Nol Hambatan Login (*Zero Login Wall*):** Buka aplikasi web langsung masuk ke mode kasir siap melayani transaksi pembeli.
+2. **100% Berfungsi Tanpa Internet (*Offline-First*):** Seluruh data transaksi, struk, dan pencatatan utang tersimpan di IndexedDB browser lokal (Dexie.js).
+3. **Ergonomi Jempol Ekstrem:** Area input dan tombol aksi utama berada di separuh bawah layar yang mudah dijangkau satu tangan (*Thumb Zone*), sementara area pembacaan struk berada di separuh atas (*Glance Zone*).
+4. **Cloud Backup Gratis ($0 Server Cost):** Menggunakan Google Sheets dan Google Drive milik pengguna via Google Identity Services (GIS).
 
 ### 1.2 Identitas Merek (Brand Identity)
-* **Nama Produk:** **Kasiry** (Gabungan kata *Kasir* dan inisial *Y*).
-* **Tagline Komunikasi:** *"Kasiry: Aplikasi Kasir Warung Paling Gampang."*
-* **Konsep Logo:** Monogram huruf **"Y"** tebal yang menyatu dengan siluet **Atap Warung Tradisional** dan simbol **Centang ($\checkmark$)** pelunasan rezeki.
-* **Palet Warna Utama (Sesuai Karakter Pedesaan):**
-  * **Primary (Hijau Daun Rezeki - `#2E7D32`):** Melambangkan uang masuk, pertumbuhan usaha, serta adem dan nyaman dipandang mata seharian di toko.
-  * **Secondary (Kuning Emas Rezeki - `#FBC02D` / `#F59E0B`):** Memberi kesan hangat, merakyat, ramah, dan simbol kelancaran rezeki kasir.
-  * **Background Surface (Putih Susu Hangat - `#F8FAF8` / `#FFFFFF`):** Menghindari silau layar di bawah sinar matahari/lampu warung dan menjaga kontras teks di atas 4.5:1.
-  * **Accent Utang (Merah Bata Peringatan - `#DC2626`):** Identifikasi tegas untuk status bon/utang pelanggan.
+* **Nama Produk:** **Kasiry**
+* **Toko Acuan / Prototipe:** **Habiba Store**
+* **Tagline:** *"Kasiry: Aplikasi Kasir Warung Paling Gampang."*
+* **Palet Warna Utama (Modern Ethereal Glassmorphism):**
+  * **Midnight Deep Navy (`#0a193d`):** Warna utama teks, tombol primer, dan kartu checkout, memberikan kesan profesional, kokoh, dan berwibawa.
+  * **Azure / Sky Blue (`#0284c7` / `#38bdf8`):** Warna aksen interaktif, tombol aksi checkout, dan indikator aktif/fokus.
+  * **Ambient Radial Background (`#e2effb` ke `#edf5fd`):** Latar belakang gradien biru lembut yang menyejukkan mata kasir seharian dan bebas silau.
+  * **Frosted Glass Surface (`rgba(255, 255, 255, 0.9)`):** Kartu putih tembus pandang dengan efek blur (`backdrop-blur-md`) dan sudut membulat lebar (`rounded-3xl`).
+  * **Alert / Utang (`#ef4444`):** Penanda tegas buku utang dan penghapusan data.
 
 ---
 
 ## 2. Target Pengguna (User Persona)
 
-### Persona 1: Pak Tejo (54 Tahun) - Pemilik Warung Kelontong
-* **Karakter:** Mengelola warung di teras rumah di desa. Mata mulai butuh kacamata baca. HP yang digunakan adalah Android kelas *entry-level* (RAM 3 GB).
-* **Kebiasaan:** Menggunakan WhatsApp dan kalkulator fisik. Sering merasa rugi karena barang dibeli dengan bon/utang tetangga yang catatannya hilang di buku kertas.
-* **Kebutuhan Utama:** Tombol kasir besar, harga barang langsung muncul saat barcode discan/diketik, dan pencatatan utang semudah mengetik nama tetangga.
+### Persona 1: Ibu Habiba (48 Tahun) - Pemilik Warung Kelontong
+* **Karakter:** Mengelola warung kelontong dari pagi hingga malam. Menggunakan smartphone Android kelas menengah.
+* **Kebiasaan:** Menggunakan WhatsApp dan kalkulator fisik. Sering lupa menagih utang pelanggan karena buku kertas sering terselip.
+* **Kebutuhan:** Tampilan yang bersih, mudah dibaca tanpa kacamata tebal, pencatatan utang instan, dan laporan harian yang bisa dikirim ke WhatsApp dalam 1 kali ketuk.
 
-### Persona 2: Mbak Sri (21 Tahun) - Anak / Penjaga Toko Pengganti
-* **Karakter:** Mahasiswi/lulusan SMK yang sering diminta gantian menjaga warung saat orang tua belanja ke pasar grosir.
-* **Kebiasaan:** Fasih pakai HP, tapi tidak hafal harga ratusan jenis barang di warung (terutama barang curah seperti telur, terigu, atau sabun yang beda varian).
-* **Kebutuhan Utama:** Kecepatan saat ada antrean pembeli, tidak perlu tanya-tanya harga lewat telepon ke orang tua, dan bisa langsung mengirim rekap penjualan ke WhatsApp bapaknya sore hari.
+### Persona 2: Penjaga Toko Pengganti / Anak Pemilik
+* **Karakter:** Sering menjaga toko bergantian saat pemilik pergi belanja ke agen grosir.
+* **Kebiasaan:** Menggunakan barcode scanner fisik atau kamera HP untuk barang berkemasan, dan tombol cepat untuk barang curah (Gas LPG, Telur, Minyak).
+* **Kebutuhan:** Barcode scanner langsung terbaca otomatis (*autofocus*), tidak perlu memilih-milih menu yang rumit.
 
 ---
 
-## 3. Sitemap & Arsitektur Informasi
+## 3. Arsitektur Informasi & Tata Letak Layar Tunggal (POS Hub)
 
-Kasiry menganut prinsip **"Zero-Page Navigation"** (Layar Kasa Tunggal). Seluruh transaksi jual-beli diselesaikan dalam satu layar utama tanpa pernah berpindah URL/halaman. Fitur sekunder dibuka melalui lembar modal (*bottom sheet / pop-up dialog*) yang cepat dan mudah ditutup.
+Aplikasi Kasiry beroperasi dengan prinsip **"Single-Screen POS Hub"**: seluruh aktivitas transaksi jual-beli diselesaikan di layar utama tanpa berpindah-pindah URL.
 
 ```mermaid
 flowchart TD
-    App([Layar Kasir Utama / Single Screen Hub])
+    App([Layar Kasir Utama / POS Hub])
     
-    App -->|Scan Barcode / Ketik Barang| SearchBar[Smart Input & Scanner]
-    App -->|Ketuk Tombol Cepat| MacroMatrix[Matriks Barang Curah Non-Barcode]
-    App -->|Daftar Keranjang Belanja| Cart[Keranjang Belanja Dinamis]
+    subgraph TopSection["1. Glance Zone (Atas)"]
+        TopBar[TopBar: Habiba Store, Tanggal, Avatar & Hamburger]
+        Cart[Struk Belanjaan / CartSection: Daftar Barang, Stepper Qty, Subtotal]
+    end
     
-    SearchBar -.->|Barcode Belum Ada| ModalLazyInv[Modal: Lazy Inventory Baru]
+    subgraph MiddleSection["2. Quick Tap Zone (Tengah)"]
+        Frequent[Barang Sering Terjual: 6-8 Tombol Cepat Barang Terlaris]
+    end
     
-    Cart -->|Tekan Tombol [BAYAR]| ModalPayment[Modal: Pembayaran Cerdas]
+    subgraph BottomSection["3. Floating Sticky Bottom Console (Bawah / Thumb Zone)"]
+        BarcodeInput[Input Barcode & Cari: Autofocus, Enter Trigger, Kamera]
+        CheckoutBar[Bar Pembayaran: Total Tagihan + Tombol Pembayaran]
+    end
     
-    ModalPayment -->|Metode Tunai| CashFlow[Smart Static Cash Matrix]
-    ModalPayment -->|Metode Utang/Bon| DebtFlow[Lazy Customer Utang Selector]
+    App --> TopSection
+    TopSection --> MiddleSection
+    MiddleSection --> BottomSection
     
-    App -->|Ikon Buku Utang di TopBar| ModalDebtBook[Modal: Buku Utang Warung]
-    ModalDebtBook -->|Bayar Utang| DebtSettle[Pencatatan Cicilan / Lunas]
+    BarcodeInput -.->|Barcode Belum Ada| ModalLazy[Modal: Input Cepat Barang Baru]
+    CheckoutBar -->|Tekan Pembayaran| ModalPay[Modal: Pembayaran Tunai & Utang]
     
-    App -->|Ikon Laporan di TopBar| ModalReport[Modal: Laporan Harian Warung]
-    ModalReport -->|1-Klik| WhatsAppExport[Kirim Teks ke WhatsApp]
-    ModalReport -->|1-Klik| ExcelExport[Unduh File Excel .xlsx]
-    
-    App -->|Ikon Pengaturan di TopBar| ModalSettings[Modal: Pengaturan Warung]
-    ModalSettings -->|1-Klik GIS| GoogleAuth[Hubungkan Akun Google]
-    GoogleAuth --> DriveSync[Auto-Backup Google Drive]
-    GoogleAuth --> SheetsSync[Sinkronisasi Google Sheets]
+    TopBar -->|Hamburger Menu| Drawer[Slide-Over Drawer]
+    Drawer --> ModalDebt[Modal: Buku Utang Warung]
+    Drawer --> ModalReport[Modal: Laporan Harian 1-Klik WA]
+    Drawer --> ModalProduct[Modal: Kelola Barang CRUD]
+    Drawer --> ModalSettings[Modal: Pengaturan & Google Sync]
 ```
 
-### Rincian Tampilan (View Breakdown):
-1. **TopBar Permanen:**
-   * Nama Warung & Tanggal Hari Ini.
-   * Indikator Sinyal: `[Offline]` (Abu/Hijau) & Indikator Cloud: `[Google Terhubung / Belum]`.
-   * Tiga Tombol Aksi Cepat: `[Buku Utang]`, `[Laporan Hari Ini]`, `[Pengaturan/Google]`.
-2. **Kawasan Kerja Kasir (Main Single Screen):**
-   * **Zona Atas:** Barcode Input (Auto-focus, siap terima tembakan scanner USB/BT) + Tombol Kamera Scanner on-demand.
-   * **Zona Tengah:** Matriks Tombol Makro Dinamis (Gas LPG 3kg, Telur 1kg, Es Batu, dll.).
-   * **Zona Bawah:** Keranjang Belanja (Nama item, kuantitas, tombol `+` / `-` besar, hapus) + Sticky Bar Total Belanja & Tombol Raksasa **[ BAYAR (Rp ...) ]**.
-3. **Modal Dialogs (Top Layer Native `<dialog>`):**
-   * `PaymentModal.vue`: Pilihan Tunai (Uang Pas, Pecahan 2rb–100rb, Kembalian) vs Utang/Bon.
-   * `LazyInventoryModal.vue`: Input kilat 2 kolom (`Nama Barang` & `Harga Jual`) saat barcode baru terdeteksi.
-   * `DebtBookModal.vue`: Tabel daftar tetangga yang berutang, saldo, dan riwayat.
-   * `DailyReportModal.vue`: Kartu rekap Uang Masuk, Estimasi Untung, dan tombol WhatsApp + Excel.
-   * `SettingsModal.vue`: Profil Warung, Login Google, Backup/Restore JSON, dan Status Lisensi.
+### Rincian Zona Tampilan Utama:
+1. **TopBar:**
+   - Ikon Hamburger 2-garis minimalis di kiri (membuka Navigation Drawer).
+   - Nama Toko: **Habiba Store** & Tanggal hari ini di tengah.
+   - Avatar Profil Toko + Dot status online hijau di kanan.
+2. **Struk Belanjaan (CartSection - Atas):**
+   - Menampilkan jumlah jenis barang dan total pcs.
+   - Daftar item belanjaan dengan nama, harga satuan, tombol kuantitas `[-] [qty] [+]`, dan subtotal.
+   - Tombol "Kosongkan" saat ingin membatalkan seluruh transaksi.
+   - Ketinggian maksimal dibatasi (`max-h-[35vh]`) dengan scroll internal agar tetap proporsional.
+3. **Barang Sering Terjual (FrequentProductsSection - Tengah):**
+   - Menampilkan 6 hingga 8 kartu barang terlaris warung (Gas LPG 3kg, Galon Aqua, Telur 1kg, Indomie, Minyak Goreng, Beras).
+   - Bersih tanpa kategori rumit dan tanpa ikon dekoratif yang berlebihan.
+4. **Floating Sticky Bottom Console (Konsol Melayang di Bawah):**
+   - **Form Input Barcode & Pencarian:** Melayang di atas bar tagihan. Memiliki autofocus aktif saat halaman dibuka, halo ring fokus biru, dan dropdown hasil pencarian yang mengambang ke arah **atas** (`bottom-full mb-2.5`).
+   - **Bar Total Tagihan & Pembayaran:** Kapsul Deep Navy berisi total tagihan nominal rupiah dan tombol **"Pembayaran"**. Hanya muncul saat ada barang di keranjang (`itemCount > 0`).
 
 ---
 
-## 4. Spesifikasi Detail Fitur (Dari Hulu ke Hilir)
+## 4. Spesifikasi Fungsional Fitur Utama
 
-### 4.1. Onboarding Bebas Hambatan (No Login Wall)
-* Saat pertama kali aplikasi dibuka di browser HP:
-  1. Muncul sambutan singkat: *"Selamat Datang di Kasiry"*.
-  2. Form super ringkas: **Nama Warung** (contoh: *Warung Bu Tejo*) dan **Nomor WhatsApp Pemilik**.
-  3. Tombol besar: **[ MULAI JUALAN SEKARANG ]**.
-  4. Data toko tersimpan permanen di `IndexedDB (Dexie)`. Pengguna langsung berada di layar kasir siap melayani pembeli pertama dalam waktu kurang dari 15 detik!
+### 4.1 Barcode Scanner Hardware (HID) & Autofocus
+* **Autofocus Berlapis:** Input pencarian memiliki `autofocus` HTML5, `nextTick()` focus pada `onMounted`, serta pemulihan fokus otomatis saat jendela peramban kembali aktif (`window.focus`).
+* **Global Typing Capture:** Mengetik tombol alfanumerik di mana saja pada layar kasir otomatis mengalihkan fokus ke input barcode tanpa menghapus karakter pertama.
+* **Deteksi Enter Scanner:** Tembakan barcode scanner fisik mengirim sinyal `Enter`. Sistem otomatis memeriksa kecocokan barang:
+  * Jika barang ditemukan $\rightarrow$ langsung masuk ke keranjang belanjaan!
+  * Jika barang belum ada $\rightarrow$ membuka *Lazy Inventory Modal* untuk mendaftarkan barang baru dalam hitungan detik.
 
-### 4.2. Tiga Pilar Master Data Produk
-1. **Pre-loaded Seed Database (~200–500 SKU Populer):**
-   * Bundling data barang kebutuhan pokok Indonesia: Indomie Goreng/Kuah, Kopi Kapal Api, Le Minerale 600ml, Teh Pucuk, Beras Ramos 5kg, Minyakita 1L, Sabun Lifebuoy, Rokok Surya 16, dll.
-   * Lengkap dengan kode barcode EAN-13 resmi.
-   * Saat warung menembakkan barcode barang tersebut untuk pertama kali, nama barang otomatis muncul; kasir hanya perlu mengonfirmasi atau menyesuaikan harga jualnya satu kali saja.
-2. **Lazy Inventory (Input Sambil Jualan):**
-   * Ketika scanner membaca barcode yang belum terdaftar:
-     * Kasir tidak dialihkan ke halaman menu stok yang ribet.
-     * Muncul pop-up kecil di tengah layar: *"Barang Baru Terdeteksi!"*.
-     * Dua kolom input besar: **Nama Barang** dan **Harga Jual**.
-     * Ketuk `[Simpan & Masukkan Keranjang]`.
-     * Barang langsung masuk transaksi saat itu dan otomatis tersimpan ke katalog warung selamanya.
-3. **Quick Macro Matrix (Barang Curah Non-Barcode):**
-   * Grid tombol besar untuk barang tanpa kemasan pabrik (LPG 3Kg, Es Batu, Telur 1/2 Kg, Sayur, Cabe).
-   * Dilengkapi fungsi filter ketik instan: jika kasir mengetik *"te"*, matriks langsung menyaring dan memunculkan tombol *[Telur]* dan *[Teh Manis]*.
+### 4.2 Lazy Inventory (Input Kilat Barang Baru)
+* Kasir tidak perlu meninggalkan layar transaksi jika ada produk baru yang discan.
+* Pop-up meminta: Nama Barang, Harga Jual, dan Harga Modal (otomatis disarankan 80% dari harga jual).
+* Sekali klik simpan, barang tersimpan ke IndexedDB dan langsung masuk ke keranjang belanjaan saat itu juga.
 
-### 4.3. Penanganan Barcode Scanner Fisik (HID Mode) & Kamera
-* **Hardware Barcode Scanner via USB OTG / Bluetooth:**
-  * Scanner fisik dikenali sistem operasi sebagai *hardware keyboard*. Scanner mengetikkan urutan angka dalam milidetik diakhiri karakter `Enter`.
-  * **Solusi Web POS Kasiry:** Menggunakan kombinasi listener `window.addEventListener('keydown')` cerdas dengan buffer waktu (< 50ms per keystroke). Kolom input menggunakan atribut `inputmode="none"` saat mode scanner aktif agar keyboard virtual HP tidak melonjak keluar menutupi layar.
-* **Kamera Barcode Scanner On-Demand:**
-  * Tombol kamera hanya aktif jika ditekan (menghemat baterai & menjaga HP tidak panas).
-  * Menggunakan **Barcode Detection API** bawaan browser Chrome (didukung ML Kit lokal di Android) dengan fallback `@zxing/library` / `html5-qrcode`.
+### 4.3 Pembayaran Cerdas: Tunai vs Bon/Utang
+* **Mode Tunai:**
+  * Tombol Uang Pas.
+  * Saran pembulatan ke atas (misal total Rp 24.500 disarankan Rp 25.000, Rp 30.000, Rp 50.000).
+  * Pecahan rupiah standar (Rp 2.000, Rp 5.000, Rp 10.000, Rp 20.000, Rp 50.000, Rp 100.000).
+  * Tampilan uang kembalian besar dan jelas.
+* **Mode Utang / Bon:**
+  * Pencarian cepat nama tetangga/pelanggan.
+  * Jika pelanggan baru, cukup ketik nama langsung tersimpan tanpa formulir bertele-tele.
+  * Masuk otomatis ke Buku Utang Digital.
 
-### 4.4. Modal Pembayaran Cerdas (Smart Payment Flow)
-Ketika kasir menekan tombol **[ BAYAR ]**:
-* **Mode Tunai (Default):**
-  * Tombol raksasa **[ UANG PAS ]** (misal belanja Rp 37.500, tombol langsung bernilai Rp 37.500).
-  * Tombol pecahan standar nominal Rupiah: `[+ 2.000]`, `[+ 5.000]`, `[+ 10.000]`, `[+ 20.000]`, `[+ 50.000]`, `[+ 100.000]`.
-  * Saran pembulatan otomatis ke atas (misal total Rp 37.500 $\rightarrow$ muncul tombol cepat `[Rp 40.000]` dan `[Rp 50.000]`).
-  * Tampilan **KEMBALIAN** berukuran ekstra besar dengan warna hijau tebal untuk mencegah kasir salah hitung uang kembalian.
-* **Mode Utang / Bon (Lazy Customer):**
-  * Digunakan saat tetangga belum bawa uang.
-  * Kolom input nama pelanggan dengan pencarian otomatis nama yang sudah pernah berutang.
-  * Jika nama baru (belum ada di daftar), muncul tombol cepat: **[ + Catat Utang ke "(Nama Baru)" ]**.
-  * Transaksi langsung selesai, barang keluar dari stok, dan saldo utang orang tersebut otomatis bertambah di Buku Utang.
+### 4.4 Buku Utang Digital & Tagih WhatsApp
+* Mencatat saldo utang per pelanggan dan tanggal transaksi terakhir.
+* Tombol catat cicilan / pelunasan utang.
+* Tombol **"Kirim WA Pengingat"**: membuka tautan WhatsApp dengan pesan sopan dan ramah yang dirancang khusus untuk budaya desa.
 
-### 4.5. Buku Utang Digital & Pelunasan
-* Tab/Modal khusus menampilkan daftar seluruh orang yang memiliki tanggungan utang.
-* Menampilkan: Nama, Terakhir Belanja, dan Total Tagihan.
-* Satu klik tombol **[ Bayar / Cicil ]**:
-  * Masukkan nominal yang dibayarkan.
-  * Utang otomatis berkurang. Jika lunas, status berganti menjadi `[LUNAS]`.
-  * Ada tombol 1-klik: **[ Kirim Pengingat WhatsApp ]** berisi rincian sopan:
-    > *"Halo Bu Tejo, sekadar menginfokan catatan bon belanja di Warung Bu Sri saat ini sebesar Rp 45.000. Matur nuwun."*
+### 4.5 Laporan Harian Warung (1-Klik WA & Excel)
+* Rekap Uang Masuk, Perkiraan Untung Bersih, Jumlah Transaksi, dan Bon/Utang Baru.
+* Daftar barang paling laris hari ini.
+* Tombol **"Kirim ke WhatsApp"**: menghasilkan teks rekap rapi dan membuka WhatsApp pemilik warung.
+* Tombol **"Unduh Excel"**: mengekspor laporan pembukuan lengkap dalam format `.xlsx` secara offline.
 
-### 4.6. Laporan Harian Ala Chat WhatsApp
-* Dirancang khusus tanpa grafik chart yang rumit. Menampilkan 3 kartu ringkas:
-  1. **Uang Masuk Hari Ini (Rp ...)**
-  2. **Perkiraan Untung Bersih (Rp ...)**
-  3. **Barang Paling Laris (Top 5)**
-  4. **Total Bon/Utang Baru Hari Ini (Rp ...)**
-* Tombol **[ Kirim ke WhatsApp ]**:
-  * Otomatis memformat teks rapi dan membuka aplikasi WhatsApp pemilik/keluarga.
-
-### 4.7. Integrasi Google Ecosystem ($0 Server Cost)
-Diadaptasi dari kesuksesan arsitektur di *Dailyy* dan *Trainyy*:
-1. **Google Identity Services (GIS):** Login 1-klik menggunakan akun Google pemilik warung tanpa backend server.
-2. **Auto-Backup Google Drive:** Menyimpan snapshot database `kasiry-backup.json` di folder pribadi Google Drive pengguna secara berkala atau manual 1-klik.
-3. **Buku Kas Google Sheets Multi-Tab:**
-   * Aplikasi otomatis membuat Google Spreadsheet berjudul:  
-     📊 **"Kasiry - Buku Kas & Laporan Warung"**.
-   * Memiliki 3 lembar kerja (sheets):
-     * `Sheet1 - Rekap Transaksi`: Tanggal, Jam, No Nota, Total Belanja, Metode (Tunai/Utang), Uang Masuk, Kembalian, Untung.
-     * `Sheet2 - Rincian Barang`: No Nota, Tanggal, Nama Barang, Barcode, Qty, Harga Satuan, Modal, Subtotal.
-     * `Sheet3 - Rekap Utang Tetangga`: Nama, Nomor WA, Total Sisa Utang, Terakhir Diperbarui.
-   * Pemilik warung bisa membuka laporan ini dari kantor, pasar, atau laptop kapan saja!
-4. **Ekspor Excel (.xlsx) Offline:**
-   * Menggunakan library client-side (`xlsx` / SheetJS).
-   * Sekali ketuk tombol **[ Unduh Excel ]**, file `.xlsx` dengan format kolom rapi langsung tersimpan di folder download HP/komputer, tanpa butuh internet.
+### 4.6 Sinkronisasi Cloud $0 (Google Sheets & Drive)
+* Menghubungkan Google Spreadsheet pemilik toko tanpa memerlukan server berbayar.
+* Data transaksi, barang terjual, dan saldo utang tersimpan rapi di Google Sheets sehingga pemilik dapat memantau warung dari mana saja.
 
 ---
 
-## 5. Desain Sistem & Panduan Ergonomi (UI/UX Guidelines)
-
-Mengikuti standar **`ui-ux-pro-max`** dan **`modern-web-guidance`**:
-
-### 5.1. Token Arsitektur (Three-Layer Structure)
-* **Primitive Tokens:**
-  * `--color-emerald-800: #1b5e20;`
-  * `--color-emerald-700: #2e7d32;` (Primary Green)
-  * `--color-emerald-600: #388e3c;`
-  * `--color-amber-500: #f59e0b;` (Secondary Gold)
-  * `--color-amber-400: #fbbf24;`
-  * `--color-slate-900: #0f172a;`
-  * `--color-slate-700: #334155;`
-  * `--color-slate-100: #f1f5f9;`
-  * `--color-cream-50: #f8faf8;`
-* **Semantic Tokens:**
-  * `--bg-app: var(--color-cream-50);`
-  * `--bg-surface: #ffffff;`
-  * `--text-primary: var(--color-slate-900);`
-  * `--text-secondary: var(--color-slate-700);`
-  * `--color-brand: var(--color-emerald-700);`
-  * `--color-accent: var(--color-amber-500);`
-  * `--color-danger: #dc2626;`
-* **Component Tokens:**
-  * `--btn-pos-height: 56px;` (Target sentuh jempol kasir)
-  * `--btn-macro-height: 64px;`
-  * `--btn-pay-height: 64px;`
-  * `--font-price-size: 1.5rem;` (24px bold)
-  * `--font-total-size: 2rem;` (32px extrabold)
-
-### 5.2. Prinsip Ergonomi Warung (Touch Targets & Readability)
-1. **Target Sentuh Minimum:** Seluruh tombol penting kasir memiliki tinggi minimal **56px–64px** dan padding minimal **12px–16px** agar tidak meleset saat kasir bekerja cepat.
-2. **Kontras Teks Tinggi:** Teks harga dan total belanja menggunakan kontras ratio $\ge 7:1$ (di atas standar WCAG AAA 4.5:1) agar tetap terbaca jelas di bawah terik matahari atau lampu neon toko.
-3. **Penyekat Visual & State Stabil:** Saat tombol ditekan, gunakan efek `active:scale-[0.98]` dan perubahan warna latar, **bukan perubahan ukuran tata letak (no layout shift)** agar antarmuka tidak bergetar.
-4. **Ikon Vektor Standar:** Menggunakan `@lucide/vue` untuk konsistensi visual. Tidak menggunakan emoji sebagai tombol aksi struktural.
-
-### 5.3. Kamus Bahasa Warung (Anti-Jargon)
-
-| Istilah Akuntansi / POS Modern | Istilah di Kasiry | Alasan Pemilihan Kata |
-| :--- | :--- | :--- |
-| *Revenue / Gross Sales* | **Uang Masuk** | Sangat alami dan langsung dimengerti pedagang. |
-| *Net Profit / Gross Margin* | **Untung Bersih** | Istilah pasar sehari-hari. |
-| *Inventory / Stock Level* | **Sisa Barang** | Konkrit dan bebas istilah asing. |
-| *Accounts Receivable (A/R)* | **Buku Utang / Bon** | Tradisi kelontong Indonesia. |
-| *Cost of Goods Sold (COGS)* | **Harga Kulak / Modal** | Biasa diucapkan saat belanja ke pasar grosir. |
-| *Void / Refund* | **Batal Belanja** | Jelas dan tidak membingungkan. |
-| *Checkout* | **Bayar** | To the point. |
-
----
-
-## 6. Arsitektur Data & Skema Database Lokal (Dexie.js)
-
-Database lokal diberi nama: **`KasiryDB`** dengan skema versi 1:
+## 5. Model Data Lokal (Dexie.js IndexedDB)
 
 ```javascript
-// Definisi Database Dexie
-import Dexie from 'dexie'
-
-export class KasiryDatabase extends Dexie {
-  constructor() {
-    super('KasiryDB')
-    this.version(1).stores({
-      products: '++id, barcode, name, sellPrice, buyPrice, isMacro, category, frequencyScore',
-      transactions: '++id, invoiceNumber, timestamp, totalAmount, paymentMethod, cashGiven, changeAmount, customerId, isDebt, isSynced',
-      transactionItems: '++id, transactionId, productId, productName, sellPrice, buyPrice, qty, subtotal',
-      customers: '++id, name, phone, totalDebt, createdAt, updatedAt',
-      debtPayments: '++id, customerId, amountPaid, timestamp, notes',
-      settings: 'key'
-    })
-  }
-}
-
-export const db = new KasiryDatabase()
+// Database Schema: KasiryDatabase (v1)
+db.version(1).stores({
+  products: '++id, barcode, name, category, sellPrice, buyPrice, isMacro, createdAt',
+  transactions: '++id, invoiceNumber, createdAt, totalAmount, paymentMethod, customerId, status',
+  transactionItems: '++id, transactionId, productId, name, sellPrice, buyPrice, qty, subtotal',
+  customers: '++id, name, phone, totalDebt, updatedAt',
+  debtPayments: '++id, customerId, amount, paymentDate, notes',
+  settings: 'key, value'
+})
 ```
 
-### Pemetaan Kolom Google Sheets:
-1. **Sheet `Rekap_Transaksi`:**
-   `[Waktu, No Nota, Total Belanja, Metode Bayar, Tunai Diberikan, Kembalian, Estimasi Untung, Nama Pelanggan]`
-2. **Sheet `Detail_Barang_Terjual`:**
-   `[No Nota, Waktu, Barcode, Nama Barang, Kuantitas, Harga Jual, Modal, Subtotal, Untung Item]`
-3. **Sheet `Buku_Utang_Pelanggan`:**
-   `[Nama Pelanggan, Nomor Telepon/WA, Total Sisa Utang, Tanggal Transaksi Terakhir, Status]`
-
 ---
 
-## 7. Penanganan Masalah Teknis Kritis (Edge Cases)
+## 6. Standar Kualitas & Non-Fungsional (NFR)
 
-### 7.1. Mencegah Kehilangan Data Lokal (Storage Persistence)
-Pada saat aplikasi pertama kali dibuka, panggil:
-```javascript
-if (navigator.storage && navigator.storage.persist) {
-  const isPersisted = await navigator.storage.persist()
-  console.log('Kasiry Storage Persisted:', isPersisted)
-}
-```
-Ini mencegah Android menghapus database IndexedDB saat memori internal perangkat menipis.
-
-### 7.2. Deteksi Scanner Fisik vs Ketikan Manual
-* Scanner mengirimkan karakter sangat cepat (biasanya < 30ms antar karakter) dan diakhiri kode karakter `Enter` (KeyCode 13).
-* Kasiry menyematkan *timing buffer*: jika ada input serial cepat diikuti `Enter`, sistem langsung memprosesnya sebagai pembacaan barcode tanpa perlu memindahkan kursor mouse atau fokus layar.
-
-### 7.3. Antrean Sinkronisasi Offline ke Online (Sync Queue)
-* Ketika kasir dalam kondisi offline, field `isSynced = 0` pada transaksi.
-* Service worker memonitor event `window.addEventListener('online', ...)`.
-* Begitu koneksi internet kembali aktif dan akun Google sedang terhubung, transaksi yang berstatus `isSynced = 0` otomatis diunggah ke Google Sheets di latar belakang tanpa mengganggu jalannya transaksi baru.
-
----
-
-## 8. Rencana Implementasi Bertahap (Sprint Roadmap)
-
-| Sprint | Fokus Pekerjaan | Output / Deliverables |
-| :---: | :--- | :--- |
-| **Sprint 1** | **Pondasi Proyek PWA & Skema Dexie** | • Setup Vite + Vue 3 + Tailwind v4 + Lucide + PWA.<br>• Skema `KasiryDB` Dexie & Inisialisasi Seed ~150 FMCG populer.<br>• Shell PWA (Manifest, Service Worker, Standalone Mode, Icons). |
-| **Sprint 2** | **Layar Kasir Utama & Lazy Inventory** | • Barcode input bar (HID Scanner buffer & toggle kamera).<br>• Matriks tombol makro dinamis & Keranjang belanja.<br>• Modal Lazy Inventory (Input kilat saat scan barang baru). |
-| **Sprint 3** | **Modal Pembayaran Cerdas & Kasus Utang** | • Smart Cash Matrix (Uang pas, pecahan rupiah, kalkulator kembalian).<br>• Mode Utang & Selector Lazy Customer (Input nama tetangga instan).<br>• Penyimpanan transaksi ke database lokal & nota belanja. |
-| **Sprint 4** | **Buku Utang & Laporan Harian Warung** | • Modal Buku Utang (Daftar berutang & pelunasan/cicilan).<br>• Modal Laporan Harian (Uang masuk, untung, barang terlaris).<br>• Fitur 1-klik kirim teks laporan dan tagihan ke WhatsApp.<br>• Generator ekspor file Excel (`.xlsx`) offline. |
-| **Sprint 5** | **Integrasi Google Ecosystem & Polishing** | • Composable `useGoogleDrive.js` (Google Identity Services token client).<br>• Pembuatan & sinkronisasi multi-tab Google Spreadsheet otomatis.<br>• Backup/Restore JSON ke Google Drive pribadi.<br>• Audit aksesibilitas, touch target $\ge 56\text{px}$, dan uji performa offline. |
-
----
-
-## 9. Penutup & Persetujuan Desain
-
-Dokumen ini menjadi **acuan tunggal kebenaran (Single Source of Truth)** dari perancangan arsitektur Kasiry dari hulu ke hilir. Seluruh pengembangan kode dan komponen antarmuka akan mengacu secara ketat pada spesifikasi di atas.
+1. **Kecepatan Build & Render:** Waktu kompilasi Vite $< 1.5$ detik, ukuran bundle gzip $< 60$ KB.
+2. **Respon Sentuh:** Responsivitas tap $< 50$ ms tanpa lag.
+3. **PWA Standar:** Lolos audit PWA Lighthouse (Service Worker Workbox, Offline Cache, App Manifest, Icon 192px/512px).
+4. **Keamanan Data:** Data tersimpan lokal di IndexedDB dengan `navigator.storage.persist()` untuk mencegah penghapusan otomatis oleh peramban saat memori HP menipis.

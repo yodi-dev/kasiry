@@ -13,7 +13,7 @@ const props = defineProps({
   },
   storeName: {
     type: String,
-    default: 'Warung Berkah Bu Tejo'
+    default: 'Habiba Store'
   }
 })
 
@@ -61,23 +61,23 @@ const shareWhatsAppReminder = (c) => {
 <template>
   <div 
     v-if="isOpen"
-    class="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-white rounded-2xl w-full max-w-xl shadow-xl border border-slate-200 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
-      <!-- Header (Clean White & Slate) -->
-      <div class="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between shrink-0">
+    <div class="bg-white rounded-3xl w-full max-w-xl shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+      <!-- Header (Design System: Deep Navy & Clean Subtitle) -->
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center border border-red-100">
+          <div class="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center border border-red-100/60">
             <BookOpen class="w-4 h-4" />
           </div>
           <div>
-            <h3 class="text-base font-semibold text-slate-900 leading-tight">Buku Utang Digital</h3>
-            <p class="text-xs text-slate-500 font-normal">Catatan bon belanja tetangga & pembayaran</p>
+            <h3 class="text-base font-bold text-[#0a193d] leading-tight">Buku Utang Digital</h3>
+            <p class="text-xs text-slate-500 font-medium">Catatan bon belanja tetangga & pembayaran</p>
           </div>
         </div>
         <button 
           @click="emit('close')"
-          class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer transition-colors"
+          class="w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
         >
           <X class="w-4 h-4" />
         </button>

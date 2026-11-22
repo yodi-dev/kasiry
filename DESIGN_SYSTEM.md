@@ -1,15 +1,25 @@
-# Desain Sistem & Panduan Visual (Design Tokens): Kasiry
+# Desain Sistem & Panduan Visual (Design Tokens): Kasiry (Habiba Store)
 
-Dokumen ini merupakan panduan implementasi antarmuka (*UI Guidelines*) dan *Design System* resmi Kasiry yang dibangun di atas **Tailwind CSS v4** dengan kepatuhan terhadap standar **WCAG AAA** dan ergonomi kasir warung.
+Dokumen ini merupakan panduan implementasi antarmuka (*UI Guidelines*), *Design Tokens*, dan standar komponen resmi Kasiry yang dibangun di atas **Tailwind CSS v4** dengan kepatuhan terhadap standar **WCAG AAA** dan ergonomi kasir warung.
+
+Desain ini berlaku sebagai **referensi standar tunggal** untuk halaman kasir utama dan seluruh halaman/modal dialog lainnya.
 
 ---
 
-## 1. Prinsip Visual Kasiry
+## 1. Prinsip Visual Kasiry (Modern Ethereal Glassmorphism)
 
-1. **Warung-First & Merakyat:** Desain hangat, bersahabat, dan tidak mengintimidasi pengguna lanjut usia atau berpendidikan dasar.
-2. **Keterbacaan Ekstrem (High Contrast & Large Types):** Angka harga dan nominal uang harus terlihat jelas dari jarak pandang 50–70 cm (jarak HP di atas meja kasir warung).
-3. **Ergonomi Jempol (Thumb-Friendly):** Tombol aksi utama berada di separuh bawah layar dengan tinggi minimal **56px–64px**.
-4. **Anti-Guncang (Zero Layout Shift):** Interaksi sentuh memberikan respons instan (*visual ripple / scale feedback*) tanpa menggeser elemen di sekitarnya.
+1. **Warung-First & Merakyat:** Tampilan bersih, ramah, dan profesional. Tidak mengintimidasi penjaga warung lansia maupun anggota keluarga penjaga pengganti.
+2. **Keterbacaan Seimbang (Anti-Excessive Bold):**
+   - Menghindari penegasan tebal (*font-black*) pada semua elemen teks.
+   - Judul menggunakan `font-bold` dengan warna Midnight Navy (`#0a193d`).
+   - Teks bodi menggunakan `font-medium` dengan warna `slate-500` / `slate-600` untuk keterbacaan yang nyaman di mata.
+   - Nominal uang menggunakan `font-bold` atau `font-black` untuk presisi kasir.
+3. **Ergonomi Terbalik (Inverted Ergonomics):**
+   - **Glance Zone (Atas):** Struk belanjaan ditempatkan di atas agar kasir leluasa melihat daftar belanja tanpa tertutup telapak tangan/jempol.
+   - **Thumb Zone (Bawah):** Form input barcode, pencarian, dan tombol *Pembayaran* berada di konsol melayang (*sticky dock*) di bagian bawah layar.
+4. **Anti-Slop & Anti-Jargon:**
+   - Menghilangkan ornamen visual yang tidak fungsional (ikon dekoratif berlebihan di kartu produk, kartu akordeon hitam pekat yang menghalangi konten).
+   - Menghilangkan jargon akuntansi (*Revenue, COGS, Gross Profit*). Menggunakan bahasa warung asli: *Uang Masuk, Perkiraan Untung, Buku Utang, Pembayaran*.
 
 ---
 
@@ -18,52 +28,59 @@ Dokumen ini merupakan panduan implementasi antarmuka (*UI Guidelines*) dan *Desi
 ### 2.1. Primitive Tokens (Nilai Mentah)
 
 ```css
-/* Color Palette */
---kasiry-green-900: #14532d;
---kasiry-green-800: #166534;
---kasiry-green-700: #2e7d32; /* Primary Brand */
---kasiry-green-600: #16a34a;
---kasiry-green-100: #dcfce7;
---kasiry-green-50:  #f0fdf4;
+/* Palet Warna Primer: Midnight Deep Navy & Azure Sky */
+--kasiry-navy-950: #050d21;
+--kasiry-navy-900: #0a193d; /* Primary Text & Dark Elements */
+--kasiry-navy-800: #102b66; /* Hover Navy */
+--kasiry-navy-700: #1a3a80;
 
---kasiry-gold-600:  #d97706;
---kasiry-gold-500:  #f59e0b; /* Secondary Brand */
---kasiry-gold-400:  #fbbf24;
---kasiry-gold-100:  #fef3c7;
+--kasiry-azure-600: #0284c7; /* Brand Primary Accent */
+--kasiry-sky-400:   #38bdf8; /* Active Badge & Glowing Ring */
+--kasiry-sky-200:   #bae6fd;
+--kasiry-sky-50:    #f0f9ff;
 
---kasiry-red-700:   #b91c1c;
---kasiry-red-600:   #dc2626; /* Debt / Warning */
---kasiry-red-50:    #fef2f2;
+/* Latar Belakang Gradien Halus */
+--kasiry-canvas-from: #e2effb;
+--kasiry-canvas-via:  #edf5fd;
+--kasiry-canvas-to:   #e5f0fb;
 
---kasiry-neutral-900: #0f172a;
---kasiry-neutral-700: #334155;
---kasiry-neutral-400: #94a3b8;
---kasiry-neutral-200: #e2e8f0;
---kasiry-neutral-100: #f1f5f9;
---kasiry-neutral-50:  #f8faf8; /* Warm Milk White */
+/* Status Semantik */
+--kasiry-emerald-600: #059669; /* Untung Bersih & Online Dot */
+--kasiry-emerald-50:  #ecfdf5;
+--kasiry-coral-600:   #ef4444; /* Peringatan Utang & Hapus */
+--kasiry-coral-50:    #fef2f2;
+--kasiry-amber-500:   #f59e0b; /* Pending / Warning */
+
+/* Netral & Kaca (Frosted Glass) */
+--kasiry-glass-white: rgba(255, 255, 255, 0.90);
+--kasiry-border-white: rgba(255, 255, 255, 0.90);
+--kasiry-slate-400:   #94a3b8;
+--kasiry-slate-500:   #64748b;
 ```
 
 ### 2.2. Semantic Tokens (Tujuan Pemakaian)
 
 ```css
 :root {
-  /* Surface & Background */
-  --bg-app: var(--kasiry-neutral-50);
-  --bg-surface: #ffffff;
-  --bg-surface-elevated: #ffffff;
-  --bg-overlay: rgba(15, 23, 42, 0.7);
+  /* Latar Belakang & Permukaan */
+  --bg-app: radial-gradient(circle at 50% 0%, #e2effb 0%, #edf5fd 50%, #e5f0fb 100%);
+  --bg-card: var(--kasiry-glass-white);
+  --bg-modal: #ffffff;
+  --bg-dark-dock: rgba(10, 25, 61, 0.95);
 
-  /* Typography */
-  --text-main: var(--kasiry-neutral-900);
-  --text-muted: var(--kasiry-neutral-700);
+  /* Tipografi */
+  --text-primary: var(--kasiry-navy-900);
+  --text-muted: var(--kasiry-slate-500);
+  --text-accent: var(--kasiry-azure-600);
   --text-inverse: #ffffff;
 
-  /* Brand Semantics */
-  --color-primary: var(--kasiry-green-700);
-  --color-primary-active: var(--kasiry-green-800);
-  --color-secondary: var(--kasiry-gold-500);
-  --color-debt: var(--kasiry-red-600);
-  --color-border: var(--kasiry-neutral-200);
+  /* Status */
+  --status-online: var(--kasiry-emerald-600);
+  --status-debt: var(--kasiry-coral-600);
+
+  /* Interaksi */
+  --focus-ring: rgba(56, 189, 248, 0.25);
+  --focus-border: var(--kasiry-azure-600);
 }
 ```
 
@@ -71,62 +88,127 @@ Dokumen ini merupakan panduan implementasi antarmuka (*UI Guidelines*) dan *Desi
 
 ```css
 :root {
-  /* Button Sizing */
-  --btn-h-primary: 60px;
-  --btn-h-macro: 64px;
-  --btn-h-small: 44px;
-  --btn-radius: 12px;
+  /* Sudut Membulat (Border Radius) */
+  --radius-card: 24px;   /* rounded-3xl */
+  --radius-button: 16px; /* rounded-2xl */
+  --radius-pill: 9999px; /* rounded-full */
 
-  /* Cart Item */
-  --cart-item-py: 14px;
-  --cart-counter-size: 48px;
+  /* Ketinggian Elemen Sentuh (Ergonomi Minimal 44-52px) */
+  --h-input-search: 48px;
+  --h-button-primary: 48px;
+  --h-stepper-btn: 32px;
+  --h-checkout-dock: 64px;
 
-  /* Typography Scales */
-  --font-cash-total: 32px;
-  --font-price-item: 20px;
-  --font-label-bold: 16px;
+  /* Bayangan Halus */
+  --shadow-dock: 0 20px 25px -5px rgba(10, 25, 61, 0.25), 0 8px 10px -6px rgba(10, 25, 61, 0.1);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
 }
 ```
 
 ---
 
-## 3. Konfigurasi Tailwind CSS v4
+## 3. Spesifikasi Komponen Utama
 
-Pada `src/style.css`, konfigurasi tema didefinisikan secara deklaratif:
+### 3.1. Kartu Struk Belanjaan (`CartSection.vue` - Glance Zone)
+- **Letak:** Di paling atas area konten kasir.
+- **Wadah:** `bg-white/90 backdrop-blur-md rounded-3xl border border-white/90 shadow-sm`.
+- **Header:** Ikon tas belanja sky, judul "Struk Belanjaan", info jenis item & total pcs, dan tombol "Kosongkan" merah lembut saat disentuh.
+- **Daftar Belanja:** Scrollable dengan batas tinggi `max-h-[35vh]` agar tidak mendominasi layar.
+- **Baris Item:** Nama barang tebal alami (`font-semibold text-[#0a193d]`), harga satuan, stepper kuantitas `[-] [qty] [+]` dengan background slate lembut, subtotal harga, dan tombol hapus.
 
-```css
-@import "tailwindcss";
+### 3.2. Grid Tombol Cepat (`FrequentProductsSection.vue`)
+- **Letak:** Di bawah Struk Belanjaan.
+- **Judul:** Lugas dan jelas: **"BARANG SERING TERJUAL"** (`text-xs font-bold text-[#0a193d] uppercase tracking-wide`).
+- **Katalog:** 6 hingga 8 produk terlaris tanpa ikon dekoratif yang berulang.
+- **Kartu Produk:** `min-h-[76px] p-3 bg-white/90 hover:bg-white rounded-2xl border border-white/90 shadow-xs`.
+  - Nama barang 2 baris (`line-clamp-2`).
+  - Harga jelas di kiri bawah, tombol `[+]` di kanan bawah.
 
-@theme {
-  --color-kasiry-green: #2e7d32;
-  --color-kasiry-green-dark: #1b5e20;
-  --color-kasiry-green-light: #f0fdf4;
-  --color-kasiry-gold: #f59e0b;
-  --color-kasiry-gold-light: #fef3c7;
-  --color-kasiry-red: #dc2626;
-  --color-kasiry-bg: #f8faf8;
-  
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-}
-```
+### 3.3. Konsol Melayang di Bawah (`Floating Sticky Bottom Console`)
+- **Wadah:** `fixed bottom-3 sm:bottom-4 inset-x-3 sm:inset-x-4 max-w-4xl mx-auto z-30 flex flex-col gap-2`.
+- **Lapis 1 - Input Barcode & Cari (`BarcodeInputBar.vue`):**
+  - Mengambang dengan latar frosted glass putih (`bg-white/95 backdrop-blur-md rounded-2xl border-2`).
+  - **Status Fokus (Autofocus):** `border-sky-500 ring-4 ring-sky-500/20 bg-white` dengan ikon pencarian berubah menjadi `text-sky-600`.
+  - Tombol Scan Kamera di sisi kanan berlatar Midnight Navy (`bg-[#0a193d] text-sky-400`).
+  - **Dropdown Hasil Pencarian:** Membuka ke arah **atas** (`bottom-full mb-2.5`) dengan bayangan mendalam (`shadow-2xl rounded-2xl border border-slate-200/90`) agar tidak terpotong tepi bawah layar.
+- **Lapis 2 - Bar Total & Pembayaran (`StickyBottomBar.vue`):**
+  - Kapsul Deep Navy (`bg-[#0a193d]/95 backdrop-blur-xl rounded-[24px] p-3 sm:p-3.5 shadow-2xl`).
+  - Menampilkan Total Tagihan nominal rupiah tebal & jumlah pcs.
+  - Tombol **"Pembayaran"** bergradien biru cerah (`from-sky-500 to-sky-600 hover:from-sky-400`).
+  - **Kondisional:** Tersembunyi saat keranjang kosong (`itemCount === 0`) dan otomatis meluncur muncul saat ada barang.
 
 ---
 
-## 4. Panduan Komponen Khusus (Ergonomic Component Specs)
+## 4. Standar Universal Desain Modal Dialog (Referensi Seluruh Halaman Lain)
 
-### 4.1. Tombol Matriks Cepat (`MacroButton.vue`)
-* **Tinggi:** 64px.
-* **Layout:** Nama barang 2 baris (font size 14px tebal), harga barang di bawah (font size 15px warna hijau tua).
-* **Efek Sentuh:** `active:scale-[0.97] transition-transform duration-75`.
-* **State Aktif:** Border tebal 2px warna hijau emerald.
+Seluruh fitur sekunder (Buku Utang, Laporan Harian, Kelola Barang, Pengaturan, Nota Struk, Scanner Kamera, dan Pembayaran) **WAJIB** menerapkan standar visual ini agar konsisten:
 
-### 4.2. Pengatur Kuantitas Belanja (`CartQuantityControl.vue`)
-* Tombol `[-]` dan `[+]` berukuran minimal **48px $\times$ 48px** dengan ikon tebal.
-* Angka kuantitas diapit di tengah dengan font 20px tebal.
-* Mencegah salah pencet saat antrean panjang.
+### 4.1. Struktur HTML Modal Standar
+```html
+<template>
+  <div 
+    v-if="isOpen"
+    class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+  >
+    <div class="bg-white rounded-3xl w-full max-w-xl shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+      
+      <!-- 1. Modal Header -->
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-100/60">
+            <!-- Icon Fitur -->
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-[#0a193d] leading-tight">Judul Fitur</h3>
+            <p class="text-xs text-slate-500 font-medium">Penjelasan singkat fitur</p>
+          </div>
+        </div>
+        <button 
+          @click="emit('close')"
+          class="w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
+        >
+          <X class="w-4 h-4" />
+        </button>
+      </div>
 
-### 4.3. Layar Dialog / Modal (`NativeDialog.vue`)
-* Menggunakan elemen native `<dialog>` browser modern (didukung penuh di Chrome Android & Safari).
-* Latar belakang gelap (*scrim*): `backdrop:bg-black/60 backdrop:backdrop-blur-sm`.
-* Animasi buka/tutup halus 150ms tanpa guncangan layar.
-* Menutup modal cukup dengan sentuh di luar area dialog (*light dismiss*) atau tombol silang besar di pojok kanan atas.
+      <!-- 2. Modal Body (Scrollable) -->
+      <div class="p-5 overflow-y-auto flex-1 space-y-4">
+        <!-- Konten Form / List Data -->
+      </div>
+
+      <!-- 3. Modal Footer (Actions) -->
+      <div class="p-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-2.5 shrink-0">
+        <button 
+          @click="emit('close')"
+          class="h-11 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+        >
+          Tutup / Batal
+        </button>
+        <button 
+          @click="handleAction"
+          class="h-11 px-5 bg-[#0a193d] hover:bg-[#102b66] active:scale-95 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+        >
+          Simpan / Konfirmasi
+        </button>
+      </div>
+
+    </div>
+  </div>
+</template>
+```
+
+### 4.2. Aturan Input Formulir di dalam Modal:
+- Kotak input teks: `h-11 px-3.5 rounded-xl border border-slate-200 text-[#0a193d] text-sm focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 outline-none transition-all`.
+- Label input: `text-xs font-semibold text-[#0a193d] mb-1 block`.
+- Bantuan / error: `text-[11px] text-slate-500` atau `text-red-500`.
+
+---
+
+## 5. Ringkasan Kepatuhan & Checklist Desain
+
+- [x] Background menggunakan gradien radial halus `#e2effb` ke `#edf5fd`.
+- [x] Tidak ada warna mencolok yang beradu secara sembarangan.
+- [x] Header menggunakan teks Midnight Deep Navy `#0a193d`.
+- [x] Input Barcode memiliki visual fokus tegas (*Sky Blue ring glow*).
+- [x] Seluruh modal menggunakan border radius `rounded-3xl` dan tombol `rounded-xl` / `rounded-2xl`.
+- [x] Seluruh teks berbahasa Indonesia yang bersahabat (*anti-jargon*).

@@ -10,8 +10,8 @@ const props = defineProps({
   storeProfile: {
     type: Object,
     default: () => ({
-      name: 'Warung Berkah Bu Tejo',
-      owner: 'Bu Tejo',
+      name: 'Habiba Store',
+      owner: 'Habiba',
       phone: '081234567890'
     })
   },
@@ -67,23 +67,23 @@ const handleLicense = () => {
 <template>
   <div 
     v-if="isOpen"
-    class="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-white rounded-2xl w-full max-w-lg shadow-xl border border-slate-200 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
-      <!-- Header (Bersih) -->
-      <div class="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between shrink-0">
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+      <!-- Header (Design System: Deep Navy & Clean Subtitle) -->
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center border border-slate-200">
+          <div class="w-8 h-8 rounded-xl bg-slate-100 text-[#0a193d] flex items-center justify-center border border-slate-200/80">
             <Settings class="w-4 h-4" />
           </div>
           <div>
-            <h3 class="text-base font-semibold text-slate-900 leading-tight">Pengaturan Warung</h3>
-            <p class="text-xs text-slate-500 font-normal">Profil warung, akun Google, & cadangan</p>
+            <h3 class="text-base font-bold text-[#0a193d] leading-tight">Pengaturan Warung</h3>
+            <p class="text-xs text-slate-500 font-medium">Profil warung, akun Google, & cadangan</p>
           </div>
         </div>
         <button 
           @click="emit('close')"
-          class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer transition-colors"
+          class="w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
         >
           <X class="w-4 h-4" />
         </button>

@@ -13,7 +13,7 @@ const props = defineProps({
   storeProfile: {
     type: Object,
     default: () => ({
-      name: 'Warung Berkah Bu Tejo',
+      name: 'Habiba Store',
       phone: '081234567890'
     })
   }
@@ -29,20 +29,20 @@ const printReceipt = () => {
 <template>
   <div 
     v-if="isOpen && receiptData"
-    class="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-white rounded-2xl w-full max-w-sm shadow-xl border border-slate-200 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+    <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
       <!-- Header Struk (Clean White & Emerald Check) -->
-      <div class="px-5 py-3.5 border-b border-slate-200/80 flex items-center justify-between shrink-0">
+      <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2">
           <div class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
             <Check class="w-3.5 h-3.5" />
           </div>
-          <h3 class="font-semibold text-sm text-slate-900">Transaksi Selesai</h3>
+          <h3 class="font-bold text-sm text-[#0a193d]">Transaksi Selesai</h3>
         </div>
         <button 
           @click="emit('close')"
-          class="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer"
+          class="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
         >
           <X class="w-4 h-4" />
         </button>

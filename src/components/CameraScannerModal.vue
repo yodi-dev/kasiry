@@ -25,18 +25,18 @@ const handlePickSample = (code) => {
 <template>
   <div 
     v-if="isOpen"
-    class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#0a193d]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-slate-900 text-white rounded-2xl w-full max-w-sm shadow-xl border border-slate-800 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
+    <div class="bg-slate-900 text-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-800 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
       <!-- Header -->
-      <div class="px-4 py-3.5 border-b border-slate-800 flex items-center justify-between">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <Camera class="w-4 h-4 text-emerald-400" />
-          <h3 class="font-semibold text-sm">Scanner Barcode Kamera</h3>
+          <Camera class="w-4 h-4 text-sky-400" />
+          <h3 class="font-bold text-sm text-white">Scanner Barcode Kamera</h3>
         </div>
         <button 
           @click="emit('close')"
-          class="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+          class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
         >
           <X class="w-4 h-4" />
         </button>

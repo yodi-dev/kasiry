@@ -92,23 +92,23 @@ const handleDelete = (id, name) => {
 <template>
   <div 
     v-if="isOpen"
-    class="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-white rounded-2xl w-full max-w-2xl shadow-xl border border-slate-200 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
       <!-- Header -->
-      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100">
+          <div class="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-100/60">
             <Package class="w-4 h-4" />
           </div>
           <div>
-            <h3 class="text-base font-semibold text-slate-900 leading-tight">Kelola Barang</h3>
-            <p class="text-xs text-slate-500 font-normal">Daftar barang warung ({{ products.length }} produk)</p>
+            <h3 class="text-base font-bold text-[#0a193d] leading-tight">Kelola Barang</h3>
+            <p class="text-xs text-slate-500 font-medium">Daftar barang warung ({{ products.length }} produk)</p>
           </div>
         </div>
         <button 
           @click="emit('close')"
-          class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer transition-colors"
+          class="w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
         >
           <X class="w-4 h-4" />
         </button>
