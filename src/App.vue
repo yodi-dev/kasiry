@@ -272,7 +272,7 @@ const handleActivateLicense = (code) => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col antialiased pb-28">
+  <div class="min-h-screen flex flex-col antialiased pb-44 sm:pb-48">
     <!-- 1. Top Bar Header -->
     <TopBar 
       :storeName="storeProfile.name"
@@ -285,31 +285,12 @@ const handleActivateLicense = (code) => {
       @openProductManage="isProductManageOpen = true"
     />
 
-    <!-- 2. Ergonomic Workspace -->
-    <main class="w-full max-w-5xl mx-auto px-4 py-3">
+    <!-- 2. Ergonomic Workspace (Keranjang Tetap di Paling Atas) -->
+    <main class="w-full max-w-5xl mx-auto px-4 py-2">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
         
-        <!-- BAGIAN 1: BARANG SERING TERJUAL (Di HP posisinya di atas, di Desktop di Kolom Kiri) -->
-        <div class="lg:col-span-6 xl:col-span-7 flex flex-col gap-3">
-          <FrequentProductsSection 
-            :frequentProducts="frequentProducts"
-            @selectProduct="addToCart"
-          />
-        </div>
-
-        <!-- BAGIAN 2: FORM INPUT BARCODE & KERANJANG (Form Input Mengambang Tepat di Atas Keranjang yang di Bawah) -->
-        <div class="lg:col-span-6 xl:col-span-5 flex flex-col gap-3">
-          <!-- Form Input Barcode & Search (Autofocus & Mengambang di Atas Keranjang) -->
-          <BarcodeInputBar 
-            ref="barcodeInputBarRef"
-            v-model:searchQuery="searchQuery"
-            :searchResults="searchResults"
-            @selectProduct="addToCart"
-            @openCamera="isCameraOpen = true"
-            @triggerLazyInventory="triggerLazyInventory"
-          />
-
-          <!-- Keranjang Belanjaan / Struk (Di Bawah Form Input) -->
+        <!-- BAGIAN 1: KERANJANG BELANJAAN / STRUK (Paling Atas di Layar) -->
+        <div class="lg:col-span-6 xl:col-span-6 flex flex-col gap-3">
           <CartSection 
             :cartItems="cart"
             @increaseQty="increaseQty"
@@ -319,15 +300,36 @@ const handleActivateLicense = (code) => {
           />
         </div>
 
+        <!-- BAGIAN 2: BARANG SERING TERJUAL (Tombol Cepat di Bawah Keranjang) -->
+        <div class="lg:col-span-6 xl:col-span-6 flex flex-col gap-3">
+          <FrequentProductsSection 
+            :frequentProducts="frequentProducts"
+            @selectProduct="addToCart"
+          />
+        </div>
+
       </div>
     </main>
 
-    <!-- 3. Floating Bottom Checkout Bar (Kapsul Melayang) -->
-    <StickyBottomBar 
-      :totalAmount="totalCartAmount"
-      :itemCount="totalCartCount"
-      @openPayment="isPaymentOpen = true"
-    />
+    <!-- 3. Floating Sticky Bottom Console (Input Barcode Sticky Tepat di Atas Total Tagihan) -->
+    <div class="fixed bottom-3 sm:bottom-4 inset-x-3 sm:inset-x-4 max-w-4xl mx-auto z-30 flex flex-col gap-2">
+      <!-- Form Input Barcode & Search (Sticky di Atas Total Tagihan, Autofocus, Dropdown Membuka ke Atas) -->
+      <BarcodeInputBar 
+        ref="barcodeInputBarRef"
+        v-model:searchQuery="searchQuery"
+        :searchResults="searchResults"
+        @selectProduct="addToCart"
+        @openCamera="isCameraOpen = true"
+        @triggerLazyInventory="triggerLazyInventory"
+      />
+
+      <!-- Bar Total Tagihan & Bayar Sekarang (Sticky di Paling Bawah) -->
+      <StickyBottomBar 
+        :totalAmount="totalCartAmount"
+        :itemCount="totalCartCount"
+        @openPayment="isPaymentOpen = true"
+      />
+    </div>
 
     <!-- 4. Modals & Overlays -->
     <!-- Modal Kelola Barang (Tambah, Edit, Hapus) -->

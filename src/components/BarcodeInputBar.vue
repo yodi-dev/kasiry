@@ -108,10 +108,10 @@ const handleEnter = () => {
       </button>
     </div>
 
-    <!-- Dropdown Hasil Pencarian Dinamis -->
+    <!-- Dropdown Hasil Pencarian Dinamis (Membuka ke Atas karena Posisi Input Sticky di Bawah) -->
     <div 
       v-if="searchQuery.trim().length > 0"
-      class="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden divide-y divide-slate-100 max-h-60 overflow-y-auto"
+      class="absolute left-0 right-0 bottom-full mb-2.5 bg-white/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden divide-y divide-slate-100 max-h-60 overflow-y-auto"
     >
       <div 
         v-for="product in searchResults" 
