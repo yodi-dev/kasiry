@@ -14,7 +14,7 @@ const sampleBarcodes = [
   { code: '8998866200224', label: 'Indomie Goreng (Katalog Ada)' },
   { code: '8991389221148', label: 'Le Minerale 600ml (Katalog Ada)' },
   { code: '8999999712345', label: 'Sunlight 210ml (Katalog Ada)' },
-  { code: '8993005123999', label: 'Biskuit Baru (Lazy Inventory)' }
+  { code: '8993005123999', label: 'Biskuit Baru (Belum Terdaftar)' }
 ]
 
 const handlePickSample = (code) => {
