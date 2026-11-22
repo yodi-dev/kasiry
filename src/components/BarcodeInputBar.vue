@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Search, Camera, X, PlusCircle } from '@lucide/vue'
 
 const props = defineProps({
@@ -21,19 +21,41 @@ const emit = defineEmits([
 ])
 
 const inputRef = ref(null)
-
-// Autofocus saat komponen dimuat
-onMounted(() => {
-  nextTick(() => {
-    inputRef.value?.focus()
-  })
-})
+const isFocused = ref(false)
 
 const focusInput = () => {
   nextTick(() => {
-    inputRef.value?.focus()
+    if (inputRef.value) {
+      inputRef.value.focus({ preventScroll: true })
+      isFocused.value = true
+    }
   })
 }
+
+// Global keydown: jika kasir mulai mengetik karakter atau barcode scanner nembak,
+// langsung arahkan fokus ke input barcode secara otomatis
+const handleGlobalKeyDown = (e) => {
+  const activeEl = document.activeElement
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return
+  if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    focusInput()
+  }
+}
+
+// Autofocus tangguh saat komponen dimuat & saat tab aktif
+onMounted(() => {
+  focusInput()
+  setTimeout(focusInput, 50)
+  setTimeout(focusInput, 200)
+  setTimeout(focusInput, 500)
+  window.addEventListener('focus', focusInput)
+  window.addEventListener('keydown', handleGlobalKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('focus', focusInput)
+  window.removeEventListener('keydown', handleGlobalKeyDown)
+})
 
 defineExpose({
   focusInput
@@ -73,7 +95,10 @@ const handleEnter = () => {
     <!-- Form Input Barcode & Search (Floating Glassmorphism Pill tepat di atas Keranjang) -->
     <div class="flex items-center gap-2">
       <div class="relative flex-1">
-        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+        <div 
+          class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors"
+          :class="isFocused ? 'text-sky-600' : 'text-slate-400'"
+        >
           <Search class="w-4 h-4" />
         </div>
 
@@ -84,8 +109,11 @@ const handleEnter = () => {
           :value="searchQuery"
           @input="handleInput"
           @keydown.enter="handleEnter"
+          @focus="isFocused = true"
+          @blur="isFocused = false"
           placeholder="Cari nama barang atau scan barcode..."
-          class="w-full h-11 sm:h-12 pl-10 pr-9 text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border border-white/90 focus:border-sky-500 focus:bg-white shadow-xs outline-hidden transition-all"
+          class="w-full h-11 sm:h-12 pl-10 pr-9 text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border-2 transition-all shadow-md outline-none"
+          :class="isFocused ? 'border-sky-500 ring-4 ring-sky-500/20 bg-white' : 'border-slate-200/80 hover:border-slate-300'"
         />
 
         <button 

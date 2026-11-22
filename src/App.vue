@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import TopBar from './components/TopBar.vue'
 import BarcodeInputBar from './components/BarcodeInputBar.vue'
 import CartSection from './components/CartSection.vue'
@@ -28,11 +28,8 @@ const storeProfile = ref({
   phone: '081234567890'
 })
 
-// State Keranjang Belanja Awal
-const cart = ref([
-  { id: 1, name: 'Gas LPG 3 Kg', sellPrice: 22000, buyPrice: 19500, qty: 1, barcode: '', category: 'Curah' },
-  { id: 7, name: 'Indomie Goreng Spesial', sellPrice: 3500, buyPrice: 2900, qty: 2, barcode: '8998866200224', category: 'Makanan' }
-])
+// State Keranjang Belanja Awal (Mulai Kosong agar Bar Pembayaran Muncul Hanya Saat Ada Barang)
+const cart = ref([])
 
 // State Pencarian Barcode / Barang
 const searchQuery = ref('')
@@ -269,6 +266,10 @@ const handleActivateLicense = (code) => {
     alert('Kode aktivasi tidak valid.')
   }
 }
+
+onMounted(() => {
+  barcodeInputBarRef.value?.focusInput()
+})
 </script>
 
 <template>
