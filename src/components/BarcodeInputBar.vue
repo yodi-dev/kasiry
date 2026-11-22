@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { Search, Camera, X, PlusCircle } from '@lucide/vue'
 
 const props = defineProps({
@@ -22,13 +22,30 @@ const emit = defineEmits([
 
 const inputRef = ref(null)
 
+// Autofocus saat komponen dimuat
+onMounted(() => {
+  nextTick(() => {
+    inputRef.value?.focus()
+  })
+})
+
+const focusInput = () => {
+  nextTick(() => {
+    inputRef.value?.focus()
+  })
+}
+
+defineExpose({
+  focusInput
+})
+
 const handleInput = (e) => {
   emit('update:searchQuery', e.target.value)
 }
 
 const clearInput = () => {
   emit('update:searchQuery', '')
-  if (inputRef.value) inputRef.value.focus()
+  focusInput()
 }
 
 const onSelect = (product) => {
@@ -41,11 +58,19 @@ const onTriggerUnknown = () => {
   emit('triggerLazyInventory', code)
   clearInput()
 }
+
+const handleEnter = () => {
+  if (props.searchResults && props.searchResults.length > 0) {
+    onSelect(props.searchResults[0])
+  } else if (props.searchQuery.trim().length > 0) {
+    onTriggerUnknown()
+  }
+}
 </script>
 
 <template>
   <div class="relative w-full">
-    <!-- Form Input Barcode & Search (Floating Glassmorphism Pill) -->
+    <!-- Form Input Barcode & Search (Floating Glassmorphism Pill tepat di atas Keranjang) -->
     <div class="flex items-center gap-2">
       <div class="relative flex-1">
         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -55,10 +80,12 @@ const onTriggerUnknown = () => {
         <input
           ref="inputRef"
           type="text"
+          autofocus
           :value="searchQuery"
           @input="handleInput"
+          @keydown.enter="handleEnter"
           placeholder="Cari nama barang atau scan barcode..."
-          class="w-full h-11 sm:h-12 pl-10 pr-9 text-sm font-medium bg-white/90 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border border-white/90 focus:border-sky-500 focus:bg-white shadow-xs outline-hidden transition-all"
+          class="w-full h-11 sm:h-12 pl-10 pr-9 text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border border-white/90 focus:border-sky-500 focus:bg-white shadow-xs outline-hidden transition-all"
         />
 
         <button 

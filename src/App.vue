@@ -37,6 +37,7 @@ const cart = ref([
 // State Pencarian Barcode / Barang
 const searchQuery = ref('')
 const scannedBarcode = ref('')
+const barcodeInputBarRef = ref(null)
 
 // State Modals
 const isPaymentOpen = ref(false)
@@ -95,6 +96,7 @@ const addToCart = (product) => {
       qty: 1
     })
   }
+  barcodeInputBarRef.value?.focusInput()
 }
 
 const increaseQty = (productId) => {
@@ -287,10 +289,19 @@ const handleActivateLicense = (code) => {
     <main class="w-full max-w-5xl mx-auto px-4 py-3">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
         
-        <!-- KOLOM 1: FORM INPUT BARCODE & KERANJANG (Sejajar & Menyatu Secara Logis) -->
-        <div class="lg:col-span-6 flex flex-col gap-3">
-          <!-- Form Input Barcode & Search (Mengambang Sejajar di Atas Keranjang) -->
+        <!-- BAGIAN 1: BARANG SERING TERJUAL (Di HP posisinya di atas, di Desktop di Kolom Kiri) -->
+        <div class="lg:col-span-6 xl:col-span-7 flex flex-col gap-3">
+          <FrequentProductsSection 
+            :frequentProducts="frequentProducts"
+            @selectProduct="addToCart"
+          />
+        </div>
+
+        <!-- BAGIAN 2: FORM INPUT BARCODE & KERANJANG (Form Input Mengambang Tepat di Atas Keranjang yang di Bawah) -->
+        <div class="lg:col-span-6 xl:col-span-5 flex flex-col gap-3">
+          <!-- Form Input Barcode & Search (Autofocus & Mengambang di Atas Keranjang) -->
           <BarcodeInputBar 
+            ref="barcodeInputBarRef"
             v-model:searchQuery="searchQuery"
             :searchResults="searchResults"
             @selectProduct="addToCart"
@@ -298,21 +309,13 @@ const handleActivateLicense = (code) => {
             @triggerLazyInventory="triggerLazyInventory"
           />
 
-          <!-- Keranjang Belanjaan / Struk -->
+          <!-- Keranjang Belanjaan / Struk (Di Bawah Form Input) -->
           <CartSection 
             :cartItems="cart"
             @increaseQty="increaseQty"
             @decreaseQty="decreaseQty"
             @removeItem="removeItem"
             @clearCart="clearCart"
-          />
-        </div>
-
-        <!-- KOLOM 2: BARANG SERING TERJUAL (Tombol Cepat) -->
-        <div class="lg:col-span-6 flex flex-col gap-3">
-          <FrequentProductsSection 
-            :frequentProducts="frequentProducts"
-            @selectProduct="addToCart"
           />
         </div>
 
