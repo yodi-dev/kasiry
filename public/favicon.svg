@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background Rounded Rect -->
+  <rect width="512" height="512" rx="128" fill="#2E7D32"/>
+  
+  <!-- Warung Traditional Roof Silhouette -->
+  <path d="M76 210 L256 90 L436 210 L400 240 L256 140 L112 240 Z" fill="#FBC02D"/>
+  
+  <!-- Stylized "Y" merged with Checkmark -->
+  <!-- Left arm -->
+  <path d="M140 200 L230 310 L282 310 L192 200 Z" fill="#FFFFFF"/>
+  <!-- Right arm (thick check stroke) -->
+  <path d="M372 170 L256 340 L220 340 L336 170 Z" fill="#FFFFFF"/>
+  <!-- Stem of Y -->
+  <path d="M236 330 H276 V420 H236 Z" rx="8" fill="#FFFFFF"/>
+  
+  <!-- Accent Dot / Golden Coin Symbol -->
+  <circle cx="256" cy="270" r="28" fill="#FBC02D"/>
+</svg>
