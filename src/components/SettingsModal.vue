@@ -64,7 +64,7 @@ const emit = defineEmits([
   'importBackup'
 ])
 
-// Tab: 'profile' | 'cloud' | 'backup'
+// 2 Tabs: 'profile' (Nama Pemilik) | 'backup' (Cadangan & Google)
 const activeTab = ref('profile')
 
 const formName = ref(props.storeProfile?.name || 'Habiba Store')
@@ -90,7 +90,7 @@ const saveProfile = () => {
   isSaved.value = true
   setTimeout(() => {
     isSaved.value = false
-  }, 2500)
+  }, 2000)
 }
 
 const triggerImportFile = () => {
@@ -119,7 +119,7 @@ const onFileSelected = (event) => {
     v-if="isOpen"
     class="fixed inset-0 z-50 bg-[#0a193d]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100/90 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100/90 overflow-hidden my-auto flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
       
       <!-- 1. Header (Design System: Midnight Deep Navy & Azure Accent) -->
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
@@ -128,8 +128,8 @@ const onFileSelected = (event) => {
             <Store class="w-5 h-5 text-sky-400" />
           </div>
           <div>
-            <h3 class="text-base font-bold text-[#0a193d] leading-tight">Profil & Pengaturan Toko</h3>
-            <p class="text-xs text-slate-500 font-medium">Identitas toko, akun Google, dan cadangan data</p>
+            <h3 class="text-base font-bold text-[#0a193d] leading-tight">Profil & Pengaturan</h3>
+            <p class="text-xs text-slate-500 font-medium">Pengaturan pemilik toko & cadangan data</p>
           </div>
         </div>
         <button 
@@ -158,7 +158,7 @@ const onFileSelected = (event) => {
           <div class="min-w-0">
             <h4 class="text-base font-bold text-white truncate leading-tight">{{ formName }}</h4>
             <p class="text-xs text-slate-300 mt-0.5 truncate flex items-center gap-1.5">
-              <span>{{ formOwner || 'Pemilik Warung' }}</span>
+              <span>{{ formOwner || 'Habiba' }}</span>
               <span class="text-slate-500">•</span>
               <span class="font-mono text-[11px]">{{ formPhone || '-' }}</span>
             </p>
@@ -185,113 +185,80 @@ const onFileSelected = (event) => {
         </div>
       </div>
 
-      <!-- 3. Segmented Pill Tab Bar -->
+      <!-- 3. Segmented Pill Tab Bar (2 Tabs) -->
       <div class="px-5 pt-3 pb-1 shrink-0">
-        <div class="p-1 bg-slate-100/80 rounded-2xl grid grid-cols-3 gap-1">
+        <div class="p-1 bg-slate-100/80 rounded-2xl grid grid-cols-2 gap-1">
           <button 
             @click="activeTab = 'profile'"
             :class="[
-              'py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+              'py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
               activeTab === 'profile' 
                 ? 'bg-[#0a193d] text-white shadow-xs' 
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             ]"
           >
-            <Store class="w-3.5 h-3.5" />
-            <span>Profil Toko</span>
-          </button>
-
-          <button 
-            @click="activeTab = 'cloud'"
-            :class="[
-              'py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
-              activeTab === 'cloud' 
-                ? 'bg-[#0a193d] text-white shadow-xs' 
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-            ]"
-          >
-            <Cloud class="w-3.5 h-3.5" />
-            <span>Akun Google</span>
+            <User class="w-4 h-4" />
+            <span>Nama Pemilik</span>
           </button>
 
           <button 
             @click="activeTab = 'backup'"
             :class="[
-              'py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+              'py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
               activeTab === 'backup' 
                 ? 'bg-[#0a193d] text-white shadow-xs' 
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             ]"
           >
-            <Database class="w-3.5 h-3.5" />
-            <span>Cadangan</span>
+            <Cloud class="w-4 h-4" />
+            <span>Cadangan & Google</span>
           </button>
         </div>
       </div>
 
       <!-- 4. Tab Body Scrollable -->
-      <div class="flex-1 overflow-y-auto px-5 py-3 space-y-4">
+      <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         
-        <!-- ==================== TAB 1: PROFIL TOKO ==================== -->
+        <!-- ==================== TAB 1: NAMA PEMILIK ==================== -->
         <div v-if="activeTab === 'profile'" class="space-y-4">
-          <!-- Form Inputs -->
           <div class="space-y-3">
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Nama Warung / Toko
+                Nama Pemilik
               </label>
               <div class="relative">
                 <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Store class="w-4 h-4" />
+                  <User class="w-4 h-4" />
                 </span>
                 <input 
                   type="text" 
-                  v-model="formName"
-                  placeholder="Contoh: Habiba Store"
+                  v-model="formOwner"
+                  placeholder="Contoh: Habiba"
                   class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-bold text-[#0a193d] outline-hidden transition-all"
                 />
               </div>
-              <p class="text-[11px] text-slate-500 mt-1">Dicetak di bagian atas struk belanja & laporan harian.</p>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Nama Pemilik / Kasir
-                </label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <User class="w-4 h-4" />
-                  </span>
-                  <input 
-                    type="text" 
-                    v-model="formOwner"
-                    placeholder="Contoh: Habiba"
-                    class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-semibold text-[#0a193d] outline-hidden transition-all"
-                  />
-                </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Nomor WhatsApp Toko
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Phone class="w-4 h-4" />
+                </span>
+                <input 
+                  type="text" 
+                  v-model="formPhone"
+                  placeholder="081234567890"
+                  class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-mono font-semibold text-[#0a193d] outline-hidden transition-all"
+                />
               </div>
-
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Nomor WhatsApp Toko
-                </label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Phone class="w-4 h-4" />
-                  </span>
-                  <input 
-                    type="text" 
-                    v-model="formPhone"
-                    placeholder="081234567890"
-                    class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-mono font-semibold text-[#0a193d] outline-hidden transition-all"
-                  />
-                </div>
-              </div>
+              <p class="text-[11px] text-slate-500 mt-1">Digunakan saat mengirim struk belanja via WhatsApp ke pelanggan.</p>
             </div>
           </div>
 
-          <!-- Save Button with Success Feedback -->
+          <!-- Single Primary Save Button -->
           <button 
             @click="saveProfile"
             :class="[
@@ -303,74 +270,74 @@ const onFileSelected = (event) => {
           >
             <Check v-if="isSaved" class="w-4 h-4 text-white" />
             <CheckCircle v-else class="w-4 h-4 text-sky-400" />
-            <span>{{ isSaved ? 'Profil Berhasil Disimpan!' : 'Simpan Perubahan Profil' }}</span>
+            <span>{{ isSaved ? 'Perubahan Berhasil Disimpan!' : 'Simpan Perubahan' }}</span>
           </button>
         </div>
 
-        <!-- ==================== TAB 2: AKUN GOOGLE ==================== -->
-        <div v-else-if="activeTab === 'cloud'" class="space-y-3.5">
-          <!-- Jika Belum Terhubung -->
-          <div v-if="!isGoogleConnected" class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3.5">
+        <!-- ==================== TAB 2: CADANGAN & GOOGLE (DISATUKAN) ==================== -->
+        <div v-else class="space-y-4">
+          <!-- 1. Bagian Cadangan Akun Google -->
+          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3.5">
             <div class="flex items-center gap-2 text-slate-800">
               <Cloud class="w-5 h-5 text-[#0284c7]" />
               <h4 class="text-sm font-bold text-[#0a193d]">Cadangan Otomatis Akun Google</h4>
             </div>
 
-            <p class="text-xs text-slate-600 leading-relaxed">
-              Hubungkan akun Google agar data toko Anda selalu aman dan kasir bisa dibuka dari perangkat lain:
-            </p>
+            <!-- Jika Belum Terhubung Google -->
+            <div v-if="!isGoogleConnected" class="space-y-3">
+              <p class="text-xs text-slate-600 leading-relaxed">
+                Hubungkan akun Google agar data toko selalu aman dan kasir bisa dibuka dari HP lain:
+              </p>
 
-            <div class="space-y-2 text-xs text-slate-700">
-              <div class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-slate-200/60">
-                <HardDrive class="w-4 h-4 text-[#0284c7] shrink-0 mt-0.5" />
-                <div>
-                  <strong class="block text-slate-900">Aman Saat Ganti HP</strong>
-                  <span class="text-slate-500 text-[11px]">Data barang dan catatan penjualan tersimpan aman di Google Drive Anda.</span>
+              <div class="space-y-2 text-xs text-slate-700">
+                <div class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-slate-200/60">
+                  <HardDrive class="w-4 h-4 text-[#0284c7] shrink-0 mt-0.5" />
+                  <div>
+                    <strong class="block text-slate-900">Aman Saat Ganti HP</strong>
+                    <span class="text-slate-500 text-[11px]">Data barang dan transaksi tersimpan otomatis di Google Drive Anda.</span>
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-slate-200/60">
+                  <FileSpreadsheet class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong class="block text-slate-900">Buku Kas di Google Sheets</strong>
+                    <span class="text-slate-500 text-[11px]">Catatan penjualan langsung rapi dan bisa dipantau lewat spreadsheet.</span>
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-slate-200/60">
+                  <Smartphone class="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong class="block text-slate-900">Bisa Buka di Banyak HP</strong>
+                    <span class="text-slate-500 text-[11px]">HP kasir dan HP pemilik toko bisa mengakses data toko yang sama.</span>
+                  </div>
                 </div>
               </div>
 
-              <div class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-slate-200/60">
-                <FileSpreadsheet class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <div>
-                  <strong class="block text-slate-900">Buku Kas di Google Sheets</strong>
-                  <span class="text-slate-500 text-[11px]">Catatan penjualan langsung rapi dan bisa dipantau lewat spreadsheet.</span>
-                </div>
-              </div>
-
-              <div class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-slate-200/60">
-                <Smartphone class="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
-                <div>
-                  <strong class="block text-slate-900">Bisa Buka di Banyak HP</strong>
-                  <span class="text-slate-500 text-[11px]">HP kasir dan HP pemilik toko bisa mengakses data toko yang sama.</span>
-                </div>
-              </div>
+              <button 
+                @click="emit('connectGoogle')"
+                class="w-full h-11 bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-slate-300 text-slate-800 font-bold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer shadow-xs transition-all active:scale-98"
+              >
+                <svg class="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                <span>Hubungkan dengan Akun Google</span>
+              </button>
             </div>
 
-            <button 
-              @click="emit('connectGoogle')"
-              class="w-full h-12 bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-slate-300 text-slate-800 font-bold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer shadow-xs transition-all active:scale-98"
-            >
-              <svg class="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-              </svg>
-              <span>Hubungkan dengan Akun Google</span>
-            </button>
-          </div>
-
-          <!-- Jika Sudah Terhubung -->
-          <div v-else class="space-y-3">
-            <!-- Account Card -->
-            <div class="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200/80 space-y-3">
-              <div class="flex items-center justify-between">
+            <!-- Jika Sudah Terhubung Google -->
+            <div v-else class="space-y-3">
+              <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200">
                 <div class="flex items-center gap-3">
                   <img 
                     v-if="googleUser?.picture" 
                     :src="googleUser.picture" 
                     referrerpolicy="no-referrer"
-                    class="w-10 h-10 rounded-full border-2 border-emerald-300 shadow-2xs"
+                    class="w-10 h-10 rounded-full border border-emerald-300 shadow-2xs"
                   />
                   <div v-else class="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-sm">
                     {{ googleUser?.name?.charAt(0) || 'G' }}
@@ -385,55 +352,51 @@ const onFileSelected = (event) => {
                 </span>
               </div>
 
-              <div class="p-2.5 bg-white rounded-xl border border-emerald-100 text-xs text-slate-600 flex items-center justify-between">
+              <div class="p-2.5 bg-white rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
                 <span class="font-medium">Terakhir Disimpan:</span>
                 <span class="font-bold text-[#0a193d]">
                   {{ lastSyncTime ? new Date(lastSyncTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Siap disimpan' }}
                 </span>
               </div>
-            </div>
 
-            <!-- Action Buttons Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button 
-                @click="emit('syncNow')"
-                :disabled="isSyncing"
-                class="h-11 px-4 bg-[#0a193d] hover:bg-slate-800 disabled:opacity-50 text-white font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer text-xs transition-all shadow-xs active:scale-95"
-              >
-                <RefreshCw :class="['w-4 h-4 text-sky-400', isSyncing ? 'animate-spin' : '']" />
-                <span>{{ isSyncing ? 'Menyimpan Data...' : 'Simpan ke Google Sekarang' }}</span>
-              </button>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button 
+                  @click="emit('syncNow')"
+                  :disabled="isSyncing"
+                  class="h-10 px-3 bg-[#0a193d] hover:bg-slate-800 disabled:opacity-50 text-white font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer text-xs transition-all shadow-xs active:scale-95"
+                >
+                  <RefreshCw :class="['w-3.5 h-3.5 text-sky-400', isSyncing ? 'animate-spin' : '']" />
+                  <span>{{ isSyncing ? 'Menyimpan...' : 'Simpan ke Google Sekarang' }}</span>
+                </button>
 
-              <button 
-                @click="emit('openGoogleSheet')"
-                class="h-11 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer text-xs transition-all shadow-xs active:scale-95"
-              >
-                <FileSpreadsheet class="w-4 h-4 text-emerald-200" />
-                <span>Buka Buku Kas (Sheets)</span>
-              </button>
-            </div>
+                <button 
+                  @click="emit('openGoogleSheet')"
+                  class="h-10 px-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer text-xs transition-all shadow-xs active:scale-95"
+                >
+                  <FileSpreadsheet class="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Buka Buku Kas (Sheets)</span>
+                </button>
+              </div>
 
-            <!-- Disconnect Action -->
-            <div class="text-center pt-1">
-              <button 
-                @click="emit('disconnectGoogle')"
-                class="text-xs text-rose-600 hover:text-rose-700 font-semibold cursor-pointer transition-colors"
-              >
-                Putuskan Sambungan Akun Google
-              </button>
+              <div class="text-center pt-0.5">
+                <button 
+                  @click="emit('disconnectGoogle')"
+                  class="text-xs text-rose-600 hover:text-rose-700 font-semibold cursor-pointer transition-colors"
+                >
+                  Putuskan Sambungan Akun Google
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- ==================== TAB 3: CADANGAN DATA ==================== -->
-        <div v-else class="space-y-3.5">
+          <!-- 2. Bagian Cadangan File Manual (Offline) -->
           <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
             <div class="flex items-center gap-2 text-[#0a193d]">
               <Database class="w-5 h-5 text-[#0284c7]" />
-              <h4 class="text-sm font-bold">Cadangan Mandiri</h4>
+              <h4 class="text-sm font-bold">Cadangan File di HP (Offline)</h4>
             </div>
             <p class="text-xs text-slate-600 leading-relaxed">
-              Simpan salinan data toko ke HP atau komputer agar Anda punya arsip cadangan yang aman tanpa perlu koneksi internet.
+              Simpan salinan data toko langsung ke memori HP agar aman tanpa perlu internet.
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
@@ -445,7 +408,7 @@ const onFileSelected = (event) => {
                   <Download class="w-4 h-4" />
                 </div>
                 <strong class="text-xs font-bold text-[#0a193d] block">Download Cadangan Toko</strong>
-                <span class="text-[11px] text-slate-500">Simpan salinan data ke HP / Komputer</span>
+                <span class="text-[11px] text-slate-500">Simpan salinan data ke HP</span>
               </button>
 
               <button 
@@ -456,7 +419,7 @@ const onFileSelected = (event) => {
                   <Upload class="w-4 h-4" />
                 </div>
                 <strong class="text-xs font-bold text-[#0a193d] block">Pulihkan Data Toko</strong>
-                <span class="text-[11px] text-slate-500">Buka file cadangan yang pernah disimpan</span>
+                <span class="text-[11px] text-slate-500">Buka file cadangan tersimpan</span>
               </button>
 
               <input 
@@ -467,35 +430,14 @@ const onFileSelected = (event) => {
                 @change="onFileSelected"
               />
             </div>
-          </div>
 
-          <div class="p-3 bg-sky-50/60 rounded-2xl border border-sky-100 flex items-center gap-2.5 text-xs text-sky-900">
-            <ShieldCheck class="w-4 h-4 text-[#0284c7] shrink-0" />
-            <span>Semua data transaksi otomatis tersimpan di HP ini dan tetap bisa dipakai walau tanpa kuota internet.</span>
+            <div class="p-3 bg-sky-50/60 rounded-xl border border-sky-100 flex items-center gap-2 text-xs text-sky-900 mt-2">
+              <ShieldCheck class="w-4 h-4 text-[#0284c7] shrink-0" />
+              <span>Semua data kasir tersimpan di HP ini dan tetap bisa dipakai walau tanpa kuota internet.</span>
+            </div>
           </div>
         </div>
 
-      </div>
-
-      <!-- 5. Footer with Credit -->
-      <div class="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between shrink-0">
-        <p class="text-xs text-slate-500 font-medium flex items-center gap-1">
-          <span>Crafted with ❤️ by</span>
-          <a 
-            href="https://awanbeo.my.id" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            class="font-bold text-[#0284c7] hover:underline"
-          >
-            awanbeo (awanbeo.my.id)
-          </a>
-        </p>
-        <button 
-          @click="emit('close')"
-          class="h-10 px-5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200/90 cursor-pointer transition-colors shadow-2xs"
-        >
-          Selesai
-        </button>
       </div>
 
     </div>

@@ -208,7 +208,7 @@ const triggerAction = (actionEvent) => {
               rel="noopener noreferrer"
               class="font-bold text-[#0284c7] hover:underline"
             >
-              awanbeo (awanbeo.my.id)
+              awanbeo
             </a>
           </p>
         </div>

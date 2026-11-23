@@ -470,21 +470,6 @@ onMounted(async () => {
         </div>
 
       </div>
-
-      <!-- Footer Kredit -->
-      <footer class="mt-8 mb-6 text-center text-xs text-slate-400">
-        <p class="flex items-center justify-center gap-1">
-          <span>Crafted with ❤️ by</span>
-          <a 
-            href="https://awanbeo.my.id" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            class="font-semibold text-[#0284c7] hover:underline"
-          >
-            awanbeo (awanbeo.my.id)
-          </a>
-        </p>
-      </footer>
     </main>
 
     <!-- 3. Floating Sticky Bottom Console (Input Barcode Sticky Tepat di Atas Total Tagihan) -->
