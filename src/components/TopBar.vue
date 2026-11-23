@@ -77,7 +77,7 @@ const triggerAction = (actionEvent) => {
     </div>
 
     <!-- Right: User/Store Profile Avatar (matches reference) -->
-    <div class="relative cursor-pointer" @click="emit('openSettings')">
+    <div class="relative cursor-pointer" @click="emit('openSettings')" role="button" title="Profil & Pengaturan Toko">
       <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#0284c7] to-[#38bdf8] p-0.5 shadow-sm border border-white/80 flex items-center justify-center overflow-hidden">
         <img 
           v-if="isGoogleConnected && googleUser?.picture" 
@@ -85,8 +85,8 @@ const triggerAction = (actionEvent) => {
           referrerpolicy="no-referrer"
           class="w-full h-full rounded-[14px] object-cover"
         />
-        <div v-else class="w-full h-full rounded-[14px] bg-[#0a193d] flex items-center justify-center text-white text-xs font-bold">
-          HS
+        <div v-else class="w-full h-full rounded-[14px] bg-[#0a193d] flex items-center justify-center text-white text-xs font-bold font-mono">
+          {{ storeName ? storeName.substring(0, 2).toUpperCase() : 'HS' }}
         </div>
       </div>
       <!-- Online / Cloud Sync Status Dot -->
@@ -186,9 +186,12 @@ const triggerAction = (actionEvent) => {
             >
               <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-xl bg-slate-100 text-[#0a193d] flex items-center justify-center shrink-0 border border-slate-200">
-                  <Settings class="w-4 h-4" />
+                  <Store class="w-4 h-4 text-[#0284c7]" />
                 </div>
-                <p class="text-sm font-semibold text-[#0a193d]">Pengaturan Toko</p>
+                <div>
+                  <p class="text-sm font-semibold text-[#0a193d]">Profil & Pengaturan</p>
+                  <p class="text-[11px] text-slate-400">Identitas, Google Sync & Cadangan</p>
+                </div>
               </div>
               <ChevronRight class="w-4 h-4 text-slate-400" />
             </button>

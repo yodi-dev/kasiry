@@ -331,7 +331,7 @@ const handleImportBackup = async (content) => {
 // Profile & Google Actions
 const handleUpdateProfile = async (newProfile) => {
   await saveStoreProfile(newProfile)
-  alert('Identitas warung berhasil diperbarui!')
+  playBeepSound('success')
 }
 
 const handleConnectGoogle = async () => {
