@@ -19,14 +19,14 @@ const licenseStatus = ref({
 })
 
 // Kategori Barang
-const defaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok', 'Curah', 'Lainnya']
-const customCategories = ref([])
+const initialDefaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok', 'Curah', 'Lainnya']
+const categoryList = ref([...initialDefaultCategories])
 
-// Gabungan kategori bawaan + kategori kustom + kategori yang ada di barang
+// Gabungan kategori tersimpan + kategori yang ada di barang aktif
 const categories = computed(() => {
-  const set = new Set([...defaultCategories, ...customCategories.value])
+  const set = new Set([...categoryList.value])
   products.value.forEach(p => {
-    if (p.category && typeof p.category === 'string' && p.category.trim()) {
+    if (!p.deleted && p.category && typeof p.category === 'string' && p.category.trim()) {
       set.add(p.category.trim())
     }
   })
@@ -87,10 +87,17 @@ export function useKasiryDB() {
       licenseStatus.value = { ...licenseSetting.value }
     }
 
-    // 5. Ambil Kategori Kustom
-    const catSetting = await db.settings.get('customCategories')
-    if (catSetting && Array.isArray(catSetting.value)) {
-      customCategories.value = catSetting.value
+    // 5. Ambil Daftar Kategori
+    const catSetting = await db.settings.get('categories')
+    if (catSetting && Array.isArray(catSetting.value) && catSetting.value.length > 0) {
+      categoryList.value = catSetting.value
+    } else {
+      categoryList.value = [...initialDefaultCategories]
+      await db.settings.put({
+        key: 'categories',
+        value: categoryList.value,
+        updatedAt: Date.now()
+      })
     }
   }
 
@@ -342,11 +349,11 @@ export function useKasiryDB() {
   const addCategory = async (catName) => {
     const trimmed = (catName || '').trim()
     if (!trimmed) return false
-    if (!customCategories.value.includes(trimmed)) {
-      customCategories.value = [...customCategories.value, trimmed]
+    if (!categoryList.value.includes(trimmed)) {
+      categoryList.value = [...categoryList.value, trimmed]
       await db.settings.put({
-        key: 'customCategories',
-        value: customCategories.value,
+        key: 'categories',
+        value: categoryList.value,
         updatedAt: Date.now()
       })
     }
@@ -354,13 +361,18 @@ export function useKasiryDB() {
   }
 
   const deleteCategory = async (catName) => {
-    customCategories.value = customCategories.value.filter(c => c !== catName)
+    const isUsed = products.value.some(p => !p.deleted && p.category === catName)
+    if (isUsed) {
+      return { success: false, reason: `Kategori "${catName}" masih digunakan oleh barang.` }
+    }
+
+    categoryList.value = categoryList.value.filter(c => c !== catName)
     await db.settings.put({
-      key: 'customCategories',
-      value: customCategories.value,
+      key: 'categories',
+      value: categoryList.value,
       updatedAt: Date.now()
     })
-    return true
+    return { success: true }
   }
 
   return {

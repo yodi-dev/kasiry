@@ -11,7 +11,8 @@ import {
   Barcode, 
   Tag, 
   ArrowLeft, 
-  TrendingUp 
+  TrendingUp,
+  Info 
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -157,7 +158,13 @@ const handleCreateCategory = () => {
 }
 
 const handleDeleteCategory = (cat) => {
-  if (confirm(`Hapus kategori "${cat}"? Barang dengan kategori ini tidak akan terhapus.`)) {
+  const count = getProductCountByCategory(cat)
+  if (count > 0) {
+    alert(`Kategori "${cat}" tidak dapat dihapus karena masih digunakan oleh ${count} barang.\n\nSilakan ganti kategori barang terkait terlebih dahulu.`)
+    return
+  }
+
+  if (confirm(`Hapus kategori "${cat}" dari daftar?`)) {
     emit('deleteCategory', cat)
     if (selectedCategory.value === cat) {
       selectedCategory.value = 'Semua'
@@ -174,7 +181,7 @@ const handleDeleteCategory = (cat) => {
     v-if="isOpen"
     class="fixed inset-0 z-50 bg-[#0a193d]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-slate-100/90 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[88vh]">
+    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-xl border border-slate-200/80 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[88vh]">
       
       <!-- 1. Header (Design System: Midnight Deep Navy & Azure Accent) -->
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
@@ -487,9 +494,9 @@ const handleDeleteCategory = (cat) => {
       <!-- ==================== SUB-VIEW: MODAL KELOLA KATEGORI ==================== -->
       <div 
         v-if="isManagingCategories" 
-        class="fixed inset-0 z-60 bg-[#0a193d]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+        class="fixed inset-0 z-60 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
       >
-        <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[82vh] animate-in zoom-in-95 duration-150">
+        <div class="bg-white rounded-3xl w-full max-w-md shadow-xl border border-slate-200/80 overflow-hidden flex flex-col max-h-[82vh] animate-in zoom-in-95 duration-150">
           <!-- Header Kelola Kategori -->
           <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
             <div class="flex items-center gap-2.5">
@@ -552,24 +559,27 @@ const handleDeleteCategory = (cat) => {
                     <span class="text-[10px] text-slate-400 font-mono">({{ getProductCountByCategory(cat) }} barang)</span>
                   </div>
 
-                  <div class="shrink-0 flex items-center gap-1.5">
-                    <span 
-                      v-if="defaultCategories.includes(cat)" 
-                      class="text-[10px] bg-slate-200/70 text-slate-600 font-medium px-2 py-0.5 rounded-full"
-                    >
-                      Bawaan
-                    </span>
+                  <div class="shrink-0 flex items-center">
                     <button 
-                      v-else 
                       @click="handleDeleteCategory(cat)"
-                      class="w-7 h-7 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center cursor-pointer transition-colors"
-                      title="Hapus Kategori"
+                      :class="[
+                        'w-8 h-8 rounded-xl flex items-center justify-center transition-colors',
+                        getProductCountByCategory(cat) > 0 
+                          ? 'text-slate-300 hover:text-slate-400 cursor-not-allowed' 
+                          : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer'
+                      ]"
+                      :title="getProductCountByCategory(cat) > 0 ? `Tidak bisa dihapus: masih digunakan oleh ${getProductCountByCategory(cat)} barang` : 'Hapus Kategori'"
                     >
-                      <Trash2 class="w-3.5 h-3.5" />
+                      <Trash2 class="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               </div>
+
+              <p class="text-[11px] text-slate-400 mt-2.5 flex items-center gap-1.5">
+                <Info class="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                <span>Kategori yang berisi barang tidak dapat dihapus sebelum kategorinya diganti.</span>
+              </p>
             </div>
           </div>
 
