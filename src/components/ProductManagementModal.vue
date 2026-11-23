@@ -462,8 +462,9 @@ const handleDeleteCategory = (cat) => {
                   Kategori Produk
                 </label>
                 <button 
+                  v-if="!isAddingCategoryInline"
                   type="button"
-                  @click="isAddingCategoryInline = !isAddingCategoryInline"
+                  @click="isAddingCategoryInline = true"
                   class="text-[11px] font-bold text-[#0284c7] hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Plus class="w-3 h-3" /> Tambah Kategori
@@ -471,25 +472,27 @@ const handleDeleteCategory = (cat) => {
               </div>
 
               <!-- Inline Quick Add Input -->
-              <div v-if="isAddingCategoryInline" class="flex items-center gap-2 mb-2">
+              <div v-if="isAddingCategoryInline" class="flex items-center gap-2 mb-2 p-2 bg-sky-50/70 border border-sky-100 rounded-xl animate-in fade-in duration-150">
                 <input 
                   type="text" 
                   v-model="newCategoryInput"
                   @keyup.enter="handleCreateCategory"
                   placeholder="Ketik kategori baru..."
-                  class="flex-1 h-9 px-3 bg-white border-2 border-[#0284c7] rounded-xl text-xs font-semibold text-[#0a193d] outline-hidden"
+                  class="flex-1 h-9 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-lg text-xs font-semibold text-[#0a193d] outline-hidden shadow-2xs"
+                  autofocus
                 />
                 <button 
                   type="button"
                   @click="handleCreateCategory"
-                  class="h-9 px-3 bg-[#0a193d] text-white text-xs font-bold rounded-xl cursor-pointer"
+                  :disabled="!newCategoryInput.trim()"
+                  class="h-9 px-3 bg-[#0a193d] hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold rounded-lg cursor-pointer disabled:cursor-not-allowed transition-all shadow-2xs"
                 >
                   Simpan
                 </button>
                 <button 
                   type="button"
-                  @click="isAddingCategoryInline = false"
-                  class="h-9 px-2 bg-slate-100 text-slate-600 text-xs font-bold rounded-xl cursor-pointer"
+                  @click="isAddingCategoryInline = false; newCategoryInput = ''"
+                  class="h-9 px-2.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                 >
                   Batal
                 </button>
