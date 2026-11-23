@@ -14,19 +14,25 @@ import ReceiptModal from './components/ReceiptModal.vue'
 import CameraScannerModal from './components/CameraScannerModal.vue'
 import ProductManagementModal from './components/ProductManagementModal.vue'
 
-import { initialProducts, initialCustomers, initialStats } from './data/mockData'
+import { useKasiryDB } from './composables/useKasiryDB'
 
-// State Master Data
-const products = ref([...initialProducts])
-const customers = ref([...initialCustomers])
-const stats = ref({ ...initialStats })
-
-// State Profil Toko (Habiba Store)
-const storeProfile = ref({
-  name: 'Habiba Store',
-  owner: 'Habiba',
-  phone: '081234567890'
-})
+// Dexie Database Composable (IndexedDB Engine)
+const {
+  isDbReady,
+  products,
+  frequentProducts,
+  customers,
+  transactions,
+  storeProfile,
+  licenseStatus,
+  loadDatabase,
+  saveProduct,
+  deleteProduct,
+  saveCustomer,
+  recordDebtPayment,
+  recordTransaction,
+  saveStoreProfile
+} = useKasiryDB()
 
 // State Keranjang Belanja Awal (Mulai Kosong agar Bar Pembayaran Muncul Hanya Saat Ada Barang)
 const cart = ref([])
@@ -50,10 +56,52 @@ const isProductManageOpen = ref(false)
 const receiptData = ref(null)
 const isGoogleConnected = ref(false)
 const googleUser = ref(null)
-const licenseStatus = ref({
-  isLifetime: false,
-  txCount: 42,
-  txLimit: 300
+
+// Computed Laporan Kasir Real-time dari Transaksi Hari Ini
+const stats = computed(() => {
+  const startOfDay = new Date()
+  startOfDay.setHours(0, 0, 0, 0)
+  const todayTimestamp = startOfDay.getTime()
+
+  const todayTx = transactions.value.filter(t => t.createdAt >= todayTimestamp)
+  
+  let sales = 0
+  let profit = 0
+  let debt = 0
+  const productCountMap = {}
+
+  todayTx.forEach(t => {
+    if (t.paymentMethod === 'TUNAI') {
+      sales += t.totalAmount
+    } else {
+      debt += t.totalAmount
+    }
+
+    if (t.items) {
+      t.items.forEach(item => {
+        const itemProfit = (item.sellPrice - (item.buyPrice || item.sellPrice * 0.8)) * item.qty
+        profit += itemProfit
+
+        if (!productCountMap[item.name]) {
+          productCountMap[item.name] = { name: item.name, qty: 0, subtotal: 0 }
+        }
+        productCountMap[item.name].qty += item.qty
+        productCountMap[item.name].subtotal += item.sellPrice * item.qty
+      })
+    }
+  })
+
+  const topProducts = Object.values(productCountMap)
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 5)
+
+  return {
+    todaySales: sales,
+    todayProfit: Math.round(profit),
+    transactionCount: todayTx.length,
+    todayNewDebt: debt,
+    topProducts
+  }
 })
 
 // Computed Filtered Products for Search
@@ -64,13 +112,6 @@ const searchResults = computed(() => {
     p.name.toLowerCase().includes(q) || 
     (p.barcode && p.barcode.includes(q))
   ).slice(0, 8)
-})
-
-// Computed Frequent Products (Hanya 6–8 Barang Sering Terjual)
-const frequentProducts = computed(() => {
-  const macros = products.value.filter(p => p.isMacro)
-  const pool = macros.length > 0 ? macros : products.value
-  return pool.slice(0, 8)
 })
 
 // Computed Cart Totals
@@ -119,38 +160,42 @@ const clearCart = () => {
   cart.value = []
 }
 
-// Product Management (CRUD)
-const handleSaveProduct = (prodData) => {
-  const idx = products.value.findIndex(p => p.id === prodData.id)
-  if (idx > -1) {
-    products.value[idx] = { ...prodData }
-  } else {
-    products.value.unshift(prodData)
-  }
+// Product Management (CRUD dengan Dexie.js)
+const handleSaveProduct = async (prodData) => {
+  await saveProduct(prodData)
 }
 
-const handleDeleteProduct = (prodId) => {
-  products.value = products.value.filter(p => p.id !== prodId)
+const handleDeleteProduct = async (prodId) => {
+  await deleteProduct(prodId)
   cart.value = cart.value.filter(c => c.id !== prodId)
 }
 
-// Lazy Inventory Handler
+// Lazy Inventory Handler (Produk baru langsung tersimpan permanen ke Dexie.js)
 const triggerLazyInventory = (barcode) => {
   scannedBarcode.value = barcode
   isLazyInventoryOpen.value = true
 }
 
-const saveAndAddToCart = (newProduct) => {
-  products.value.unshift(newProduct)
-  addToCart(newProduct)
+const saveAndAddToCart = async (newProduct) => {
+  const saved = await saveProduct(newProduct)
+  addToCart(saved)
   isLazyInventoryOpen.value = false
 }
 
-// Payment Handlers
-const handleProcessCashPayment = (data) => {
+// Payment Handlers (Menyimpan riwayat transaksi ke Dexie.js)
+const handleProcessCashPayment = async (data) => {
   const now = new Date()
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
   const invoice = `KSR-${Date.now().toString().slice(-6)}`
+
+  await recordTransaction({
+    invoiceNumber: invoice,
+    totalAmount: data.totalAmount,
+    paymentMethod: 'TUNAI',
+    cashGiven: data.cashGiven,
+    changeAmount: data.changeAmount,
+    items: [...cart.value]
+  })
 
   receiptData.value = {
     invoiceNumber: invoice,
@@ -162,61 +207,41 @@ const handleProcessCashPayment = (data) => {
     items: [...cart.value]
   }
 
-  stats.value.todaySales += data.totalAmount
-  stats.value.transactionCount += 1
-  licenseStatus.value.txCount += 1
-
   clearCart()
   isPaymentOpen.value = false
   isReceiptOpen.value = true
 }
 
-const handleProcessDebtPayment = (data) => {
+const handleProcessDebtPayment = async (data) => {
   const now = new Date()
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
   const invoice = `BON-${Date.now().toString().slice(-6)}`
 
-  let cust = customers.value.find(c => c.name.toLowerCase() === data.customer.name.toLowerCase())
-  if (cust) {
-    cust.totalDebt += data.totalAmount
-    cust.lastDate = 'Hari ini'
-  } else {
-    cust = {
-      id: Date.now(),
-      name: data.customer.name,
-      phone: data.customer.phone || '',
-      totalDebt: data.totalAmount,
-      lastDate: 'Hari ini'
-    }
-    customers.value.unshift(cust)
-  }
+  await recordTransaction({
+    invoiceNumber: invoice,
+    totalAmount: data.totalAmount,
+    paymentMethod: 'UTANG / BON',
+    customer: data.customer,
+    items: [...cart.value]
+  })
 
   receiptData.value = {
     invoiceNumber: invoice,
     time: timeStr,
     totalAmount: data.totalAmount,
     paymentMethod: 'UTANG / BON',
-    customer: cust,
+    customer: data.customer,
     items: [...cart.value]
   }
-
-  stats.value.todayNewDebt += data.totalAmount
-  stats.value.transactionCount += 1
-  licenseStatus.value.txCount += 1
 
   clearCart()
   isPaymentOpen.value = false
   isReceiptOpen.value = true
 }
 
-// Record Pelunasan Utang
-const handleRecordDebtPayment = ({ customerId, amount }) => {
-  const c = customers.value.find(item => item.id === customerId)
-  if (c) {
-    c.totalDebt = Math.max(0, c.totalDebt - amount)
-    c.lastDate = 'Hari ini'
-    stats.value.todaySales += amount
-  }
+// Record Pelunasan Utang (Tersimpan ke Dexie.js)
+const handleRecordDebtPayment = async ({ customerId, amount }) => {
+  await recordDebtPayment({ customerId, amount })
 }
 
 // Handler Scan Barcode Kamera
@@ -231,8 +256,8 @@ const handleBarcodeScan = (code) => {
 }
 
 // Profile & Google Actions
-const handleUpdateProfile = (newProfile) => {
-  storeProfile.value = { ...newProfile }
+const handleUpdateProfile = async (newProfile) => {
+  await saveStoreProfile(newProfile)
   alert('Identitas warung berhasil diperbarui!')
 }
 
@@ -267,7 +292,8 @@ const handleActivateLicense = (code) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadDatabase()
   barcodeInputBarRef.value?.focusInput()
 })
 </script>
