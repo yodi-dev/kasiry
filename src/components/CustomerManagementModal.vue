@@ -44,7 +44,6 @@ const emit = defineEmits(['close', 'saveCustomer', 'deleteCustomer'])
 const currentView = ref('list')
 
 const searchQuery = ref('')
-const activeFilter = ref('all') // 'all' | 'with_debt' | 'no_debt'
 const selectedCustomer = ref(null)
 
 const customerForm = ref({
@@ -70,32 +69,12 @@ const handleClose = () => {
   emit('close')
 }
 
-const customersWithDebt = computed(() => {
-  return props.customers.filter(c => (c.totalDebt || 0) > 0)
-})
-
-const customersWithoutDebt = computed(() => {
-  return props.customers.filter(c => (c.totalDebt || 0) <= 0)
-})
-
-const totalCustomerDebt = computed(() => {
-  return props.customers.reduce((sum, c) => sum + (c.totalDebt || 0), 0)
-})
-
 const filteredCustomers = computed(() => {
-  let list = props.customers
-
-  if (activeFilter.value === 'with_debt') {
-    list = customersWithDebt.value
-  } else if (activeFilter.value === 'no_debt') {
-    list = customersWithoutDebt.value
-  }
-
   const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return list
+  if (!q) return props.customers
 
-  return list.filter(c => 
-    c.name.toLowerCase().includes(q) || 
+  return props.customers.filter(c => 
+    (c.name && c.name.toLowerCase().includes(q)) || 
     (c.phone && c.phone.includes(q)) ||
     (c.address && c.address.toLowerCase().includes(q))
   )
@@ -274,10 +253,10 @@ const openWhatsAppChat = (c) => {
 
           <div>
             <h3 class="text-base font-bold text-[#0a193d] leading-tight">
-              {{ currentView === 'form' ? (customerForm.id ? 'Edit Data Pelanggan' : 'Tambah Pelanggan Baru') : currentView === 'detail' ? 'Detail & Riwayat Belanja' : 'Data & Pelanggan Toko' }}
+              {{ currentView === 'form' ? (customerForm.id ? 'Edit Data Pelanggan' : 'Tambah Pelanggan Baru') : currentView === 'detail' ? 'Detail Pelanggan' : 'Data Pelanggan' }}
             </h3>
             <p class="text-xs text-slate-500 font-medium">
-              {{ currentView === 'form' ? 'Lengkapi identitas & kontak pelanggan' : currentView === 'detail' ? `${selectedCustomer?.name || ''}` : `Total ${customers.length} pelanggan terdaftar` }}
+              {{ currentView === 'form' ? 'Lengkapi identitas & kontak pelanggan' : currentView === 'detail' ? `${selectedCustomer?.name || ''}` : 'Kelola data kontak & riwayat pelanggan toko' }}
             </p>
           </div>
         </div>
@@ -296,33 +275,15 @@ const openWhatsAppChat = (c) => {
       <!-- VIEW 1: DAFTAR PELANGGAN (LIST VIEW) -->
       <div v-if="currentView === 'list'" class="flex flex-col flex-1 min-h-0">
         
-        <!-- Ringkasan Pelanggan & Bon -->
-        <div class="p-4 bg-slate-50 border-b border-slate-100 shrink-0">
-          <div class="grid grid-cols-2 gap-2.5">
-            <div class="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Pelanggan</p>
-              <p class="text-lg sm:text-xl font-bold font-mono text-[#0a193d] mt-0.5">
-                {{ customers.length }} <span class="text-xs font-sans font-medium text-slate-500">Orang</span>
-              </p>
-            </div>
-            <div class="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Bon Aktif</p>
-              <p :class="['text-lg sm:text-xl font-bold font-mono mt-0.5', totalCustomerDebt > 0 ? 'text-rose-600' : 'text-emerald-600']">
-                Rp {{ totalCustomerDebt.toLocaleString('id-ID') }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Controls: Pencarian, Tambah Pelanggan & Filter -->
-        <div class="p-4 border-b border-slate-100 space-y-3 shrink-0 bg-white">
+        <!-- Controls: Pencarian & Tambah Pelanggan -->
+        <div class="p-4 border-b border-slate-100 shrink-0 bg-white">
           <div class="flex items-center gap-2.5">
             <div class="relative flex-1">
               <Search class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input 
                 type="text" 
                 v-model="searchQuery"
-                placeholder="Cari nama, nomor WhatsApp, atau alamat..."
+                placeholder="Cari nama atau nomor HP pelanggan..."
                 class="w-full h-11 pl-10 pr-8 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-xs sm:text-sm font-semibold text-[#0a193d] outline-hidden transition-all"
               />
               <button 
@@ -343,48 +304,9 @@ const openWhatsAppChat = (c) => {
               <span class="sm:hidden">Tambah</span>
             </button>
           </div>
-
-          <!-- Filter Status Chips -->
-          <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-            <button 
-              @click="activeFilter = 'all'"
-              :class="[
-                'px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all',
-                activeFilter === 'all' 
-                  ? 'bg-[#0a193d] text-white shadow-2xs' 
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
-              ]"
-            >
-              Semua ({{ customers.length }})
-            </button>
-
-            <button 
-              @click="activeFilter = 'with_debt'"
-              :class="[
-                'px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all',
-                activeFilter === 'with_debt' 
-                  ? 'bg-[#0a193d] text-white shadow-2xs' 
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
-              ]"
-            >
-              Ada Bon ({{ customersWithDebt.length }})
-            </button>
-
-            <button 
-              @click="activeFilter = 'no_debt'"
-              :class="[
-                'px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all',
-                activeFilter === 'no_debt' 
-                  ? 'bg-[#0a193d] text-white shadow-2xs' 
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
-              ]"
-            >
-              Tanpa Bon ({{ customersWithoutDebt.length }})
-            </button>
-          </div>
         </div>
 
-        <!-- Scrollable Customer List: Bersih, Jelas, Nyaman & Tidak Ramai -->
+        <!-- Scrollable Customer List: Bersih, Jelas & Nyaman -->
         <div class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5">
           <!-- Empty State -->
           <div 
@@ -396,77 +318,40 @@ const openWhatsAppChat = (c) => {
             <p class="text-[11px] text-slate-400 mt-0.5">Coba ubah kata kunci pencarian atau tambah pelanggan baru</p>
           </div>
 
-          <!-- Customer Item Card: Desain Lega & Interaktif -->
+          <!-- Customer Item Card: Fokus pada Nama & Kontak -->
           <div 
             v-for="c in filteredCustomers" 
             :key="c.id"
             @click="openDetailView(c)"
-            class="p-3.5 sm:p-4 bg-white hover:bg-slate-50/90 border border-slate-200/80 rounded-2xl transition-all shadow-2xs flex items-center justify-between gap-3 sm:gap-4 cursor-pointer group active:scale-[0.99]"
+            class="p-4 bg-white hover:bg-slate-50/90 border border-slate-200/80 rounded-2xl transition-all shadow-2xs flex items-center justify-between gap-4 cursor-pointer group active:scale-[0.99]"
           >
-            <!-- Kolom Kiri: Avatar + Nama + Kontak & Alamat Terpisah -->
-            <div class="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
-              <!-- Avatar Inisial Lembut & Elegan -->
-              <div class="w-11 h-11 rounded-2xl bg-sky-50 group-hover:bg-[#0a193d] text-[#0284c7] group-hover:text-white flex items-center justify-center font-bold text-sm uppercase shrink-0 border border-sky-100/80 group-hover:border-[#0a193d] transition-all shadow-2xs">
-                {{ c.name ? c.name.charAt(0) : 'P' }}
-              </div>
+            <!-- Kolom Kiri: Nama Jelas & Kontak di bawahnya -->
+            <div class="min-w-0 flex-1 space-y-1">
+              <!-- NAMA PELANGGAN: Paling menonjol & jelas -->
+              <h4 class="font-bold text-base text-[#0a193d] group-hover:text-[#0284c7] transition-colors leading-tight">
+                {{ c.name }}
+              </h4>
 
-              <!-- Info Nama & Kontak (Setiap info di barisnya sendiri) -->
-              <div class="min-w-0 flex-1 space-y-1">
-                <!-- Baris 1: Nama Pelanggan & Badge Bon (Jika ada) -->
-                <div class="flex items-center gap-2">
-                  <h4 class="font-bold text-sm sm:text-base text-[#0a193d] truncate group-hover:text-[#0284c7] transition-colors leading-tight">
-                    {{ c.name }}
-                  </h4>
-                  <span 
-                    v-if="(c.totalDebt || 0) > 0" 
-                    class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200/60 font-mono shrink-0"
-                  >
-                    Bon: Rp {{ (c.totalDebt || 0).toLocaleString('id-ID') }}
-                  </span>
-                </div>
+              <!-- Nomor HP / WhatsApp di bawah nama -->
+              <p v-if="c.phone" class="text-xs text-slate-500 font-mono flex items-center gap-1.5">
+                <Phone class="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>{{ formatPhone(c.phone) }}</span>
+              </p>
+              <p v-else class="text-xs text-slate-400 italic">
+                Nomor HP belum diisi
+              </p>
 
-                <!-- Baris 2: Nomor WhatsApp & Tombol Chat Langsung -->
-                <div v-if="c.phone" class="text-xs text-slate-500 font-mono flex items-center gap-1.5 truncate">
-                  <Phone class="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span class="truncate">{{ formatPhone(c.phone) }}</span>
-                  <button 
-                    type="button" 
-                    @click.stop="openWhatsAppChat(c)"
-                    class="inline-flex items-center gap-1 text-[10px] font-sans font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 px-2 py-0.5 rounded-full transition-colors shrink-0 ml-1 cursor-pointer"
-                    title="Kirim pesan WhatsApp langsung"
-                  >
-                    <MessageSquare class="w-3 h-3 text-emerald-600" />
-                    <span>Chat WA</span>
-                  </button>
-                </div>
-                <p v-else class="text-[11px] text-slate-400 italic">
-                  Nomor HP belum diisi
-                </p>
-
-                <!-- Baris 3: Alamat / Catatan Lokasi Rumah -->
-                <p v-if="c.address" class="text-xs text-slate-400 flex items-center gap-1.5 truncate">
-                  <MapPin class="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span class="truncate">{{ c.address }}</span>
-                </p>
-              </div>
+              <!-- Alamat di bawah nomor HP jika ada -->
+              <p v-if="c.address" class="text-xs text-slate-500 flex items-center gap-1.5 truncate">
+                <MapPin class="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span class="truncate">{{ c.address }}</span>
+              </p>
             </div>
 
-            <!-- Kolom Kanan: Ringkasan Total Belanja & Panah Detail -->
-            <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
-              <div class="text-right">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Total Belanja
-                </span>
-                <span class="font-mono font-bold text-xs sm:text-sm text-[#0a193d] block leading-tight">
-                  Rp {{ getCustomerStats(c.id, c.name).totalSpent.toLocaleString('id-ID') }}
-                </span>
-                <span class="text-[11px] text-slate-400 block mt-0.5 font-medium">
-                  {{ getCustomerStats(c.id, c.name).count }}x transaksi
-                </span>
-              </div>
-
-              <!-- Chevron Panah Navigasi Detail -->
-              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100 group-hover:bg-[#0a193d] group-hover:text-white text-slate-400 flex items-center justify-center transition-all shadow-2xs">
+            <!-- Kolom Kanan: Tombol Detail yang Jelas & Bersih -->
+            <div class="flex items-center gap-2 shrink-0">
+              <div class="h-9 px-3.5 bg-slate-100 group-hover:bg-[#0a193d] group-hover:text-white text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-2xs">
+                <span>Detail</span>
                 <ChevronRight class="w-4 h-4" />
               </div>
             </div>
@@ -475,10 +360,7 @@ const openWhatsAppChat = (c) => {
         </div>
 
         <!-- Modal Footer -->
-        <div class="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between shrink-0">
-          <span class="text-xs text-slate-500 font-medium">
-            Menampilkan {{ filteredCustomers.length }} dari {{ customers.length }} pelanggan
-          </span>
+        <div class="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end shrink-0">
           <button 
             @click="handleClose"
             class="h-10 px-5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200/90 cursor-pointer transition-colors shadow-2xs"
