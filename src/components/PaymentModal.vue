@@ -14,6 +14,10 @@ const props = defineProps({
   savedCustomers: {
     type: Array,
     default: () => []
+  },
+  transactions: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -127,11 +131,35 @@ const onManualCashInput = (e) => {
   cashInputStr.value = num > 0 ? String(num) : ''
 }
 
-// Filter pelanggan di mode kas
+// Menghitung frekuensi transaksi belanja pelanggan
+const getCustomerTxCount = (cust) => {
+  if (!props.transactions || props.transactions.length === 0 || !cust) return 0
+  const cid = cust.id
+  const cname = cust.name
+  return props.transactions.filter(t => 
+    (cid && (t.customerId === cid || t.customer?.id === cid)) ||
+    (cname && (t.customerName === cname || t.customer?.name === cname))
+  ).length
+}
+
+// Filter pelanggan di mode kas (diurutkan berdasarkan yang paling sering belanja)
 const filteredCashCustomers = computed(() => {
+  const sorted = [...props.savedCustomers].sort((a, b) => {
+    // Umum selalu di posisi pertama
+    if (a.name.toLowerCase() === 'umum') return -1
+    if (b.name.toLowerCase() === 'umum') return 1
+
+    const countA = getCustomerTxCount(a)
+    const countB = getCustomerTxCount(b)
+    if (countB !== countA) {
+      return countB - countA // Yang paling sering belanja di atas
+    }
+    return a.name.localeCompare(b.name, 'id')
+  })
+
   const q = cashCustomerQuery.value.trim().toLowerCase()
-  if (!q) return props.savedCustomers.slice(0, 8)
-  return props.savedCustomers.filter(c => 
+  if (!q) return sorted.slice(0, 10)
+  return sorted.filter(c => 
     c.name.toLowerCase().includes(q) || 
     (c.phone && c.phone.includes(q))
   )
@@ -197,11 +225,24 @@ const resetToUmum = () => {
   cashCustomerQuery.value = ''
 }
 
-// Filter pelanggan di mode utang
+// Filter pelanggan di mode utang (diurutkan frekuensi belanja, mengecualikan "Umum")
 const filteredCustomers = computed(() => {
+  const nonUmum = props.savedCustomers.filter(c => c.name.toLowerCase() !== 'umum')
+  const sorted = [...nonUmum].sort((a, b) => {
+    const countA = getCustomerTxCount(a)
+    const countB = getCustomerTxCount(b)
+    if (countB !== countA) {
+      return countB - countA // Frekuensi belanja terbanyak di atas
+    }
+    return a.name.localeCompare(b.name, 'id')
+  })
+
   const q = customerQuery.value.trim().toLowerCase()
-  if (!q) return props.savedCustomers
-  return props.savedCustomers.filter(c => c.name.toLowerCase().includes(q))
+  if (!q) return sorted
+  return sorted.filter(c => 
+    c.name.toLowerCase().includes(q) ||
+    (c.phone && c.phone.includes(q))
+  )
 })
 
 const selectCustomer = (c) => {
@@ -453,9 +494,14 @@ const submitPayment = () => {
                   :key="c.id"
                   type="button"
                   @click="selectCashCustomer(c)"
-                  class="w-full p-2 px-2.5 text-left hover:bg-slate-50 flex items-center justify-between text-xs cursor-pointer"
+                  class="w-full p-2 px-2.5 text-left hover:bg-slate-50 flex items-center justify-between text-xs cursor-pointer group"
                 >
-                  <span class="font-bold text-[#0a193d] truncate">{{ c.name }}</span>
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="font-bold text-[#0a193d] group-hover:text-[#0284c7] truncate">{{ c.name }}</span>
+                    <span v-if="getCustomerTxCount(c) > 0" class="text-[10px] font-semibold px-1.5 py-0.5 bg-sky-50 text-[#0284c7] rounded-md shrink-0">
+                      {{ getCustomerTxCount(c) }}x belanja
+                    </span>
+                  </div>
                   <span v-if="c.phone" class="text-[11px] text-slate-400 font-mono shrink-0 ml-2">{{ c.phone }}</span>
                 </button>
 
@@ -596,7 +642,12 @@ const submitPayment = () => {
                 ]"
               >
                 <div class="min-w-0 pr-1">
-                  <p class="text-xs font-bold truncate">{{ c.name }}</p>
+                  <div class="flex items-center gap-1.5">
+                    <p class="text-xs font-bold truncate">{{ c.name }}</p>
+                    <span v-if="getCustomerTxCount(c) > 0" class="text-[9px] font-semibold px-1.5 py-0.5 bg-sky-50 text-[#0284c7] rounded shrink-0">
+                      {{ getCustomerTxCount(c) }}x
+                    </span>
+                  </div>
                   <p class="text-[11px] text-red-600 font-semibold mt-0.5">
                     Sisa Bon: Rp {{ (c.totalDebt || 0).toLocaleString('id-ID') }}
                   </p>

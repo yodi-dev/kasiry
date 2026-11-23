@@ -248,6 +248,8 @@ const handleProcessCashPayment = async (data) => {
     cashGiven: data.cashGiven,
     changeAmount: data.changeAmount,
     customer: custObj,
+    customerId: custObj?.id || null,
+    customerName: custObj?.name || '',
     items: [...cart.value]
   }
 
@@ -283,6 +285,8 @@ const handleProcessDebtPayment = async (data) => {
     totalAmount: data.totalAmount,
     paymentMethod: 'UTANG / BON',
     customer: data.customer,
+    customerId: data.customer?.id || null,
+    customerName: data.customer?.name || '',
     items: [...cart.value]
   }
 
@@ -588,6 +592,7 @@ onMounted(async () => {
       :isOpen="isPaymentOpen"
       :totalAmount="totalCartAmount"
       :savedCustomers="customers"
+      :transactions="transactions"
       @close="isPaymentOpen = false"
       @processCashPayment="handleProcessCashPayment"
       @processDebtPayment="handleProcessDebtPayment"

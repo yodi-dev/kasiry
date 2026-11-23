@@ -69,17 +69,6 @@ const handleClose = () => {
   emit('close')
 }
 
-const filteredCustomers = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return props.customers
-
-  return props.customers.filter(c => 
-    (c.name && c.name.toLowerCase().includes(q)) || 
-    (c.phone && c.phone.includes(q)) ||
-    (c.address && c.address.toLowerCase().includes(q))
-  )
-})
-
 // Hitung total belanja & jumlah transaksi per pelanggan
 const getCustomerStats = (customerId, customerName) => {
   if (!props.transactions || props.transactions.length === 0) {
@@ -87,8 +76,8 @@ const getCustomerStats = (customerId, customerName) => {
   }
 
   const matches = props.transactions.filter(t => 
-    (customerId && t.customerId === customerId) || 
-    (customerName && t.customerName === customerName)
+    (customerId && (t.customerId === customerId || t.customer?.id === customerId)) || 
+    (customerName && (t.customerName === customerName || t.customer?.name === customerName))
   )
 
   const totalSpent = matches.reduce((sum, t) => sum + (t.totalAmount || 0), 0)
@@ -98,6 +87,33 @@ const getCustomerStats = (customerId, customerName) => {
   }
 }
 
+// Urutkan pelanggan berdasarkan yang paling sering belanja (terbanyak di atas)
+const filteredCustomers = computed(() => {
+  const sorted = [...props.customers].sort((a, b) => {
+    // "Umum" selalu di posisi paling atas jika ada
+    const isAUmum = a.name?.toLowerCase() === 'umum'
+    const isBUmum = b.name?.toLowerCase() === 'umum'
+    if (isAUmum && !isBUmum) return -1
+    if (!isAUmum && isBUmum) return 1
+
+    const countA = getCustomerStats(a.id, a.name).count
+    const countB = getCustomerStats(b.id, b.name).count
+    if (countB !== countA) {
+      return countB - countA // Frekuensi belanja terbanyak di atas
+    }
+    return (a.name || '').localeCompare(b.name || '', 'id')
+  })
+
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return sorted
+
+  return sorted.filter(c => 
+    (c.name && c.name.toLowerCase().includes(q)) || 
+    (c.phone && c.phone.includes(q)) ||
+    (c.address && c.address.toLowerCase().includes(q))
+  )
+})
+
 // Ambil riwayat seluruh transaksi pelanggan (Tunai maupun Utang)
 const customerTransactions = computed(() => {
   if (!selectedCustomer.value || !props.transactions) return []
@@ -106,8 +122,8 @@ const customerTransactions = computed(() => {
 
   return props.transactions
     .filter(t => 
-      (cid && t.customerId === cid) || 
-      (cname && t.customerName === cname)
+      (cid && (t.customerId === cid || t.customer?.id === cid)) || 
+      (cname && (t.customerName === cname || t.customer?.name === cname))
     )
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 })
@@ -327,10 +343,18 @@ const openWhatsAppChat = (c) => {
           >
             <!-- Kolom Kiri: Nama Jelas & Kontak di bawahnya -->
             <div class="min-w-0 flex-1 space-y-1">
-              <!-- NAMA PELANGGAN: Paling menonjol & jelas -->
-              <h4 class="font-bold text-base text-[#0a193d] group-hover:text-[#0284c7] transition-colors leading-tight">
-                {{ c.name }}
-              </h4>
+              <!-- NAMA PELANGGAN: Paling menonjol & jelas + tag frekuensi belanja -->
+              <div class="flex items-center gap-2">
+                <h4 class="font-bold text-base text-[#0a193d] group-hover:text-[#0284c7] transition-colors leading-tight truncate">
+                  {{ c.name }}
+                </h4>
+                <span 
+                  v-if="getCustomerStats(c.id, c.name).count > 0" 
+                  class="text-[10px] font-bold px-2 py-0.5 bg-sky-50 text-[#0284c7] rounded-full shrink-0"
+                >
+                  {{ getCustomerStats(c.id, c.name).count }}x belanja
+                </span>
+              </div>
 
               <!-- Nomor HP / WhatsApp di bawah nama -->
               <p v-if="c.phone" class="text-xs text-slate-500 font-mono flex items-center gap-1.5">
