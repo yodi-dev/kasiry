@@ -13,6 +13,7 @@ import SettingsModal from './components/SettingsModal.vue'
 import ReceiptModal from './components/ReceiptModal.vue'
 import CameraScannerModal from './components/CameraScannerModal.vue'
 import ProductManagementModal from './components/ProductManagementModal.vue'
+import CustomerManagementModal from './components/CustomerManagementModal.vue'
 
 import { useKasiryDB } from './composables/useKasiryDB'
 import { useHardwareScanner } from './composables/useHardwareScanner'
@@ -85,6 +86,7 @@ const isSettingsOpen = ref(false)
 const isReceiptOpen = ref(false)
 const isCameraOpen = ref(false)
 const isProductManageOpen = ref(false)
+const isCustomerManageOpen = ref(false)
 
 // State Transaksi Struk
 const receiptData = ref(null)
@@ -225,12 +227,22 @@ const handleProcessCashPayment = async (data) => {
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
   const invoice = `KSR-${Date.now().toString().slice(-6)}`
 
+  let custObj = data.customer || null
+  if (custObj && !custObj.id && custObj.name) {
+    custObj = await saveCustomer({
+      name: custObj.name.trim(),
+      phone: custObj.phone || '',
+      totalDebt: 0
+    })
+  }
+
   const txPayload = {
     invoiceNumber: invoice,
     totalAmount: data.totalAmount,
     paymentMethod: 'TUNAI',
     cashGiven: data.cashGiven,
     changeAmount: data.changeAmount,
+    customer: custObj,
     items: [...cart.value]
   }
 
@@ -247,6 +259,7 @@ const handleProcessCashPayment = async (data) => {
     paymentMethod: 'TUNAI',
     cashGiven: data.cashGiven,
     changeAmount: data.changeAmount,
+    customer: custObj,
     items: [...cart.value]
   }
 
@@ -447,6 +460,7 @@ onMounted(async () => {
       @openSettings="isSettingsOpen = true"
       @openCamera="isCameraOpen = true"
       @openProductManage="isProductManageOpen = true"
+      @openCustomerManage="isCustomerManageOpen = true"
     />
 
     <!-- 2. Ergonomic Workspace (Keranjang Tetap di Paling Atas) -->
@@ -535,6 +549,17 @@ onMounted(async () => {
       @close="isDebtBookOpen = false"
       @recordPayment="handleRecordDebtPayment"
       @addCustomer="handleSaveCustomer"
+      @deleteCustomer="handleDeleteCustomer"
+    />
+
+    <!-- Modal Manajemen Data Pelanggan -->
+    <CustomerManagementModal 
+      :isOpen="isCustomerManageOpen"
+      :customers="customers"
+      :transactions="transactions"
+      :storeName="storeProfile.name"
+      @close="isCustomerManageOpen = false"
+      @saveCustomer="handleSaveCustomer"
       @deleteCustomer="handleDeleteCustomer"
     />
 

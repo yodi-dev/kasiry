@@ -8,7 +8,8 @@ import {
   Camera, 
   Store, 
   ChevronRight,
-  Package
+  Package,
+  Users
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -39,7 +40,8 @@ const emit = defineEmits([
   'openDailyReport', 
   'openSettings', 
   'openCamera',
-  'openProductManage'
+  'openProductManage',
+  'openCustomerManage'
 ])
 
 const isDrawerOpen = ref(false)
@@ -131,6 +133,19 @@ const triggerAction = (actionEvent) => {
                   <Package class="w-4 h-4" />
                 </div>
                 <p class="text-sm font-semibold text-[#0a193d]">Kelola Barang</p>
+              </div>
+              <ChevronRight class="w-4 h-4 text-slate-400" />
+            </button>
+
+            <button 
+              @click="triggerAction('openCustomerManage')"
+              class="w-full p-3 rounded-2xl hover:bg-slate-50 flex items-center justify-between text-left transition-colors cursor-pointer group"
+            >
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center shrink-0 border border-sky-100">
+                  <Users class="w-4 h-4 text-[#0284c7]" />
+                </div>
+                <p class="text-sm font-semibold text-[#0a193d]">Data Pelanggan</p>
               </div>
               <ChevronRight class="w-4 h-4 text-slate-400" />
             </button>

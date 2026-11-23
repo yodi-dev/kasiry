@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { X, CheckCircle, Banknote, UserCheck, Plus, AlertCircle, CreditCard } from '@lucide/vue'
+import { X, CheckCircle, Banknote, UserCheck, Plus, AlertCircle, CreditCard, User, Search } from '@lucide/vue'
 
 const props = defineProps({
   isOpen: {
@@ -25,6 +25,8 @@ const activeTab = ref('cash')
 // Cash Mode State
 const cashGiven = ref(0)
 const cashInputStr = ref('')
+const selectedCashCustomer = ref(null)
+const cashCustomerQuery = ref('')
 
 // Debt Mode State
 const customerQuery = ref('')
@@ -37,6 +39,8 @@ watch(() => props.isOpen, (newVal) => {
     cashInputStr.value = String(props.totalAmount)
     selectedCustomer.value = null
     customerQuery.value = ''
+    selectedCashCustomer.value = null
+    cashCustomerQuery.value = ''
   }
 })
 
@@ -95,6 +99,28 @@ const onManualCashInput = (e) => {
   cashInputStr.value = num > 0 ? String(num) : ''
 }
 
+// Filter pelanggan di mode kas (opsional)
+const filteredCashCustomers = computed(() => {
+  const q = cashCustomerQuery.value.trim().toLowerCase()
+  if (!q) return props.savedCustomers.slice(0, 5)
+  return props.savedCustomers.filter(c => 
+    c.name.toLowerCase().includes(q) || 
+    (c.phone && c.phone.includes(q))
+  )
+})
+
+const selectCashCustomer = (c) => {
+  selectedCashCustomer.value = c
+  cashCustomerQuery.value = c.name
+}
+
+const createAndSelectCashCustomer = () => {
+  const newName = cashCustomerQuery.value.trim()
+  if (!newName) return
+  const newCust = { id: null, name: newName, totalDebt: 0, phone: '' }
+  selectedCashCustomer.value = newCust
+}
+
 // Filter pelanggan di mode utang
 const filteredCustomers = computed(() => {
   const q = customerQuery.value.trim().toLowerCase()
@@ -121,7 +147,8 @@ const submitPayment = () => {
     emit('processCashPayment', {
       totalAmount: props.totalAmount,
       cashGiven: cashGiven.value,
-      changeAmount: changeAmount.value
+      changeAmount: changeAmount.value,
+      customer: selectedCashCustomer.value || null
     })
   } else {
     if (!selectedCustomer.value && !customerQuery.value.trim()) return
@@ -211,6 +238,73 @@ const submitPayment = () => {
       <div class="flex-1 overflow-y-auto">
         <!-- TAB 1: MODE TUNAI -->
         <div v-if="activeTab === 'cash'" class="px-5 py-2 space-y-3.5">
+          <!-- Pelanggan Pembeli (Opsional) -->
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                <User class="w-3.5 h-3.5 text-slate-400" />
+                <span>Data Pelanggan (Opsional):</span>
+              </label>
+              <button 
+                v-if="selectedCashCustomer"
+                type="button"
+                @click="selectedCashCustomer = null; cashCustomerQuery = ''"
+                class="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+              >
+                Hapus
+              </button>
+            </div>
+
+            <!-- Jika Pelanggan Dipilih -->
+            <div v-if="selectedCashCustomer" class="flex items-center justify-between p-2.5 bg-white border border-[#0284c7] rounded-xl text-xs">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-7 h-7 rounded-lg bg-sky-50 text-[#0284c7] font-bold flex items-center justify-center shrink-0 text-xs">
+                  {{ selectedCashCustomer.name.charAt(0).toUpperCase() }}
+                </div>
+                <div class="truncate">
+                  <span class="font-bold text-[#0a193d]">{{ selectedCashCustomer.name }}</span>
+                  <span v-if="selectedCashCustomer.phone" class="text-slate-400 font-mono text-[11px] ml-1.5">({{ selectedCashCustomer.phone }})</span>
+                </div>
+              </div>
+              <span class="text-[10px] bg-sky-50 text-[#0284c7] font-bold px-2 py-0.5 rounded-full shrink-0">Terpilih</span>
+            </div>
+
+            <!-- Input pencarian pelanggan jika belum dipilih -->
+            <div v-else class="space-y-1.5">
+              <div class="relative">
+                <Search class="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input 
+                  type="text" 
+                  v-model="cashCustomerQuery"
+                  placeholder="Ketik nama pelanggan jika ingin dicatat..."
+                  class="w-full h-9 pl-8 pr-3 text-xs font-semibold bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl outline-hidden text-[#0a193d]"
+                />
+              </div>
+
+              <!-- Saran Pelanggan saat mengetik -->
+              <div v-if="cashCustomerQuery.trim()" class="max-h-28 overflow-y-auto bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-2xs">
+                <button 
+                  v-for="c in filteredCashCustomers" 
+                  :key="c.id"
+                  type="button"
+                  @click="selectCashCustomer(c)"
+                  class="w-full p-2 px-3 text-left hover:bg-slate-50 flex items-center justify-between text-xs cursor-pointer"
+                >
+                  <span class="font-bold text-[#0a193d] truncate">{{ c.name }}</span>
+                  <span v-if="c.phone" class="text-[11px] text-slate-400 font-mono">{{ c.phone }}</span>
+                </button>
+                <button 
+                  type="button"
+                  @click="createAndSelectCashCustomer"
+                  class="w-full p-2 px-3 text-left bg-sky-50/60 hover:bg-sky-100/60 text-[#0284c7] text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus class="w-3.5 h-3.5" />
+                  <span>Tambah pelanggan baru: "{{ cashCustomerQuery }}"</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Input Nominal Diterima -->
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
