@@ -15,8 +15,8 @@ export default defineConfig({
         short_name: 'Kasiry',
         description: 'Aplikasi Kasir Warung Kelontong & UMKM Pedesaan Offline-First',
         lang: 'id',
-        theme_color: '#2e7d32',
-        background_color: '#f8faf8',
+        theme_color: '#0a193d',
+        background_color: '#edf5fd',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
