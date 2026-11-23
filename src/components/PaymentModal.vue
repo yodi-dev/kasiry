@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { X, CheckCircle, Banknote, UserCheck, Plus, AlertCircle, CreditCard, User, Search } from '@lucide/vue'
+import { X, CheckCircle, Banknote, UserCheck, Plus, AlertCircle, CreditCard, User, Search, ChevronRight } from '@lucide/vue'
 
 const props = defineProps({
   isOpen: {
@@ -343,9 +343,10 @@ const submitPayment = () => {
                 <button 
                   type="button" 
                   @click="cancelQuickAdd"
-                  class="text-[11px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                  class="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
+                  title="Tutup"
                 >
-                  Batal
+                  <X class="w-4 h-4" />
                 </button>
               </div>
 
@@ -387,38 +388,30 @@ const submitPayment = () => {
               </div>
             </div>
 
-            <!-- 2. Kondisi: Tampilan Pelanggan Terpilih (Normal) -->
-            <div v-else-if="!isCustomerDropdownOpen" class="flex items-center justify-between p-2.5 bg-white border border-slate-200/90 rounded-xl text-xs shadow-2xs">
+            <!-- 2. Kondisi: Tampilan Pelanggan Terpilih (Sentuh data pelanggan untuk ganti) -->
+            <div 
+              v-else-if="!isCustomerDropdownOpen" 
+              @click="isCustomerDropdownOpen = true"
+              class="flex items-center justify-between p-2.5 bg-white hover:bg-slate-50/90 border border-slate-200/90 hover:border-[#0284c7] rounded-xl text-xs shadow-2xs cursor-pointer transition-all group active:scale-[0.99]"
+              title="Sentuh untuk ganti pelanggan"
+            >
               <div class="flex items-center gap-2.5 min-w-0">
-                <div class="w-8 h-8 rounded-xl bg-sky-50 text-[#0284c7] font-bold flex items-center justify-center shrink-0 text-xs border border-sky-100/80">
+                <div class="w-8 h-8 rounded-xl bg-sky-50 group-hover:bg-[#0a193d] text-[#0284c7] group-hover:text-white font-bold flex items-center justify-center shrink-0 text-xs border border-sky-100/80 group-hover:border-[#0a193d] transition-colors">
                   {{ selectedCashCustomer?.name ? selectedCashCustomer.name.charAt(0).toUpperCase() : 'U' }}
                 </div>
                 <div class="min-w-0 truncate">
-                  <div class="flex items-center gap-1.5">
-                    <span class="font-bold text-[#0a193d] text-sm truncate">{{ selectedCashCustomer?.name || 'Umum' }}</span>
-                    <span 
-                      v-if="selectedCashCustomer?.name && selectedCashCustomer.name.toLowerCase() === 'umum'" 
-                      class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0"
-                    >
-                      Default
-                    </span>
-                  </div>
-                  <p v-if="selectedCashCustomer?.phone" class="text-slate-400 font-mono text-[11px] truncate">
+                  <h4 class="font-bold text-[#0a193d] group-hover:text-[#0284c7] text-sm truncate transition-colors leading-tight">
+                    {{ selectedCashCustomer?.name || 'Umum' }}
+                  </h4>
+                  <p v-if="selectedCashCustomer?.phone" class="text-slate-400 font-mono text-[11px] truncate mt-0.5">
                     {{ selectedCashCustomer.phone }}
                   </p>
                 </div>
               </div>
 
-              <div class="flex items-center gap-1.5 shrink-0">
-                <button 
-                  type="button"
-                  @click="isCustomerDropdownOpen = true"
-                  class="h-8 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                  title="Ganti ke pelanggan lain"
-                >
-                  <Search class="w-3.5 h-3.5 text-slate-500" />
-                  <span>Ganti</span>
-                </button>
+              <!-- Indikator Sentuh / Chevron Kanan -->
+              <div class="w-7 h-7 rounded-lg bg-slate-50 group-hover:bg-sky-50 text-slate-400 group-hover:text-[#0284c7] flex items-center justify-center transition-colors shrink-0">
+                <ChevronRight class="w-4 h-4" />
               </div>
             </div>
 
@@ -450,10 +443,7 @@ const submitPayment = () => {
                   @click="resetToUmum"
                   class="w-full p-2 px-2.5 text-left hover:bg-slate-50 flex items-center justify-between text-xs cursor-pointer"
                 >
-                  <div class="flex items-center gap-2">
-                    <span class="font-bold text-[#0a193d]">Umum</span>
-                    <span class="text-[10px] bg-slate-100 text-slate-500 px-1 rounded">Default</span>
-                  </div>
+                  <span class="font-bold text-[#0a193d]">Umum</span>
                   <span v-if="selectedCashCustomer?.name?.toLowerCase() === 'umum'" class="text-[10px] text-[#0284c7] font-bold">Terpilih</span>
                 </button>
 
