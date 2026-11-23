@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { X, CheckCircle, Banknote, UserCheck, Plus, AlertCircle, CreditCard, User, Search, ChevronRight } from '@lucide/vue'
 
 const props = defineProps({
@@ -39,6 +39,46 @@ const newCustPhone = ref('')
 // Debt Mode State
 const customerQuery = ref('')
 const selectedCustomer = ref(null)
+
+// Element Refs untuk fokus kursor otomatis
+const customerSearchInputRef = ref(null)
+const quickAddNameInputRef = ref(null)
+const debtCustomerInputRef = ref(null)
+
+// Buka pencarian pelanggan dan langsung aktifkan kursor
+const openCustomerDropdown = () => {
+  isCustomerDropdownOpen.value = true
+  nextTick(() => {
+    customerSearchInputRef.value?.focus()
+  })
+}
+
+// Watcher dropdown pelanggan: aktifkan kursor setiap kali dropdown terbuka
+watch(isCustomerDropdownOpen, (isOpen) => {
+  if (isOpen) {
+    nextTick(() => {
+      customerSearchInputRef.value?.focus()
+    })
+  }
+})
+
+// Watcher form tambah pelanggan cepat
+watch(isAddingCustomer, (isAdding) => {
+  if (isAdding) {
+    nextTick(() => {
+      quickAddNameInputRef.value?.focus()
+    })
+  }
+})
+
+// Watcher pergantian tab (mode utang otomatis fokus ke input pelanggan)
+watch(activeTab, (tab) => {
+  if (tab === 'debt') {
+    nextTick(() => {
+      debtCustomerInputRef.value?.focus()
+    })
+  }
+})
 
 // Dapatkan objek pelanggan "Umum" bawaan
 const getUmumCustomer = () => {
@@ -177,6 +217,9 @@ const openQuickAddForm = () => {
   isCustomerDropdownOpen.value = false
   newCustName.value = cashCustomerQuery.value.trim()
   newCustPhone.value = ''
+  nextTick(() => {
+    quickAddNameInputRef.value?.focus()
+  })
 }
 
 // Batal tambah cepat
@@ -393,11 +436,11 @@ const submitPayment = () => {
 
               <div class="space-y-2">
                 <input 
+                  ref="quickAddNameInputRef"
                   type="text" 
                   v-model="newCustName" 
                   placeholder="Nama Pelanggan (contoh: Bu Siti, Mas Joko)..." 
                   class="w-full h-9 px-3 text-xs font-semibold bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#0284c7] rounded-xl outline-hidden text-[#0a193d]"
-                  autofocus
                   @keydown.enter.prevent="handleSaveQuickCustomer"
                 />
                 <input 
@@ -432,7 +475,7 @@ const submitPayment = () => {
             <!-- 2. Kondisi: Tampilan Pelanggan Terpilih (Sentuh data pelanggan untuk ganti) -->
             <div 
               v-else-if="!isCustomerDropdownOpen" 
-              @click="isCustomerDropdownOpen = true"
+              @click="openCustomerDropdown"
               class="flex items-center justify-between p-2.5 bg-white hover:bg-slate-50/90 border border-slate-200/90 hover:border-[#0284c7] rounded-xl text-xs shadow-2xs cursor-pointer transition-all group active:scale-[0.99]"
               title="Sentuh untuk ganti pelanggan"
             >
@@ -461,11 +504,12 @@ const submitPayment = () => {
               <div class="relative">
                 <Search class="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
                 <input 
+                  ref="customerSearchInputRef"
                   type="text" 
                   v-model="cashCustomerQuery"
                   placeholder="Ketik nama pelanggan untuk mencari..."
                   class="w-full h-9 pl-8 pr-8 text-xs font-semibold bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#0284c7] rounded-xl outline-hidden text-[#0a193d]"
-                  autofocus
+                  @keydown.esc="isCustomerDropdownOpen = false"
                 />
                 <button 
                   type="button"
@@ -606,6 +650,7 @@ const submitPayment = () => {
               Nama Pelanggan:
             </label>
             <input 
+              ref="debtCustomerInputRef"
               type="text" 
               v-model="customerQuery"
               placeholder="Ketik nama pelanggan..."
