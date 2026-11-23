@@ -244,16 +244,12 @@ onUnmounted(() => {
           <div class="absolute inset-x-8 top-1/2 -translate-y-1/2 h-0.5 bg-sky-400 shadow-[0_0_12px_#38bdf8] animate-pulse z-10 pointer-events-none"></div>
 
           <!-- Frame Bidik Kaca -->
-          <div class="w-52 h-40 border-2 border-sky-400/90 rounded-2xl relative flex items-center justify-center z-10 pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]">
-            <span class="text-[10px] font-bold text-sky-400 bg-slate-950/90 px-2.5 py-0.5 rounded-full absolute -top-3 shadow-sm tracking-wide">
-              Arahkan Barcode ke Sini
-            </span>
-          </div>
+          <div class="w-52 h-40 border-2 border-sky-400/90 rounded-2xl relative flex items-center justify-center z-10 pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"></div>
 
           <!-- Petunjuk Pindai -->
           <div class="absolute bottom-3 inset-x-4 text-center z-10 pointer-events-none">
             <p class="text-[11px] text-white/90 font-medium bg-black/50 backdrop-blur-xs py-1 px-3 rounded-full inline-block">
-              Posisikan barcode produk di dalam kotak
+              Posisikan barcode di dalam kotak
             </p>
           </div>
         </template>
