@@ -227,13 +227,18 @@ const handleProcessCashPayment = async (data) => {
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
   const invoice = `KSR-${Date.now().toString().slice(-6)}`
 
-  let custObj = data.customer || null
+  let custObj = data.customer || customers.value.find(c => c.name.toLowerCase() === 'umum') || { name: 'Umum', phone: '', totalDebt: 0 }
   if (custObj && !custObj.id && custObj.name) {
-    custObj = await saveCustomer({
-      name: custObj.name.trim(),
-      phone: custObj.phone || '',
-      totalDebt: 0
-    })
+    const existing = customers.value.find(c => c.name.toLowerCase() === custObj.name.trim().toLowerCase())
+    if (existing) {
+      custObj = existing
+    } else {
+      custObj = await saveCustomer({
+        name: custObj.name.trim(),
+        phone: custObj.phone || '',
+        totalDebt: 0
+      })
+    }
   }
 
   const txPayload = {
@@ -530,6 +535,7 @@ onMounted(async () => {
       @close="isPaymentOpen = false"
       @processCashPayment="handleProcessCashPayment"
       @processDebtPayment="handleProcessDebtPayment"
+      @saveCustomer="handleSaveCustomer"
     />
 
     <!-- Modal Input Cepat Barcode Baru (Lazy Inventory) -->

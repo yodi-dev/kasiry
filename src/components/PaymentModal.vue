@@ -17,7 +17,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'processCashPayment', 'processDebtPayment'])
+const emit = defineEmits(['close', 'processCashPayment', 'processDebtPayment', 'saveCustomer'])
 
 // Active Tab: 'cash' | 'debt'
 const activeTab = ref('cash')
@@ -27,10 +27,24 @@ const cashGiven = ref(0)
 const cashInputStr = ref('')
 const selectedCashCustomer = ref(null)
 const cashCustomerQuery = ref('')
+const isCustomerDropdownOpen = ref(false)
+const isAddingCustomer = ref(false)
+const newCustName = ref('')
+const newCustPhone = ref('')
 
 // Debt Mode State
 const customerQuery = ref('')
 const selectedCustomer = ref(null)
+
+// Dapatkan objek pelanggan "Umum" bawaan
+const getUmumCustomer = () => {
+  return props.savedCustomers.find(c => c.name.toLowerCase() === 'umum') || {
+    id: null,
+    name: 'Umum',
+    phone: '',
+    totalDebt: 0
+  }
+}
 
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
@@ -39,10 +53,24 @@ watch(() => props.isOpen, (newVal) => {
     cashInputStr.value = String(props.totalAmount)
     selectedCustomer.value = null
     customerQuery.value = ''
-    selectedCashCustomer.value = null
+
+    // Default setiap transaksi tunai ke pelanggan "Umum"
+    selectedCashCustomer.value = getUmumCustomer()
     cashCustomerQuery.value = ''
+    isCustomerDropdownOpen.value = false
+    isAddingCustomer.value = false
+    newCustName.value = ''
+    newCustPhone.value = ''
   }
 })
+
+// Sinkronkan jika data savedCustomers tiba dari IndexedDB setelah modal terbuka
+watch(() => props.savedCustomers, (newCustomers) => {
+  if (selectedCashCustomer.value && selectedCashCustomer.value.name.toLowerCase() === 'umum' && !selectedCashCustomer.value.id) {
+    const found = newCustomers.find(c => c.name.toLowerCase() === 'umum')
+    if (found) selectedCashCustomer.value = found
+  }
+}, { deep: true })
 
 // Pecahan uang kertas standar
 const standardBills = [2000, 5000, 10000, 20000, 50000, 100000]
@@ -99,10 +127,10 @@ const onManualCashInput = (e) => {
   cashInputStr.value = num > 0 ? String(num) : ''
 }
 
-// Filter pelanggan di mode kas (opsional)
+// Filter pelanggan di mode kas
 const filteredCashCustomers = computed(() => {
   const q = cashCustomerQuery.value.trim().toLowerCase()
-  if (!q) return props.savedCustomers.slice(0, 5)
+  if (!q) return props.savedCustomers.slice(0, 8)
   return props.savedCustomers.filter(c => 
     c.name.toLowerCase().includes(q) || 
     (c.phone && c.phone.includes(q))
@@ -111,14 +139,62 @@ const filteredCashCustomers = computed(() => {
 
 const selectCashCustomer = (c) => {
   selectedCashCustomer.value = c
-  cashCustomerQuery.value = c.name
+  cashCustomerQuery.value = ''
+  isCustomerDropdownOpen.value = false
 }
 
+// Buka form cepat tambah pelanggan
+const openQuickAddForm = () => {
+  isAddingCustomer.value = true
+  isCustomerDropdownOpen.value = false
+  newCustName.value = cashCustomerQuery.value.trim()
+  newCustPhone.value = ''
+}
+
+// Batal tambah cepat
+const cancelQuickAdd = () => {
+  isAddingCustomer.value = false
+  newCustName.value = ''
+  newCustPhone.value = ''
+}
+
+// Simpan pelanggan cepat
+const handleSaveQuickCustomer = () => {
+  const name = newCustName.value.trim()
+  if (!name) return
+
+  const newCust = {
+    id: null,
+    name,
+    phone: newCustPhone.value.trim(),
+    totalDebt: 0
+  }
+
+  emit('saveCustomer', newCust)
+  selectedCashCustomer.value = newCust
+  isAddingCustomer.value = false
+  isCustomerDropdownOpen.value = false
+  newCustName.value = ''
+  newCustPhone.value = ''
+}
+
+// Buat dan pilih pelanggan dari teks pencarian
 const createAndSelectCashCustomer = () => {
   const newName = cashCustomerQuery.value.trim()
   if (!newName) return
   const newCust = { id: null, name: newName, totalDebt: 0, phone: '' }
+  emit('saveCustomer', newCust)
   selectedCashCustomer.value = newCust
+  cashCustomerQuery.value = ''
+  isCustomerDropdownOpen.value = false
+}
+
+// Reset pelanggan kembali ke "Umum"
+const resetToUmum = () => {
+  selectedCashCustomer.value = getUmumCustomer()
+  isCustomerDropdownOpen.value = false
+  isAddingCustomer.value = false
+  cashCustomerQuery.value = ''
 }
 
 // Filter pelanggan di mode utang
@@ -148,7 +224,7 @@ const submitPayment = () => {
       totalAmount: props.totalAmount,
       cashGiven: cashGiven.value,
       changeAmount: changeAmount.value,
-      customer: selectedCashCustomer.value || null
+      customer: selectedCashCustomer.value || getUmumCustomer()
     })
   } else {
     if (!selectedCustomer.value && !customerQuery.value.trim()) return
@@ -238,68 +314,170 @@ const submitPayment = () => {
       <div class="flex-1 overflow-y-auto">
         <!-- TAB 1: MODE TUNAI -->
         <div v-if="activeTab === 'cash'" class="px-5 py-2 space-y-3.5">
-          <!-- Pelanggan Pembeli (Opsional) -->
+          <!-- Bagian Data Pelanggan (Default: Umum) -->
           <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+            <!-- Header Judul (Tanpa teks opsional) -->
             <div class="flex items-center justify-between">
-              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <User class="w-3.5 h-3.5 text-slate-400" />
-                <span>Data Pelanggan (Opsional):</span>
+                <span>Pelanggan:</span>
               </label>
+
+              <!-- Tombol Cepat Tambah Pelanggan di samping judul -->
               <button 
-                v-if="selectedCashCustomer"
+                v-if="!isAddingCustomer"
                 type="button"
-                @click="selectedCashCustomer = null; cashCustomerQuery = ''"
-                class="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                @click="openQuickAddForm"
+                class="text-[11px] font-bold text-[#0284c7] hover:text-[#0a193d] flex items-center gap-1 cursor-pointer transition-colors"
+                title="Daftarkan pelanggan baru langsung di sini"
               >
-                Hapus
+                <Plus class="w-3.5 h-3.5" />
+                <span>Tambah Pelanggan</span>
               </button>
             </div>
 
-            <!-- Jika Pelanggan Dipilih -->
-            <div v-if="selectedCashCustomer" class="flex items-center justify-between p-2.5 bg-white border border-[#0284c7] rounded-xl text-xs">
-              <div class="flex items-center gap-2 min-w-0">
-                <div class="w-7 h-7 rounded-lg bg-sky-50 text-[#0284c7] font-bold flex items-center justify-center shrink-0 text-xs">
-                  {{ selectedCashCustomer.name.charAt(0).toUpperCase() }}
-                </div>
-                <div class="truncate">
-                  <span class="font-bold text-[#0a193d]">{{ selectedCashCustomer.name }}</span>
-                  <span v-if="selectedCashCustomer.phone" class="text-slate-400 font-mono text-[11px] ml-1.5">({{ selectedCashCustomer.phone }})</span>
-                </div>
+            <!-- 1. Kondisi: Sedang Tambah Pelanggan Cepat (Inline Form) -->
+            <div v-if="isAddingCustomer" class="p-3 bg-white border border-[#0284c7] rounded-xl space-y-2.5 shadow-2xs animate-in fade-in zoom-in-95 duration-100">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-[#0a193d]">Tambah Pelanggan Baru</span>
+                <button 
+                  type="button" 
+                  @click="cancelQuickAdd"
+                  class="text-[11px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  Batal
+                </button>
               </div>
-              <span class="text-[10px] bg-sky-50 text-[#0284c7] font-bold px-2 py-0.5 rounded-full shrink-0">Terpilih</span>
+
+              <div class="space-y-2">
+                <input 
+                  type="text" 
+                  v-model="newCustName" 
+                  placeholder="Nama Pelanggan (contoh: Bu Siti, Mas Joko)..." 
+                  class="w-full h-9 px-3 text-xs font-semibold bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#0284c7] rounded-xl outline-hidden text-[#0a193d]"
+                  autofocus
+                  @keydown.enter.prevent="handleSaveQuickCustomer"
+                />
+                <input 
+                  type="text" 
+                  v-model="newCustPhone" 
+                  placeholder="Nomor WhatsApp / HP (contoh: 08123...)" 
+                  class="w-full h-9 px-3 text-xs font-mono font-semibold bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#0284c7] rounded-xl outline-hidden text-[#0a193d]"
+                  @keydown.enter.prevent="handleSaveQuickCustomer"
+                />
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-1">
+                <button 
+                  type="button" 
+                  @click="cancelQuickAdd"
+                  class="h-8 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="button" 
+                  @click="handleSaveQuickCustomer"
+                  :disabled="!newCustName.trim()"
+                  class="h-8 px-3.5 bg-[#0a193d] hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                >
+                  <Plus class="w-3.5 h-3.5 text-sky-400" />
+                  <span>Simpan & Pilih</span>
+                </button>
+              </div>
             </div>
 
-            <!-- Input pencarian pelanggan jika belum dipilih -->
-            <div v-else class="space-y-1.5">
+            <!-- 2. Kondisi: Tampilan Pelanggan Terpilih (Normal) -->
+            <div v-else-if="!isCustomerDropdownOpen" class="flex items-center justify-between p-2.5 bg-white border border-slate-200/90 rounded-xl text-xs shadow-2xs">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-xl bg-sky-50 text-[#0284c7] font-bold flex items-center justify-center shrink-0 text-xs border border-sky-100/80">
+                  {{ selectedCashCustomer?.name ? selectedCashCustomer.name.charAt(0).toUpperCase() : 'U' }}
+                </div>
+                <div class="min-w-0 truncate">
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold text-[#0a193d] text-sm truncate">{{ selectedCashCustomer?.name || 'Umum' }}</span>
+                    <span 
+                      v-if="selectedCashCustomer?.name && selectedCashCustomer.name.toLowerCase() === 'umum'" 
+                      class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0"
+                    >
+                      Default
+                    </span>
+                  </div>
+                  <p v-if="selectedCashCustomer?.phone" class="text-slate-400 font-mono text-[11px] truncate">
+                    {{ selectedCashCustomer.phone }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button 
+                  type="button"
+                  @click="isCustomerDropdownOpen = true"
+                  class="h-8 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title="Ganti ke pelanggan lain"
+                >
+                  <Search class="w-3.5 h-3.5 text-slate-500" />
+                  <span>Ganti</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 3. Kondisi: Dropdown Pencarian / Pemilihan Pelanggan -->
+            <div v-else class="space-y-2 bg-white p-2.5 rounded-xl border border-[#0284c7] shadow-2xs">
               <div class="relative">
                 <Search class="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
                 <input 
                   type="text" 
                   v-model="cashCustomerQuery"
-                  placeholder="Ketik nama pelanggan jika ingin dicatat..."
-                  class="w-full h-9 pl-8 pr-3 text-xs font-semibold bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl outline-hidden text-[#0a193d]"
+                  placeholder="Ketik nama pelanggan untuk mencari..."
+                  class="w-full h-9 pl-8 pr-8 text-xs font-semibold bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#0284c7] rounded-xl outline-hidden text-[#0a193d]"
+                  autofocus
                 />
+                <button 
+                  type="button"
+                  @click="isCustomerDropdownOpen = false"
+                  class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
               </div>
 
-              <!-- Saran Pelanggan saat mengetik -->
-              <div v-if="cashCustomerQuery.trim()" class="max-h-28 overflow-y-auto bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-2xs">
+              <!-- Daftar Pelanggan yang Cocok -->
+              <div class="max-h-36 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-lg">
+                <!-- Opsi Cepat Kembali ke "Umum" -->
                 <button 
-                  v-for="c in filteredCashCustomers" 
+                  type="button"
+                  @click="resetToUmum"
+                  class="w-full p-2 px-2.5 text-left hover:bg-slate-50 flex items-center justify-between text-xs cursor-pointer"
+                >
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-[#0a193d]">Umum</span>
+                    <span class="text-[10px] bg-slate-100 text-slate-500 px-1 rounded">Default</span>
+                  </div>
+                  <span v-if="selectedCashCustomer?.name?.toLowerCase() === 'umum'" class="text-[10px] text-[#0284c7] font-bold">Terpilih</span>
+                </button>
+
+                <!-- Pelanggan Tersimpan Lainnya -->
+                <button 
+                  v-for="c in filteredCashCustomers.filter(c => c.name.toLowerCase() !== 'umum')" 
                   :key="c.id"
                   type="button"
                   @click="selectCashCustomer(c)"
-                  class="w-full p-2 px-3 text-left hover:bg-slate-50 flex items-center justify-between text-xs cursor-pointer"
+                  class="w-full p-2 px-2.5 text-left hover:bg-slate-50 flex items-center justify-between text-xs cursor-pointer"
                 >
                   <span class="font-bold text-[#0a193d] truncate">{{ c.name }}</span>
-                  <span v-if="c.phone" class="text-[11px] text-slate-400 font-mono">{{ c.phone }}</span>
+                  <span v-if="c.phone" class="text-[11px] text-slate-400 font-mono shrink-0 ml-2">{{ c.phone }}</span>
                 </button>
+
+                <!-- Opsi Tambah Pelanggan Baru Berdasarkan Ketikan -->
                 <button 
+                  v-if="cashCustomerQuery.trim()"
                   type="button"
                   @click="createAndSelectCashCustomer"
-                  class="w-full p-2 px-3 text-left bg-sky-50/60 hover:bg-sky-100/60 text-[#0284c7] text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  class="w-full p-2 px-2.5 text-left bg-sky-50/70 hover:bg-sky-100 text-[#0284c7] text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus class="w-3.5 h-3.5" />
-                  <span>Tambah pelanggan baru: "{{ cashCustomerQuery }}"</span>
+                  <span class="truncate">Tambah & Pilih: "{{ cashCustomerQuery }}"</span>
                 </button>
               </div>
             </div>

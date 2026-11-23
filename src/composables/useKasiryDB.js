@@ -54,11 +54,28 @@ export function useKasiryDB() {
       .toArray()
     products.value = allProducts
 
-    // 2. Ambil Pelanggan (Buku Utang)
-    const allCustomers = await db.customers
+    // 2. Ambil Pelanggan (Buku Utang & Pembeli)
+    let allCustomers = await db.customers
       .filter(c => !c.deleted)
       .reverse()
       .toArray()
+
+    // Pastikan pelanggan default "Umum" selalu tersedia
+    const hasUmum = allCustomers.some(c => c.name.toLowerCase() === 'umum')
+    if (!hasUmum) {
+      await db.customers.add({
+        name: 'Umum',
+        phone: '',
+        totalDebt: 0,
+        lastDate: 'Hari ini',
+        updatedAt: Date.now(),
+        deleted: false
+      })
+      allCustomers = await db.customers
+        .filter(c => !c.deleted)
+        .reverse()
+        .toArray()
+    }
     customers.value = allCustomers
 
     // 3. Ambil Transaksi Terakhir (100 transaksi terbaru)

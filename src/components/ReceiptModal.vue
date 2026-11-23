@@ -46,6 +46,7 @@ const shareToWhatsApp = () => {
     `No: ${r.invoiceNumber}\n` +
     `Waktu: ${r.time}\n` +
     `Metode: ${r.paymentMethod}\n` +
+    (r.customer?.name ? `Pelanggan: ${r.customer.name}\n` : '') +
     `--------------------------------\n` +
     itemsText +
     `--------------------------------\n` +

@@ -433,10 +433,11 @@ export const seedProducts = [
 
 // Data Pelanggan Awal (Buku Utang Demo Warung)
 export const seedCustomers = [
-  { id: 1, name: 'Bu Tejo', phone: '081234567891', totalDebt: 45000, lastDate: '21 Nov 2026', updatedAt: Date.now(), deleted: false },
-  { id: 2, name: 'Pak RT Bambang', phone: '081398765432', totalDebt: 120000, lastDate: '20 Nov 2026', updatedAt: Date.now(), deleted: false },
-  { id: 3, name: 'Mbak Pur', phone: '085712344321', totalDebt: 15000, lastDate: '22 Nov 2026', updatedAt: Date.now(), deleted: false },
-  { id: 4, name: 'Kang Ujang', phone: '082155566677', totalDebt: 72000, lastDate: '19 Nov 2026', updatedAt: Date.now(), deleted: false }
+  { id: 1, name: 'Umum', phone: '', totalDebt: 0, lastDate: 'Hari ini', updatedAt: Date.now(), deleted: false },
+  { id: 2, name: 'Bu Tejo', phone: '081234567891', totalDebt: 45000, lastDate: '21 Nov 2026', updatedAt: Date.now(), deleted: false },
+  { id: 3, name: 'Pak RT Bambang', phone: '081398765432', totalDebt: 120000, lastDate: '20 Nov 2026', updatedAt: Date.now(), deleted: false },
+  { id: 4, name: 'Mbak Pur', phone: '085712344321', totalDebt: 15000, lastDate: '22 Nov 2026', updatedAt: Date.now(), deleted: false },
+  { id: 5, name: 'Kang Ujang', phone: '082155566677', totalDebt: 72000, lastDate: '19 Nov 2026', updatedAt: Date.now(), deleted: false }
 ]
 
 // Data Pengaturan Profil Awal (Habiba Store)
