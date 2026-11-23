@@ -18,6 +18,21 @@ const licenseStatus = ref({
   txLimit: 999999
 })
 
+// Kategori Barang
+const defaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok', 'Curah', 'Lainnya']
+const customCategories = ref([])
+
+// Gabungan kategori bawaan + kategori kustom + kategori yang ada di barang
+const categories = computed(() => {
+  const set = new Set([...defaultCategories, ...customCategories.value])
+  products.value.forEach(p => {
+    if (p.category && typeof p.category === 'string' && p.category.trim()) {
+      set.add(p.category.trim())
+    }
+  })
+  return Array.from(set)
+})
+
 export function useKasiryDB() {
   // Inisialisasi Database & Muat Data
   const loadDatabase = async () => {
@@ -70,6 +85,12 @@ export function useKasiryDB() {
     const licenseSetting = await db.settings.get('licenseStatus')
     if (licenseSetting && licenseSetting.value) {
       licenseStatus.value = { ...licenseSetting.value }
+    }
+
+    // 5. Ambil Kategori Kustom
+    const catSetting = await db.settings.get('customCategories')
+    if (catSetting && Array.isArray(catSetting.value)) {
+      customCategories.value = catSetting.value
     }
   }
 
@@ -317,6 +338,31 @@ export function useKasiryDB() {
     }
   }
 
+  // Manajemen Kategori
+  const addCategory = async (catName) => {
+    const trimmed = (catName || '').trim()
+    if (!trimmed) return false
+    if (!customCategories.value.includes(trimmed)) {
+      customCategories.value = [...customCategories.value, trimmed]
+      await db.settings.put({
+        key: 'customCategories',
+        value: customCategories.value,
+        updatedAt: Date.now()
+      })
+    }
+    return true
+  }
+
+  const deleteCategory = async (catName) => {
+    customCategories.value = customCategories.value.filter(c => c !== catName)
+    await db.settings.put({
+      key: 'customCategories',
+      value: customCategories.value,
+      updatedAt: Date.now()
+    })
+    return true
+  }
+
   return {
     isDbReady,
     products,
@@ -326,6 +372,11 @@ export function useKasiryDB() {
     debtPayments,
     storeProfile,
     licenseStatus,
+    categories,
+    customCategories,
+    defaultCategories,
+    addCategory,
+    deleteCategory,
     loadDatabase,
     refreshAllData,
     saveProduct,

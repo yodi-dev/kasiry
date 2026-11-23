@@ -11,7 +11,6 @@ import {
   Barcode, 
   Tag, 
   ArrowLeft, 
-  Sparkles,
   TrendingUp 
 } from '@lucide/vue'
 
@@ -23,14 +22,28 @@ const props = defineProps({
   products: {
     type: Array,
     default: () => []
+  },
+  categories: {
+    type: Array,
+    default: () => ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok', 'Curah', 'Lainnya']
   }
 })
 
-const emit = defineEmits(['close', 'saveProduct', 'deleteProduct'])
+const emit = defineEmits([
+  'close', 
+  'saveProduct', 
+  'deleteProduct', 
+  'addCategory', 
+  'deleteCategory'
+])
+
+const defaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok', 'Curah', 'Lainnya']
 
 const searchQuery = ref('')
 const selectedCategory = ref('Semua')
 const isEditing = ref(false)
+const isManagingCategories = ref(false)
+const newCategoryInput = ref('')
 
 const currentProduct = ref({
   id: null,
@@ -42,8 +55,16 @@ const currentProduct = ref({
   isMacro: false
 })
 
-const categories = ['Semua', 'Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok', 'Curah', 'Lainnya']
-const formCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok', 'Curah', 'Lainnya']
+const availableCategories = computed(() => {
+  if (props.categories && props.categories.length > 0) {
+    return props.categories
+  }
+  return defaultCategories
+})
+
+const filterCategories = computed(() => {
+  return ['Semua', ...availableCategories.value]
+})
 
 const filteredProducts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -57,6 +78,10 @@ const filteredProducts = computed(() => {
     return matchesSearch && matchesCategory
   })
 })
+
+const getProductCountByCategory = (cat) => {
+  return props.products.filter(p => p.category === cat).length
+}
 
 // Hitung estimasi keuntungan saat mengisi form
 const estimatedProfit = computed(() => {
@@ -75,7 +100,7 @@ const openAddForm = () => {
     sellPrice: '',
     buyPrice: '',
     barcode: '',
-    category: selectedCategory.value !== 'Semua' ? selectedCategory.value : 'Sembako',
+    category: selectedCategory.value !== 'Semua' ? selectedCategory.value : (availableCategories.value[0] || 'Sembako'),
     isMacro: false
   }
   isEditing.value = true
@@ -88,7 +113,7 @@ const openEditForm = (p) => {
     sellPrice: String(p.sellPrice),
     buyPrice: p.buyPrice ? String(p.buyPrice) : '',
     barcode: p.barcode || '',
-    category: p.category || 'Sembako',
+    category: p.category || (availableCategories.value[0] || 'Sembako'),
     isMacro: !!p.isMacro
   }
   isEditing.value = true
@@ -106,7 +131,7 @@ const handleSave = () => {
     buyPrice: buy > 0 ? buy : Math.round(sell * 0.8),
     barcode: currentProduct.value.barcode.trim(),
     category: currentProduct.value.category,
-    isMacro: currentProduct.value.isMacro
+    isMacro: currentProduct.value.isMacro || false
   })
 
   isEditing.value = false
@@ -115,6 +140,31 @@ const handleSave = () => {
 const handleDelete = (id, name) => {
   if (confirm(`Hapus barang "${name}" dari daftar?`)) {
     emit('deleteProduct', id)
+  }
+}
+
+// Manajemen Kategori
+const handleCreateCategory = () => {
+  const trimmed = newCategoryInput.value.trim()
+  if (!trimmed) return
+  emit('addCategory', trimmed)
+  
+  if (isEditing.value) {
+    currentProduct.value.category = trimmed
+  }
+  
+  newCategoryInput.value = ''
+}
+
+const handleDeleteCategory = (cat) => {
+  if (confirm(`Hapus kategori "${cat}"? Barang dengan kategori ini tidak akan terhapus.`)) {
+    emit('deleteCategory', cat)
+    if (selectedCategory.value === cat) {
+      selectedCategory.value = 'Semua'
+    }
+    if (currentProduct.value.category === cat) {
+      currentProduct.value = availableCategories.value[0] || 'Sembako'
+    }
   }
 }
 </script>
@@ -148,13 +198,9 @@ const handleDelete = (id, name) => {
 
       <!-- VIEW 1: FORM TAMBAH / EDIT BARANG -->
       <div v-if="isEditing" class="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
-        <!-- Sub-header Form Navigasi -->
+        <!-- Sub-header Form Navigasi (Bersih Tanpa Ikon di Judul) -->
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div class="flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-sky-50 text-[#0284c7] flex items-center justify-center font-bold text-xs">
-              <Edit2 v-if="currentProduct.id" class="w-3.5 h-3.5" />
-              <Plus v-else class="w-4 h-4" />
-            </span>
+          <div>
             <h4 class="font-bold text-sm text-[#0a193d]">
               {{ currentProduct.id ? 'Edit Data Barang' : 'Tambah Barang Baru' }}
             </h4>
@@ -250,9 +296,18 @@ const handleDelete = (id, name) => {
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Kategori Produk
-              </label>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Kategori Produk
+                </label>
+                <button 
+                  type="button"
+                  @click="isManagingCategories = true"
+                  class="text-[11px] font-bold text-[#0284c7] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus class="w-3 h-3" /> Tambah Kategori
+                </button>
+              </div>
               <div class="relative">
                 <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Tag class="w-4 h-4" />
@@ -261,28 +316,10 @@ const handleDelete = (id, name) => {
                   v-model="currentProduct.category"
                   class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-xs font-bold text-[#0a193d] outline-hidden transition-all appearance-none cursor-pointer"
                 >
-                  <option v-for="c in formCategories" :key="c" :value="c">{{ c }}</option>
+                  <option v-for="c in availableCategories" :key="c" :value="c">{{ c }}</option>
                 </select>
               </div>
             </div>
-          </div>
-
-          <!-- Pilihan Tombol Cepat Beranda -->
-          <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200/60">
-                <Sparkles class="w-4 h-4" />
-              </div>
-              <div>
-                <strong class="text-xs font-bold text-[#0a193d] block">Tampilkan di Tombol Cepat Beranda</strong>
-                <span class="text-[11px] text-slate-500">Muncul di menu cepat kasir untuk barang paling laris.</span>
-              </div>
-            </div>
-            <input 
-              type="checkbox" 
-              v-model="currentProduct.isMacro"
-              class="w-5 h-5 accent-[#0a193d] rounded cursor-pointer shrink-0"
-            />
           </div>
         </div>
 
@@ -336,10 +373,10 @@ const handleDelete = (id, name) => {
             </button>
           </div>
 
-          <!-- Kategori Filter Chips -->
+          <!-- Kategori Filter Chips + Tombol Kelola Kategori -->
           <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
             <button 
-              v-for="cat in categories" 
+              v-for="cat in filterCategories" 
               :key="cat"
               @click="selectedCategory = cat"
               :class="[
@@ -350,6 +387,16 @@ const handleDelete = (id, name) => {
               ]"
             >
               {{ cat }}
+            </button>
+
+            <!-- Tombol Kelola Kategori -->
+            <button 
+              @click="isManagingCategories = true"
+              class="px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200/60 whitespace-nowrap flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+              title="Kelola & Tambah Kategori"
+            >
+              <Tag class="w-3.5 h-3.5" />
+              <span>Kelola Kategori</span>
             </button>
           </div>
         </div>
@@ -380,15 +427,7 @@ const handleDelete = (id, name) => {
               </div>
 
               <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <h5 class="font-bold text-sm text-[#0a193d] truncate">{{ p.name }}</h5>
-                  <span 
-                    v-if="p.isMacro" 
-                    class="text-[10px] bg-sky-50 text-sky-700 border border-sky-200/60 px-2 py-0.2 rounded-full font-bold flex items-center gap-0.5 shrink-0"
-                  >
-                    ★ Cepat
-                  </span>
-                </div>
+                <h5 class="font-bold text-sm text-[#0a193d] truncate">{{ p.name }}</h5>
 
                 <div class="flex items-center gap-2 mt-0.5 flex-wrap text-xs">
                   <span class="font-bold text-[#0a193d] font-mono">
@@ -442,6 +481,107 @@ const handleDelete = (id, name) => {
           >
             Tutup
           </button>
+        </div>
+      </div>
+
+      <!-- ==================== SUB-VIEW: MODAL KELOLA KATEGORI ==================== -->
+      <div 
+        v-if="isManagingCategories" 
+        class="fixed inset-0 z-60 bg-[#0a193d]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+      >
+        <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[82vh] animate-in zoom-in-95 duration-150">
+          <!-- Header Kelola Kategori -->
+          <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-sky-50 text-[#0284c7] flex items-center justify-center border border-sky-100">
+                <Tag class="w-4 h-4" />
+              </div>
+              <div>
+                <h4 class="text-sm font-bold text-[#0a193d]">Kelola Kategori Barang</h4>
+                <p class="text-[11px] text-slate-500 font-medium">Tambah & atur kategori produk toko</p>
+              </div>
+            </div>
+            <button 
+              @click="isManagingCategories = false"
+              class="w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Body: Buat Kategori Baru & Daftar Kategori -->
+          <div class="p-5 flex-1 overflow-y-auto space-y-4">
+            <!-- Form Input Buat Kategori Baru -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Buat Kategori Baru
+              </label>
+              <div class="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  v-model="newCategoryInput"
+                  @keyup.enter="handleCreateCategory"
+                  placeholder="Contoh: Obat & Herbal, Gas..."
+                  class="flex-1 h-11 px-3.5 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] rounded-xl text-xs sm:text-sm font-semibold text-[#0a193d] outline-hidden transition-all"
+                />
+                <button 
+                  @click="handleCreateCategory"
+                  :disabled="!newCategoryInput.trim()"
+                  class="h-11 px-4 bg-[#0a193d] hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-all shadow-xs"
+                >
+                  <Plus class="w-4 h-4" />
+                  <span>Tambah</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Daftar Kategori -->
+            <div>
+              <p class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Daftar Kategori Tersedia ({{ availableCategories.length }})
+              </p>
+              <div class="space-y-1.5">
+                <div 
+                  v-for="cat in availableCategories" 
+                  :key="cat"
+                  class="p-2.5 px-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/70 flex items-center justify-between gap-2 transition-colors"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <Tag class="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span class="text-xs font-bold text-[#0a193d] truncate">{{ cat }}</span>
+                    <span class="text-[10px] text-slate-400 font-mono">({{ getProductCountByCategory(cat) }} barang)</span>
+                  </div>
+
+                  <div class="shrink-0 flex items-center gap-1.5">
+                    <span 
+                      v-if="defaultCategories.includes(cat)" 
+                      class="text-[10px] bg-slate-200/70 text-slate-600 font-medium px-2 py-0.5 rounded-full"
+                    >
+                      Bawaan
+                    </span>
+                    <button 
+                      v-else 
+                      @click="handleDeleteCategory(cat)"
+                      class="w-7 h-7 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center cursor-pointer transition-colors"
+                      title="Hapus Kategori"
+                    >
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Kelola Kategori -->
+          <div class="p-3.5 bg-slate-50/80 border-t border-slate-100 flex justify-end shrink-0">
+            <button 
+              @click="isManagingCategories = false"
+              class="h-9 px-4 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors"
+            >
+              Selesai
+            </button>
+          </div>
         </div>
       </div>
 

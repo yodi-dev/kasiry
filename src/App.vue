@@ -30,6 +30,9 @@ const {
   debtPayments,
   storeProfile,
   licenseStatus,
+  categories,
+  addCategory,
+  deleteCategory,
   loadDatabase,
   saveProduct,
   deleteProduct,
@@ -497,9 +500,12 @@ onMounted(async () => {
     <ProductManagementModal 
       :isOpen="isProductManageOpen"
       :products="products"
+      :categories="categories"
       @close="isProductManageOpen = false"
       @saveProduct="handleSaveProduct"
       @deleteProduct="handleDeleteProduct"
+      @addCategory="addCategory"
+      @deleteCategory="deleteCategory"
     />
 
     <!-- Modal Pembayaran (Tunai vs Utang) -->
