@@ -297,10 +297,10 @@ const shareWhatsAppReminder = (c) => {
 
           <div>
             <h3 class="text-base font-bold text-[#0a193d] leading-tight">
-              {{ currentView === 'add' ? 'Tambah Tetangga Baru' : currentView === 'pay' ? 'Catat Pembayaran Bon' : 'Buku Utang Digital' }}
+              {{ currentView === 'add' ? 'Tambah Pelanggan Baru' : currentView === 'pay' ? 'Catat Pembayaran Bon' : 'Buku Utang Digital' }}
             </h3>
             <p class="text-xs text-slate-500 font-medium">
-              {{ currentView === 'add' ? 'Catat data tetangga & saldo bon awal' : currentView === 'pay' ? `Pelunasan bon ${selectedCustomer?.name || ''}` : 'Catatan bon belanja tetangga & pembayaran' }}
+              {{ currentView === 'add' ? 'Catat data pelanggan & saldo bon awal' : currentView === 'pay' ? `Pelunasan bon ${selectedCustomer?.name || ''}` : 'Catatan bon belanja pelanggan & pembayaran' }}
             </p>
           </div>
         </div>
@@ -324,7 +324,7 @@ const shareWhatsAppReminder = (c) => {
           <div class="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
             <div>
               <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Piutang Belum Lunas</p>
-              <p class="text-xs text-slate-500 mt-0.5">{{ unpaidCount }} orang belum melunasi bon</p>
+              <p class="text-xs text-slate-500 mt-0.5">{{ unpaidCount }} pelanggan belum melunasi bon</p>
             </div>
             <div class="text-right">
               <p class="text-xl sm:text-2xl font-bold font-mono text-[#0a193d]">
@@ -334,7 +334,7 @@ const shareWhatsAppReminder = (c) => {
           </div>
         </div>
 
-        <!-- Controls: Search, Filter & Tambah Tetangga -->
+        <!-- Controls: Search, Filter & Tambah Pelanggan -->
         <div class="p-4 border-b border-slate-100 space-y-3 shrink-0 bg-white">
           <div class="flex items-center gap-2.5">
             <div class="relative flex-1">
@@ -359,7 +359,7 @@ const shareWhatsAppReminder = (c) => {
               class="h-11 px-4 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-2xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95 shrink-0"
             >
               <UserPlus class="w-4 h-4 text-sky-400" />
-              <span class="hidden sm:inline">Tambah Tetangga</span>
+              <span class="hidden sm:inline">Tambah Pelanggan</span>
               <span class="sm:hidden">Tambah</span>
             </button>
           </div>
@@ -480,7 +480,7 @@ const shareWhatsAppReminder = (c) => {
         <!-- Modal Footer -->
         <div class="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between shrink-0">
           <span class="text-xs text-slate-500 font-medium">
-            Menampilkan {{ filteredList.length }} dari {{ customers.length }} tetangga
+            Menampilkan {{ filteredList.length }} dari {{ customers.length }} pelanggan
           </span>
           <button 
             @click="handleClose"
@@ -492,12 +492,12 @@ const shareWhatsAppReminder = (c) => {
 
       </div>
 
-      <!-- VIEW 2: FORM TAMBAH TETANGGA -->
+      <!-- VIEW 2: FORM TAMBAH PELANGGAN -->
       <div v-else-if="currentView === 'add'" class="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
         <!-- Sub-header Navigasi -->
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
-            <h4 class="font-bold text-sm text-[#0a193d]">Tambah Tetangga Baru</h4>
+            <h4 class="font-bold text-sm text-[#0a193d]">Tambah Pelanggan Baru</h4>
           </div>
           <button 
             @click="currentView = 'list'"
@@ -513,7 +513,7 @@ const shareWhatsAppReminder = (c) => {
           <!-- Nama Lengkap / Panggilan -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Nama Tetangga / Pelanggan <span class="text-rose-500">*</span>
+              Nama Pelanggan <span class="text-rose-500">*</span>
             </label>
             <div class="relative">
               <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">

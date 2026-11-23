@@ -98,7 +98,7 @@ const emit = defineEmits(['openAddProduct', 'openDailyReport', 'openDebtBook'])
           Rp {{ totalDebt.toLocaleString('id-ID') }}
         </p>
         <p class="text-[11px] text-sky-100 font-medium mt-1">
-          Tetangga / Langganan
+          Pelanggan / Langganan
         </p>
       </div>
     </div>

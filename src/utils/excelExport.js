@@ -44,7 +44,7 @@ export function exportKasiryExcel({
     ['Estimasi Untung Bersih', stats.todayProfit || 0],
     ['Bon / Utang Baru Tercatat', stats.todayNewDebt || 0],
     ['Total Transaksi / Struk', `${stats.transactionCount || 0} Kali`],
-    ['Total Piutang Belum Lunas (Semua Tetangga)', customers.reduce((sum, c) => sum + (c.totalDebt || 0), 0)]
+    ['Total Piutang Belum Lunas (Semua Pelanggan)', customers.reduce((sum, c) => sum + (c.totalDebt || 0), 0)]
   ]
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
   wsSummary['!cols'] = [{ wch: 38 }, { wch: 25 }]
@@ -156,7 +156,7 @@ export function exportKasiryExcel({
   XLSX.utils.book_append_sheet(wb, wsProd, 'Barang Terjual')
 
   // ==========================================
-  // SHEET 4: BUKU UTANG TETANGGA
+  // SHEET 4: BUKU UTANG PELANGGAN
   // ==========================================
   const debtHeader = [
     'No',
@@ -183,7 +183,7 @@ export function exportKasiryExcel({
     { wch: 26 },
     { wch: 16 }
   ]
-  XLSX.utils.book_append_sheet(wb, wsDebt, 'Buku Utang Tetangga')
+  XLSX.utils.book_append_sheet(wb, wsDebt, 'Buku Utang Pelanggan')
 
   // Eksekusi download file .xlsx
   const fileDate = new Date().toISOString().slice(0, 10)
