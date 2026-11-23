@@ -2,23 +2,20 @@
 import { ref, watch } from 'vue'
 import { 
   X, 
-  Settings, 
   Store, 
   Cloud, 
   CheckCircle, 
   Database, 
   FileSpreadsheet, 
-  ShieldCheck, 
   RefreshCw, 
-  Key, 
-  ExternalLink,
-  User,
-  Phone,
-  Download,
-  Upload,
-  Check,
-  Smartphone,
-  HardDrive
+  User, 
+  Phone, 
+  Download, 
+  Upload, 
+  Check, 
+  Smartphone, 
+  HardDrive,
+  ShieldCheck
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -33,6 +30,10 @@ const props = defineProps({
       owner: 'Habiba',
       phone: '081234567890'
     })
+  },
+  isOnline: {
+    type: Boolean,
+    default: true
   },
   isGoogleConnected: {
     type: Boolean,
@@ -49,18 +50,6 @@ const props = defineProps({
   isSyncing: {
     type: Boolean,
     default: false
-  },
-  customClientId: {
-    type: String,
-    default: ''
-  },
-  licenseStatus: {
-    type: Object,
-    default: () => ({
-      isLifetime: false,
-      txCount: 42,
-      txLimit: 300
-    })
   }
 })
 
@@ -71,10 +60,8 @@ const emit = defineEmits([
   'disconnectGoogle', 
   'syncNow', 
   'openGoogleSheet', 
-  'updateCustomClientId', 
   'exportBackup', 
-  'importBackup', 
-  'activateLicense'
+  'importBackup'
 ])
 
 // Tab: 'profile' | 'cloud' | 'backup'
@@ -83,9 +70,6 @@ const activeTab = ref('profile')
 const formName = ref(props.storeProfile?.name || 'Habiba Store')
 const formOwner = ref(props.storeProfile?.owner || 'Habiba')
 const formPhone = ref(props.storeProfile?.phone || '081234567890')
-const formClientId = ref(props.customClientId || '')
-const showClientIdInput = ref(false)
-const licenseInput = ref('')
 const fileInputRef = ref(null)
 const isSaved = ref(false)
 
@@ -97,10 +81,6 @@ watch(() => props.storeProfile, (newVal) => {
   }
 }, { deep: true, immediate: true })
 
-watch(() => props.customClientId, (newVal) => {
-  formClientId.value = newVal || ''
-})
-
 const saveProfile = () => {
   emit('updateProfile', {
     name: formName.value.trim() || 'Habiba Store',
@@ -111,17 +91,6 @@ const saveProfile = () => {
   setTimeout(() => {
     isSaved.value = false
   }, 2500)
-}
-
-const saveCustomClientId = () => {
-  emit('updateCustomClientId', formClientId.value.trim())
-  alert('Google Client ID berhasil disimpan!')
-}
-
-const handleLicense = () => {
-  if (!licenseInput.value.trim()) return
-  emit('activateLicense', licenseInput.value.trim())
-  licenseInput.value = ''
 }
 
 const triggerImportFile = () => {
@@ -160,7 +129,7 @@ const onFileSelected = (event) => {
           </div>
           <div>
             <h3 class="text-base font-bold text-[#0a193d] leading-tight">Profil & Pengaturan Toko</h3>
-            <p class="text-xs text-slate-500 font-medium">Identitas warung, Google Sync & cadangan data</p>
+            <p class="text-xs text-slate-500 font-medium">Identitas toko, akun Google, dan cadangan data</p>
           </div>
         </div>
         <button 
@@ -202,11 +171,16 @@ const onFileSelected = (event) => {
               'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border',
               isGoogleConnected 
                 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30' 
-                : 'bg-sky-500/15 text-sky-300 border-sky-400/30'
+                : isOnline 
+                  ? 'bg-sky-500/15 text-sky-300 border-sky-400/30'
+                  : 'bg-rose-500/15 text-rose-300 border-rose-400/30'
             ]"
           >
-            <span class="w-1.5 h-1.5 rounded-full" :class="isGoogleConnected ? 'bg-emerald-400 animate-pulse' : 'bg-sky-400'"></span>
-            {{ isGoogleConnected ? 'Cloud Aktif' : 'Offline' }}
+            <span 
+              class="w-1.5 h-1.5 rounded-full" 
+              :class="isGoogleConnected ? 'bg-emerald-400 animate-pulse' : isOnline ? 'bg-sky-400' : 'bg-rose-400'"
+            ></span>
+            {{ isGoogleConnected ? 'Cloud Aktif' : isOnline ? 'Online' : 'Offline' }}
           </span>
         </div>
       </div>
@@ -237,7 +211,7 @@ const onFileSelected = (event) => {
             ]"
           >
             <Cloud class="w-3.5 h-3.5" />
-            <span>Google Sync</span>
+            <span>Akun Google</span>
           </button>
 
           <button 
@@ -277,7 +251,7 @@ const onFileSelected = (event) => {
                   class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-bold text-[#0a193d] outline-hidden transition-all"
                 />
               </div>
-              <p class="text-[11px] text-slate-500 mt-1">Dicetak di bagian atas struk belanja & laporan harian Excel.</p>
+              <p class="text-[11px] text-slate-500 mt-1">Dicetak di bagian atas struk belanja & laporan harian.</p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -331,72 +305,27 @@ const onFileSelected = (event) => {
             <CheckCircle v-else class="w-4 h-4 text-sky-400" />
             <span>{{ isSaved ? 'Profil Berhasil Disimpan!' : 'Simpan Perubahan Profil' }}</span>
           </button>
-
-          <!-- Status Lisensi Toko -->
-          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <ShieldCheck class="w-4 h-4 text-[#0284c7]" />
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Status Lisensi Kasiry</span>
-              </div>
-              <span 
-                :class="[
-                  'text-[11px] font-bold px-2.5 py-0.5 rounded-full',
-                  licenseStatus.isLifetime 
-                    ? 'bg-emerald-100 text-emerald-800' 
-                    : 'bg-amber-100 text-amber-800'
-                ]"
-              >
-                {{ licenseStatus.isLifetime ? 'Aktif Penuh' : 'Masa Percobaan' }}
-              </span>
-            </div>
-
-            <div v-if="licenseStatus.isLifetime" class="text-xs text-slate-600 flex items-center gap-1.5 pt-1">
-              <CheckCircle class="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Lisensi seumur hidup aktif. Semua fitur kasir, sinkronisasi & laporan tanpa batas.</span>
-            </div>
-
-            <div v-else class="space-y-2 pt-1 text-xs text-slate-600">
-              <p>
-                Terpakai: <strong>{{ licenseStatus.txCount }} / {{ licenseStatus.txLimit }}</strong> transaksi gratis.
-              </p>
-              <div class="flex items-center gap-2">
-                <input 
-                  type="text" 
-                  v-model="licenseInput"
-                  placeholder="Masukkan Kode Aktivasi..."
-                  class="flex-1 h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs font-mono text-[#0a193d] outline-hidden focus:border-[#0284c7]"
-                />
-                <button 
-                  @click="handleLicense"
-                  class="h-9 px-4 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors shadow-2xs"
-                >
-                  Aktivasi
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <!-- ==================== TAB 2: GOOGLE SYNC ==================== -->
+        <!-- ==================== TAB 2: AKUN GOOGLE ==================== -->
         <div v-else-if="activeTab === 'cloud'" class="space-y-3.5">
           <!-- Jika Belum Terhubung -->
           <div v-if="!isGoogleConnected" class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3.5">
             <div class="flex items-center gap-2 text-slate-800">
               <Cloud class="w-5 h-5 text-[#0284c7]" />
-              <h4 class="text-sm font-bold text-[#0a193d]">Sinkronisasi Google Cloud ($0)</h4>
+              <h4 class="text-sm font-bold text-[#0a193d]">Cadangan Otomatis Akun Google</h4>
             </div>
 
             <p class="text-xs text-slate-600 leading-relaxed">
-              Hubungkan akun Google pemilik toko untuk mengaktifkan sinkronisasi multi-device tanpa biaya sewa server:
+              Hubungkan akun Google agar data toko Anda selalu aman dan kasir bisa dibuka dari perangkat lain:
             </p>
 
             <div class="space-y-2 text-xs text-slate-700">
               <div class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-slate-200/60">
                 <HardDrive class="w-4 h-4 text-[#0284c7] shrink-0 mt-0.5" />
                 <div>
-                  <strong class="block text-slate-900">Cadangan Otomatis ke Google Drive</strong>
-                  <span class="text-slate-500 text-[11px]">File backup otomatis disimpan ke Google Drive pribadi secara aman.</span>
+                  <strong class="block text-slate-900">Aman Saat Ganti HP</strong>
+                  <span class="text-slate-500 text-[11px]">Data barang dan catatan penjualan tersimpan aman di Google Drive Anda.</span>
                 </div>
               </div>
 
@@ -404,15 +333,15 @@ const onFileSelected = (event) => {
                 <FileSpreadsheet class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
                   <strong class="block text-slate-900">Buku Kas di Google Sheets</strong>
-                  <span class="text-slate-500 text-[11px]">Riwayat transaksi langsung tercatat ke Google Sheets real-time.</span>
+                  <span class="text-slate-500 text-[11px]">Catatan penjualan langsung rapi dan bisa dipantau lewat spreadsheet.</span>
                 </div>
               </div>
 
               <div class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-slate-200/60">
                 <Smartphone class="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
                 <div>
-                  <strong class="block text-slate-900">Akses Multi-Device</strong>
-                  <span class="text-slate-500 text-[11px]">Buka kasir di beberapa HP bersamaan, data otomatis tersinkron.</span>
+                  <strong class="block text-slate-900">Bisa Buka di Banyak HP</strong>
+                  <span class="text-slate-500 text-[11px]">HP kasir dan HP pemilik toko bisa mengakses data toko yang sama.</span>
                 </div>
               </div>
             </div>
@@ -427,7 +356,7 @@ const onFileSelected = (event) => {
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
               </svg>
-              <span>Hubungkan Akun Google (1-Klik)</span>
+              <span>Hubungkan dengan Akun Google</span>
             </button>
           </div>
 
@@ -452,14 +381,14 @@ const onFileSelected = (event) => {
                   </div>
                 </div>
                 <span class="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-200 px-2.5 py-1 rounded-full">
-                  Multi-Device Aktif
+                  Tersambung
                 </span>
               </div>
 
               <div class="p-2.5 bg-white rounded-xl border border-emerald-100 text-xs text-slate-600 flex items-center justify-between">
-                <span class="font-medium">Status Sinkronisasi Terakhir:</span>
+                <span class="font-medium">Terakhir Disimpan:</span>
                 <span class="font-bold text-[#0a193d]">
-                  {{ lastSyncTime ? new Date(lastSyncTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Siap sinkron' }}
+                  {{ lastSyncTime ? new Date(lastSyncTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Siap disimpan' }}
                 </span>
               </div>
             </div>
@@ -472,7 +401,7 @@ const onFileSelected = (event) => {
                 class="h-11 px-4 bg-[#0a193d] hover:bg-slate-800 disabled:opacity-50 text-white font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer text-xs transition-all shadow-xs active:scale-95"
               >
                 <RefreshCw :class="['w-4 h-4 text-sky-400', isSyncing ? 'animate-spin' : '']" />
-                <span>{{ isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang' }}</span>
+                <span>{{ isSyncing ? 'Menyimpan Data...' : 'Simpan ke Google Sekarang' }}</span>
               </button>
 
               <button 
@@ -480,7 +409,7 @@ const onFileSelected = (event) => {
                 class="h-11 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer text-xs transition-all shadow-xs active:scale-95"
               >
                 <FileSpreadsheet class="w-4 h-4 text-emerald-200" />
-                <span>Buka Google Sheets</span>
+                <span>Buka Buku Kas (Sheets)</span>
               </button>
             </div>
 
@@ -494,34 +423,6 @@ const onFileSelected = (event) => {
               </button>
             </div>
           </div>
-
-          <!-- Advanced Google Client ID -->
-          <div class="pt-1 border-t border-slate-100">
-            <button 
-              @click="showClientIdInput = !showClientIdInput"
-              class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1.5 cursor-pointer font-medium py-1"
-            >
-              <Key class="w-3.5 h-3.5" />
-              <span>Pengaturan Google Client ID (Opsional untuk pengembang)</span>
-            </button>
-            <div v-if="showClientIdInput" class="mt-2 p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-2">
-              <p class="text-slate-500 text-[11px]">
-                Gunakan Client ID Google Cloud kustom jika menggunakan domain produksi sendiri:
-              </p>
-              <input 
-                type="text" 
-                v-model="formClientId"
-                placeholder="apps.googleusercontent.com..."
-                class="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-900 outline-hidden focus:border-[#0284c7]"
-              />
-              <button 
-                @click="saveCustomClientId"
-                class="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl cursor-pointer"
-              >
-                Simpan Client ID
-              </button>
-            </div>
-          </div>
         </div>
 
         <!-- ==================== TAB 3: CADANGAN DATA ==================== -->
@@ -529,10 +430,10 @@ const onFileSelected = (event) => {
           <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
             <div class="flex items-center gap-2 text-[#0a193d]">
               <Database class="w-5 h-5 text-[#0284c7]" />
-              <h4 class="text-sm font-bold">Cadangan File Offline (.json)</h4>
+              <h4 class="text-sm font-bold">Cadangan Mandiri</h4>
             </div>
             <p class="text-xs text-slate-600 leading-relaxed">
-              Semua data kasir Anda tersimpan 100% di memori perangkat ini (IndexedDB). Anda bisa mengunduh file cadangan mandiri untuk dipindahkan ke HP lain atau disimpan di flashdisk/laptop.
+              Simpan salinan data toko ke HP atau komputer agar Anda punya arsip cadangan yang aman tanpa perlu koneksi internet.
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
@@ -543,8 +444,8 @@ const onFileSelected = (event) => {
                 <div class="w-8 h-8 rounded-xl bg-sky-50 text-[#0284c7] flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                   <Download class="w-4 h-4" />
                 </div>
-                <strong class="text-xs font-bold text-[#0a193d] block">Unduh Cadangan</strong>
-                <span class="text-[11px] text-slate-500">Simpan file .json ke HP/PC</span>
+                <strong class="text-xs font-bold text-[#0a193d] block">Download Cadangan Toko</strong>
+                <span class="text-[11px] text-slate-500">Simpan salinan data ke HP / Komputer</span>
               </button>
 
               <button 
@@ -554,8 +455,8 @@ const onFileSelected = (event) => {
                 <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                   <Upload class="w-4 h-4" />
                 </div>
-                <strong class="text-xs font-bold text-[#0a193d] block">Pulihkan Data</strong>
-                <span class="text-[11px] text-slate-500">Impor data dari file .json</span>
+                <strong class="text-xs font-bold text-[#0a193d] block">Pulihkan Data Toko</strong>
+                <span class="text-[11px] text-slate-500">Buka file cadangan yang pernah disimpan</span>
               </button>
 
               <input 
@@ -570,15 +471,25 @@ const onFileSelected = (event) => {
 
           <div class="p-3 bg-sky-50/60 rounded-2xl border border-sky-100 flex items-center gap-2.5 text-xs text-sky-900">
             <ShieldCheck class="w-4 h-4 text-[#0284c7] shrink-0" />
-            <span>Penyimpanan lokal: <strong>Dexie.js IndexedDB</strong> aktif. Data transaksi aman walau internet mati total.</span>
+            <span>Semua data transaksi otomatis tersimpan di HP ini dan tetap bisa dipakai walau tanpa kuota internet.</span>
           </div>
         </div>
 
       </div>
 
-      <!-- 5. Footer -->
+      <!-- 5. Footer with Credit -->
       <div class="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between shrink-0">
-        <span class="text-xs text-slate-400 font-medium">Kasiry • Habiba Store</span>
+        <p class="text-xs text-slate-500 font-medium flex items-center gap-1">
+          <span>Crafted with ❤️ by</span>
+          <a 
+            href="https://awanbeo.my.id" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            class="font-bold text-[#0284c7] hover:underline"
+          >
+            awanbeo (awanbeo.my.id)
+          </a>
+        </p>
         <button 
           @click="emit('close')"
           class="h-10 px-5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200/90 cursor-pointer transition-colors shadow-2xs"

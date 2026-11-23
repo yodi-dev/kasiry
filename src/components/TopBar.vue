@@ -198,8 +198,19 @@ const triggerAction = (actionEvent) => {
           </nav>
         </div>
 
-        <div class="p-4 border-t border-slate-100 text-xs text-slate-400">
-          Kasiry • Habiba Store
+        <div class="p-4 border-t border-slate-100 text-xs text-slate-500">
+          <p class="font-bold text-slate-700">{{ storeName }}</p>
+          <p class="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
+            <span>Crafted with ❤️ by</span>
+            <a 
+              href="https://awanbeo.my.id" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="font-bold text-[#0284c7] hover:underline"
+            >
+              awanbeo (awanbeo.my.id)
+            </a>
+          </p>
         </div>
       </div>
     </div>
