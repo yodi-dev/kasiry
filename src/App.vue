@@ -542,6 +542,7 @@ onMounted(async () => {
     <DailyReportModal 
       :isOpen="isDailyReportOpen"
       :stats="stats"
+      :transactions="transactions"
       :storeName="storeProfile.name"
       @close="isDailyReportOpen = false"
       @downloadExcel="handleDownloadExcel"
