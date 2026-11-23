@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { X, Settings, Store, Cloud, CheckCircle, Database, FileSpreadsheet, ShieldCheck } from '@lucide/vue'
+import { X, Settings, Store, Cloud, CheckCircle, Database, FileSpreadsheet, ShieldCheck, RefreshCw, Key, ExternalLink } from '@lucide/vue'
 
 const props = defineProps({
   isOpen: {
@@ -23,6 +23,18 @@ const props = defineProps({
     type: Object,
     default: null
   },
+  lastSyncTime: {
+    type: String,
+    default: null
+  },
+  isSyncing: {
+    type: Boolean,
+    default: false
+  },
+  customClientId: {
+    type: String,
+    default: ''
+  },
   licenseStatus: {
     type: Object,
     default: () => ({
@@ -38,7 +50,9 @@ const emit = defineEmits([
   'updateProfile', 
   'connectGoogle', 
   'disconnectGoogle', 
+  'syncNow',
   'openGoogleSheet', 
+  'updateCustomClientId',
   'exportBackup', 
   'importBackup',
   'activateLicense'
@@ -47,6 +61,8 @@ const emit = defineEmits([
 const formName = ref(props.storeProfile.name)
 const formOwner = ref(props.storeProfile.owner)
 const formPhone = ref(props.storeProfile.phone)
+const formClientId = ref(props.customClientId)
+const showClientIdInput = ref(false)
 const licenseInput = ref('')
 const fileInputRef = ref(null)
 
@@ -56,6 +72,11 @@ const saveProfile = () => {
     owner: formOwner.value.trim(),
     phone: formPhone.value.trim()
   })
+}
+
+const saveCustomClientId = () => {
+  emit('updateCustomClientId', formClientId.value.trim())
+  alert('Google Client ID berhasil disimpan!')
 }
 
 const handleLicense = () => {
@@ -193,25 +214,86 @@ const onFileSelected = (event) => {
           </div>
 
           <!-- Jika Sudah Terhubung -->
-          <div v-else class="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 text-xs space-y-2">
-            <div class="flex items-center gap-2">
-              <CheckCircle class="w-4 h-4 text-emerald-700" />
-              <span class="font-medium text-emerald-950">
-                Tersambung: {{ googleUser?.name || 'Pemilik Warung' }}
+          <div v-else class="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 text-xs space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <img 
+                  v-if="googleUser?.picture" 
+                  :src="googleUser.picture" 
+                  referrerpolicy="no-referrer"
+                  class="w-7 h-7 rounded-full border border-emerald-300"
+                />
+                <div v-else class="w-7 h-7 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
+                  {{ googleUser?.name?.charAt(0) || 'G' }}
+                </div>
+                <div>
+                  <p class="font-bold text-slate-900 leading-tight">{{ googleUser?.name || 'Pemilik Warung' }}</p>
+                  <p class="text-[11px] text-slate-500 font-mono">{{ googleUser?.email || '' }}</p>
+                </div>
+              </div>
+              <span class="text-[10px] font-medium text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                Multi-Device Aktif
               </span>
             </div>
-            <div class="flex gap-2 pt-1">
+
+            <div class="p-2 bg-white/80 rounded-lg border border-emerald-100 text-[11px] text-slate-600 flex items-center justify-between">
+              <span>Status Cloud:</span>
+              <span class="font-medium text-slate-800">
+                {{ lastSyncTime ? 'Tersinkron (' + new Date(lastSyncTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ')' : 'Siap sinkron' }}
+              </span>
+            </div>
+
+            <div class="flex gap-2 pt-0.5 flex-wrap">
+              <button 
+                @click="emit('syncNow')"
+                :disabled="isSyncing"
+                class="h-8 px-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-medium rounded-lg flex items-center gap-1.5 cursor-pointer text-xs transition-colors shadow-2xs"
+              >
+                <RefreshCw :class="['w-3.5 h-3.5', isSyncing ? 'animate-spin' : '']" />
+                <span>{{ isSyncing ? 'Sinkronisasi...' : 'Sinkronkan Sekarang' }}</span>
+              </button>
+
               <button 
                 @click="emit('openGoogleSheet')"
-                class="h-8 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-lg flex items-center gap-1.5 cursor-pointer text-xs"
+                class="h-8 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-lg flex items-center gap-1.5 cursor-pointer text-xs transition-colors shadow-2xs"
               >
-                <FileSpreadsheet class="w-3.5 h-3.5" /> Buka Google Sheets
+                <FileSpreadsheet class="w-3.5 h-3.5" />
+                <span>Buka Google Sheets</span>
               </button>
+
               <button 
                 @click="emit('disconnectGoogle')"
-                class="h-8 px-2.5 bg-white text-slate-700 border border-slate-300 font-medium rounded-lg hover:bg-slate-50 cursor-pointer text-xs"
+                class="h-8 px-2.5 bg-white text-slate-600 border border-slate-300 font-medium rounded-lg hover:bg-slate-50 cursor-pointer text-xs transition-colors ml-auto"
               >
                 Putuskan
+              </button>
+            </div>
+          </div>
+
+          <!-- Pengaturan Lanjutan Client ID (Opsional) -->
+          <div class="pt-1">
+            <button 
+              @click="showClientIdInput = !showClientIdInput"
+              class="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer font-medium"
+            >
+              <Key class="w-3 h-3" />
+              <span>Pengaturan Google Client ID (Opsional)</span>
+            </button>
+            <div v-if="showClientIdInput" class="mt-2 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+              <p class="text-slate-500 text-[11px]">
+                Gunakan Client ID Google Cloud sendiri untuk akses produksi domain kustom:
+              </p>
+              <input 
+                type="text" 
+                v-model="formClientId"
+                placeholder="apps.googleusercontent.com..."
+                class="w-full h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 outline-hidden"
+              />
+              <button 
+                @click="saveCustomClientId"
+                class="h-7 px-2.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium rounded-md cursor-pointer"
+              >
+                Simpan Client ID
               </button>
             </div>
           </div>

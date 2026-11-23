@@ -18,6 +18,7 @@ import { useKasiryDB } from './composables/useKasiryDB'
 import { useHardwareScanner } from './composables/useHardwareScanner'
 import { playBeepSound } from './utils/sound'
 import { exportKasiryExcel } from './utils/excelExport'
+import { useGoogleSync } from './composables/useGoogleSync'
 
 // Dexie Database Composable (IndexedDB Engine)
 const {
@@ -37,9 +38,27 @@ const {
   recordDebtPayment,
   recordTransaction,
   saveStoreProfile,
+  getFullDatabasePayload,
   exportBackupJSON,
   importBackupJSON
 } = useKasiryDB()
+
+// Google Drive & Sheets Sync Composable ($0 Cloud Multi-Device Engine)
+const {
+  isConnected: isGoogleConnected,
+  userProfile: googleUser,
+  lastSyncTime,
+  linkedSheetId,
+  customClientId,
+  isConnecting: isGoogleConnecting,
+  isSyncing: isGoogleSyncing,
+  statusMessage: googleSyncStatus,
+  connect: connectGoogle,
+  disconnect: disconnectGoogle,
+  syncWithCloud,
+  appendTransactionToSheet,
+  ensureSpreadsheet
+} = useGoogleSync()
 
 // State Keranjang Belanja Awal (Mulai Kosong agar Bar Pembayaran Muncul Hanya Saat Ada Barang)
 const cart = ref([])
@@ -59,10 +78,8 @@ const isReceiptOpen = ref(false)
 const isCameraOpen = ref(false)
 const isProductManageOpen = ref(false)
 
-// State Transaksi & Google
+// State Transaksi Struk
 const receiptData = ref(null)
-const isGoogleConnected = ref(false)
-const googleUser = ref(null)
 
 // Computed Laporan Kasir Real-time dari Transaksi Hari Ini
 const stats = computed(() => {
@@ -200,16 +217,20 @@ const handleProcessCashPayment = async (data) => {
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
   const invoice = `KSR-${Date.now().toString().slice(-6)}`
 
-  await recordTransaction({
+  const txPayload = {
     invoiceNumber: invoice,
     totalAmount: data.totalAmount,
     paymentMethod: 'TUNAI',
     cashGiven: data.cashGiven,
     changeAmount: data.changeAmount,
     items: [...cart.value]
-  })
+  }
 
+  await recordTransaction(txPayload)
   playBeepSound('success')
+
+  // Catat ke Google Sheets secara asinkron di latar belakang jika terhubung
+  appendTransactionToSheet(txPayload)
 
   receiptData.value = {
     invoiceNumber: invoice,
@@ -231,15 +252,19 @@ const handleProcessDebtPayment = async (data) => {
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
   const invoice = `BON-${Date.now().toString().slice(-6)}`
 
-  await recordTransaction({
+  const txPayload = {
     invoiceNumber: invoice,
     totalAmount: data.totalAmount,
     paymentMethod: 'UTANG / BON',
     customer: data.customer,
     items: [...cart.value]
-  })
+  }
 
+  await recordTransaction(txPayload)
   playBeepSound('success')
+
+  // Catat ke Google Sheets secara asinkron di latar belakang jika terhubung
+  appendTransactionToSheet(txPayload)
 
   receiptData.value = {
     invoiceNumber: invoice,
@@ -309,22 +334,49 @@ const handleUpdateProfile = async (newProfile) => {
   alert('Identitas warung berhasil diperbarui!')
 }
 
-const handleConnectGoogle = () => {
-  isGoogleConnected.value = true
-  googleUser.value = {
-    name: storeProfile.value.owner || 'Habiba',
-    email: 'habiba.store@gmail.com'
+const handleConnectGoogle = async () => {
+  const res = await connectGoogle()
+  if (res.success) {
+    playBeepSound('success')
+    handleSyncCloud()
+  } else if (res.error) {
+    alert(res.error)
   }
-  alert('Akun Google berhasil terhubung!')
 }
 
 const handleDisconnectGoogle = () => {
-  isGoogleConnected.value = false
-  googleUser.value = null
+  disconnectGoogle()
 }
 
-const handleOpenGoogleSheet = () => {
-  window.open('https://docs.google.com/spreadsheets/', '_blank')
+const handleSyncCloud = async () => {
+  const localPayload = await getFullDatabasePayload()
+  const res = await syncWithCloud(localPayload, async (mergedPayload) => {
+    await importBackupJSON(mergedPayload)
+  }, false)
+
+  if (res.success) {
+    playBeepSound('success')
+    alert('Sinkronisasi cloud berhasil! Data antar-perangkat telah cocok.')
+  } else if (res.error) {
+    alert('Gagal sinkronisasi: ' + res.error)
+  }
+}
+
+const handleOpenGoogleSheet = async () => {
+  let sheetId = linkedSheetId.value
+  if (!sheetId) {
+    sheetId = await ensureSpreadsheet()
+  }
+  if (sheetId) {
+    window.open(`https://docs.google.com/spreadsheets/d/${sheetId}`, '_blank')
+  } else {
+    window.open('https://docs.google.com/spreadsheets/', '_blank')
+  }
+}
+
+const handleUpdateCustomClientId = (clientId) => {
+  customClientId.value = clientId
+  localStorage.setItem('kasiry_custom_client_id', clientId)
 }
 
 const handleSaveCustomer = async (custData) => {
@@ -363,6 +415,13 @@ const handleActivateLicense = (code) => {
 onMounted(async () => {
   await loadDatabase()
   barcodeInputBarRef.value?.focusInput()
+  // Jika akun Google aktif, lakukan sinkronisasi otomatis diam-diam di latar belakang saat buka aplikasi
+  if (isGoogleConnected.value) {
+    const localPayload = await getFullDatabasePayload()
+    syncWithCloud(localPayload, async (mergedPayload) => {
+      await importBackupJSON(mergedPayload)
+    }, false)
+  }
 })
 </script>
 
@@ -373,6 +432,8 @@ onMounted(async () => {
       :storeName="storeProfile.name"
       :isOnline="true"
       :totalDebtCount="customers.length"
+      :isGoogleConnected="isGoogleConnected"
+      :googleUser="googleUser"
       @openDebtBook="isDebtBookOpen = true"
       @openDailyReport="isDailyReportOpen = true"
       @openSettings="isSettingsOpen = true"
@@ -480,12 +541,17 @@ onMounted(async () => {
       :storeProfile="storeProfile"
       :isGoogleConnected="isGoogleConnected"
       :googleUser="googleUser"
+      :lastSyncTime="lastSyncTime"
+      :isSyncing="isGoogleSyncing"
+      :customClientId="customClientId"
       :licenseStatus="licenseStatus"
       @close="isSettingsOpen = false"
       @updateProfile="handleUpdateProfile"
       @connectGoogle="handleConnectGoogle"
       @disconnectGoogle="handleDisconnectGoogle"
+      @syncNow="handleSyncCloud"
       @openGoogleSheet="handleOpenGoogleSheet"
+      @updateCustomClientId="handleUpdateCustomClientId"
       @exportBackup="handleExportBackup"
       @importBackup="handleImportBackup"
       @activateLicense="handleActivateLicense"

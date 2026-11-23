@@ -23,6 +23,14 @@ const props = defineProps({
   totalDebtCount: {
     type: Number,
     default: 4
+  },
+  isGoogleConnected: {
+    type: Boolean,
+    default: false
+  },
+  googleUser: {
+    type: Object,
+    default: null
   }
 })
 
@@ -70,15 +78,22 @@ const triggerAction = (actionEvent) => {
 
     <!-- Right: User/Store Profile Avatar (matches reference) -->
     <div class="relative cursor-pointer" @click="emit('openSettings')">
-      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#0284c7] to-[#38bdf8] p-0.5 shadow-sm border border-white/80 flex items-center justify-center">
-        <div class="w-full h-full rounded-[14px] bg-[#0a193d] flex items-center justify-center text-white text-xs font-bold">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#0284c7] to-[#38bdf8] p-0.5 shadow-sm border border-white/80 flex items-center justify-center overflow-hidden">
+        <img 
+          v-if="isGoogleConnected && googleUser?.picture" 
+          :src="googleUser.picture" 
+          referrerpolicy="no-referrer"
+          class="w-full h-full rounded-[14px] object-cover"
+        />
+        <div v-else class="w-full h-full rounded-[14px] bg-[#0a193d] flex items-center justify-center text-white text-xs font-bold">
           HS
         </div>
       </div>
-      <!-- Online Status Dot -->
+      <!-- Online / Cloud Sync Status Dot -->
       <span 
-        class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white"
-        :class="isOnline ? 'bg-emerald-500' : 'bg-slate-400'"
+        class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center text-[7px] text-white"
+        :class="isGoogleConnected ? 'bg-emerald-500' : isOnline ? 'bg-sky-500' : 'bg-slate-400'"
+        :title="isGoogleConnected ? 'Cloud Sync Aktif' : isOnline ? 'Online' : 'Offline'"
       ></span>
     </div>
 

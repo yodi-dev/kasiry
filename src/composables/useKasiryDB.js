@@ -235,15 +235,15 @@ export function useKasiryDB() {
     })
   }
 
-  // Ekspor Cadangan ke File JSON
-  const exportBackupJSON = async () => {
+  // Dapatkan seluruh data database untuk sinkronisasi cloud
+  const getFullDatabasePayload = async () => {
     const allProducts = await db.products.toArray()
     const allCustomers = await db.customers.toArray()
     const allTransactions = await db.transactions.toArray()
     const allDebtPayments = await db.debtPayments.toArray()
     const allSettings = await db.settings.toArray()
 
-    const backupData = {
+    return {
       app: 'Kasiry POS',
       version: '2.2',
       exportedAt: new Date().toISOString(),
@@ -256,6 +256,11 @@ export function useKasiryDB() {
         settings: allSettings
       }
     }
+  }
+
+  // Ekspor Cadangan ke File JSON
+  const exportBackupJSON = async () => {
+    const backupData = await getFullDatabasePayload()
 
     const jsonString = JSON.stringify(backupData, null, 2)
     const blob = new Blob([jsonString], { type: 'application/json' })
@@ -330,6 +335,7 @@ export function useKasiryDB() {
     recordDebtPayment,
     recordTransaction,
     saveStoreProfile,
+    getFullDatabasePayload,
     exportBackupJSON,
     importBackupJSON
   }
