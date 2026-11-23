@@ -105,6 +105,16 @@ const formatCustomerDate = (c) => {
   return c.lastDate || 'Hari ini'
 }
 
+// Format nomor HP agar rapi dan mudah dibaca
+const formatPhone = (phone) => {
+  if (!phone) return ''
+  const clean = String(phone).replace(/\D/g, '')
+  if (clean.length >= 10) {
+    return clean.replace(/(\d{4})(\d{4})(\d+)/, '$1-$2-$3')
+  }
+  return phone
+}
+
 // Ambil riwayat bon belanja pelanggan jika ada transaksi tercatat
 const customerDebtTransactions = computed(() => {
   if (!selectedCustomer.value || !props.transactions) return []
@@ -337,33 +347,41 @@ const shareWhatsAppReminder = (c) => {
             <p class="text-[11px] text-slate-400 mt-0.5">Coba ubah kata kunci pencarian atau filter status</p>
           </div>
 
-          <!-- Baris Pelanggan (Sesuai Permintaan: Nama, Tanggal di Bawahnya, Nominal & Tombol Bayar di Sampingnya) -->
+          <!-- Baris Pelanggan (Nama, Tanggal di Bawahnya, Nominal & Tombol Bayar di Sampingnya) -->
           <div 
             v-for="c in filteredList" 
             :key="c.id"
-            class="p-4 bg-white hover:bg-slate-50/80 border border-slate-200/80 rounded-2xl transition-all shadow-2xs flex items-center justify-between gap-4"
+            class="p-3.5 sm:p-4 bg-white hover:bg-slate-50/80 border border-slate-200/80 rounded-2xl transition-all shadow-2xs flex items-center justify-between gap-3"
           >
             <!-- Kolom Kiri: Nama & Tanggal di Bawahnya -->
-            <div class="min-w-0 flex-1">
+            <div class="min-w-0 flex-1 space-y-1">
               <h4 class="font-bold text-base text-[#0a193d] leading-tight truncate">
                 {{ c.name }}
               </h4>
               
-              <!-- Tanggal ditampilkan jelas di bawah nama -->
-              <p class="text-xs text-slate-500 font-medium mt-1 flex items-center gap-1.5">
+              <!-- Tanggal ditampilkan jelas di bawah nama (Baris 1) -->
+              <p class="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
                 <Calendar class="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>{{ formatCustomerDate(c) }}</span>
-                <span v-if="c.phone" class="text-slate-400 font-mono text-[11px]">({{ c.phone }})</span>
+              </p>
+
+              <!-- Nomor HP di baris terpisah agar tidak tumpang tindih (Baris 2) -->
+              <p v-if="c.phone" class="text-xs text-slate-400 font-mono flex items-center gap-1.5 truncate">
+                <Phone class="w-3 h-3 text-slate-400 shrink-0" />
+                <span>{{ formatPhone(c.phone) }}</span>
               </p>
             </div>
 
             <!-- Kolom Kanan: Nominal Utang & Tombol Bayar di Sampingnya -->
-            <div class="flex items-center gap-3 shrink-0">
+            <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
               <div class="text-right">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  {{ (c.totalDebt || 0) > 0 ? 'Sisa Bon' : 'Status' }}
+                </span>
                 <span 
                   :class="[
                     'font-mono font-bold text-base sm:text-lg block leading-tight',
-                    (c.totalDebt || 0) > 0 ? 'text-[#0a193d]' : 'text-slate-400'
+                    (c.totalDebt || 0) > 0 ? 'text-rose-600' : 'text-slate-400'
                   ]"
                 >
                   Rp {{ (c.totalDebt || 0).toLocaleString('id-ID') }}
@@ -374,7 +392,7 @@ const shareWhatsAppReminder = (c) => {
               <button 
                 v-if="(c.totalDebt || 0) > 0"
                 @click="openPayView(c)"
-                class="h-10 px-4 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-xs shrink-0"
+                class="h-10 px-4 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center cursor-pointer transition-all active:scale-95 shadow-xs shrink-0"
               >
                 Bayar
               </button>
@@ -518,9 +536,13 @@ const shareWhatsAppReminder = (c) => {
           <div class="flex items-center justify-between gap-3">
             <div>
               <p class="text-sm font-bold text-[#0a193d]">{{ selectedCustomer?.name }}</p>
-              <p class="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1">
-                <Calendar class="w-3 h-3 text-slate-400" />
+              <p class="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1.5">
+                <Calendar class="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>Tanggal bon: {{ formatCustomerDate(selectedCustomer) }}</span>
+              </p>
+              <p v-if="selectedCustomer?.phone" class="text-xs text-slate-400 font-mono mt-0.5 flex items-center gap-1.5">
+                <Phone class="w-3 h-3 text-slate-400 shrink-0" />
+                <span>{{ formatPhone(selectedCustomer.phone) }}</span>
               </p>
             </div>
 
