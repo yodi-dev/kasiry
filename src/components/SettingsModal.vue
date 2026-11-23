@@ -224,38 +224,58 @@ const onFileSelected = (event) => {
           <div class="space-y-3">
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Nama Pemilik
+                Nama Toko / Warung
               </label>
               <div class="relative">
                 <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <User class="w-4 h-4" />
+                  <Store class="w-4 h-4" />
                 </span>
                 <input 
                   type="text" 
-                  v-model="formOwner"
-                  placeholder="Contoh: Habiba"
+                  v-model="formName"
+                  placeholder="Contoh: Habiba Store"
                   class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-bold text-[#0a193d] outline-hidden transition-all"
                 />
               </div>
+              <p class="text-[11px] text-slate-500 mt-1">Dicetak di bagian atas struk belanja & laporan harian.</p>
             </div>
 
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Nomor WhatsApp Toko
-              </label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Phone class="w-4 h-4" />
-                </span>
-                <input 
-                  type="text" 
-                  v-model="formPhone"
-                  placeholder="081234567890"
-                  class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-mono font-semibold text-[#0a193d] outline-hidden transition-all"
-                />
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Nama Pemilik
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <User class="w-4 h-4" />
+                  </span>
+                  <input 
+                    type="text" 
+                    v-model="formOwner"
+                    placeholder="Contoh: Habiba"
+                    class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-semibold text-[#0a193d] outline-hidden transition-all"
+                  />
+                </div>
               </div>
-              <p class="text-[11px] text-slate-500 mt-1">Digunakan saat mengirim struk belanja via WhatsApp ke pelanggan.</p>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Nomor WhatsApp Toko
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Phone class="w-4 h-4" />
+                  </span>
+                  <input 
+                    type="text" 
+                    v-model="formPhone"
+                    placeholder="081234567890"
+                    class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-mono font-semibold text-[#0a193d] outline-hidden transition-all"
+                  />
+                </div>
+              </div>
             </div>
+            <p class="text-[11px] text-slate-500">Nomor WhatsApp digunakan saat mengirim struk belanja via WhatsApp ke pelanggan.</p>
           </div>
 
           <!-- Single Primary Save Button -->
