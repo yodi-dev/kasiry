@@ -530,6 +530,7 @@ onMounted(async () => {
     <DebtBookModal 
       :isOpen="isDebtBookOpen"
       :customers="customers"
+      :transactions="transactions"
       :storeName="storeProfile.name"
       @close="isDebtBookOpen = false"
       @recordPayment="handleRecordDebtPayment"

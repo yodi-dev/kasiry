@@ -7,11 +7,11 @@ import {
   Check, 
   Search, 
   UserPlus, 
-  Trash2, 
-  Edit2, 
   ArrowLeft, 
   Phone,
-  User
+  User,
+  Calendar,
+  Receipt
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -20,6 +20,10 @@ const props = defineProps({
     default: false
   },
   customers: {
+    type: Array,
+    default: () => []
+  },
+  transactions: {
     type: Array,
     default: () => []
   },
@@ -41,9 +45,8 @@ const activeFilter = ref('unpaid') // 'unpaid' | 'all' | 'paid'
 const selectedCustomer = ref(null)
 const paymentAmount = ref('')
 
-// State untuk Tambah / Edit Pelanggan
+// State untuk Tambah Pelanggan Baru
 const customerForm = ref({
-  id: null,
   name: '',
   phone: '',
   totalDebt: ''
@@ -82,7 +85,38 @@ const filteredList = computed(() => {
   )
 })
 
-// Perhitungan sisa utang secara real-time
+// Format tanggal bon yang jelas dan mudah dipahami
+const formatCustomerDate = (c) => {
+  if (!c) return '-'
+  if (c.updatedAt) {
+    const d = new Date(c.updatedAt)
+    const now = new Date()
+    const isToday = d.toDateString() === now.toDateString()
+    if (isToday) {
+      const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      return `Hari ini, ${timeStr}`
+    }
+    return d.toLocaleDateString('id-ID', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric' 
+    })
+  }
+  return c.lastDate || 'Hari ini'
+}
+
+// Ambil riwayat bon belanja pelanggan jika ada transaksi tercatat
+const customerDebtTransactions = computed(() => {
+  if (!selectedCustomer.value || !props.transactions) return []
+  return props.transactions
+    .filter(t => 
+      (t.customerId === selectedCustomer.value.id || t.customerName === selectedCustomer.value.name) &&
+      t.paymentMethod === 'UTANG / BON'
+    )
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+})
+
+// Perhitungan sisa utang saat pembayaran
 const remainingDebtPreview = computed(() => {
   if (!selectedCustomer.value) return 0
   const current = selectedCustomer.value.totalDebt || 0
@@ -97,10 +131,9 @@ const isFullyPaidPreview = computed(() => {
   return pay >= current && current > 0
 })
 
-// Navigasi form tambah
+// Buka form tambah
 const openAddForm = () => {
   customerForm.value = {
-    id: null,
     name: '',
     phone: '',
     totalDebt: ''
@@ -108,25 +141,13 @@ const openAddForm = () => {
   currentView.value = 'add'
 }
 
-// Navigasi form edit
-const openEditForm = (c) => {
-  customerForm.value = {
-    id: c.id,
-    name: c.name,
-    phone: c.phone || '',
-    totalDebt: c.totalDebt ? String(c.totalDebt) : '0'
-  }
-  currentView.value = 'add'
-}
-
-// Simpan Tambah / Edit
+// Simpan Tambah Pelanggan
 const handleSaveCustomer = () => {
   if (!customerForm.value.name.trim()) return
 
   const initialDebt = parseInt(String(customerForm.value.totalDebt).replace(/\D/g, '') || '0', 10)
 
   emit('addCustomer', {
-    id: customerForm.value.id || null,
     name: customerForm.value.name.trim(),
     phone: customerForm.value.phone.trim(),
     totalDebt: initialDebt,
@@ -136,7 +157,7 @@ const handleSaveCustomer = () => {
   currentView.value = 'list'
 }
 
-// Navigasi form bayar
+// Buka Tampilan Bayar
 const openPayView = (c) => {
   selectedCustomer.value = c
   paymentAmount.value = String(c.totalDebt || 0)
@@ -159,13 +180,7 @@ const handleConfirmPayment = () => {
   currentView.value = 'list'
 }
 
-const handleDeleteCustomer = (c) => {
-  if (confirm(`Hapus catatan pelanggan "${c.name}" dari buku utang?`)) {
-    emit('deleteCustomer', c.id)
-  }
-}
-
-// WhatsApp reminder sopan
+// WhatsApp pengingat sopan
 const shareWhatsAppReminder = (c) => {
   const msg = `Halo Bu/Pak ${c.name}, sekadar menginfokan catatan bon belanja di ${props.storeName} saat ini tercatat sebesar Rp ${(c.totalDebt || 0).toLocaleString('id-ID')}.\n\nJika ada waktu senggang, bisa mampir ya. Terima kasih 🙏`
   
@@ -197,7 +212,7 @@ const shareWhatsAppReminder = (c) => {
   >
     <div class="bg-white rounded-3xl w-full max-w-xl shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[88vh]">
       
-      <!-- 1. Header (Tenang & Seragam dengan Kelola Barang) -->
+      <!-- 1. Header Modal -->
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-2xl bg-[#0a193d] text-white flex items-center justify-center shadow-xs">
@@ -205,10 +220,10 @@ const shareWhatsAppReminder = (c) => {
           </div>
           <div>
             <h3 class="text-base font-bold text-[#0a193d] leading-tight">
-              {{ currentView === 'add' ? (customerForm.id ? 'Edit Data Tetangga' : 'Tambah Tetangga Baru') : currentView === 'pay' ? 'Catat Pembayaran Bon' : 'Buku Utang Digital' }}
+              {{ currentView === 'add' ? 'Tambah Tetangga Baru' : currentView === 'pay' ? 'Catat Pembayaran Bon' : 'Buku Utang Digital' }}
             </h3>
             <p class="text-xs text-slate-500 font-medium">
-              {{ currentView === 'add' ? 'Nama tetangga & saldo bon awal' : currentView === 'pay' ? `Pelunasan bon ${selectedCustomer?.name || ''}` : 'Catatan bon belanja tetangga & pembayaran' }}
+              {{ currentView === 'add' ? 'Catat data tetangga & saldo bon awal' : currentView === 'pay' ? `Pelunasan bon ${selectedCustomer?.name || ''}` : 'Catatan bon belanja tetangga & pembayaran' }}
             </p>
           </div>
         </div>
@@ -225,7 +240,7 @@ const shareWhatsAppReminder = (c) => {
       <!-- VIEW 1: DAFTAR BUKU UTANG (LIST VIEW) -->
       <div v-if="currentView === 'list'" class="flex flex-col flex-1 min-h-0">
         
-        <!-- Ringkasan Total Piutang (Bersih, Rapi & Tidak Mencolok) -->
+        <!-- Ringkasan Total Piutang Belum Lunas -->
         <div class="p-4 bg-slate-50 border-b border-slate-100 shrink-0">
           <div class="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
             <div>
@@ -240,7 +255,7 @@ const shareWhatsAppReminder = (c) => {
           </div>
         </div>
 
-        <!-- Controls: Pencarian, Tambah Tetangga, dan Filter Status -->
+        <!-- Controls: Search, Filter & Tambah Tetangga -->
         <div class="p-4 border-b border-slate-100 space-y-3 shrink-0 bg-white">
           <div class="flex items-center gap-2.5">
             <div class="relative flex-1">
@@ -248,7 +263,7 @@ const shareWhatsAppReminder = (c) => {
               <input 
                 type="text" 
                 v-model="searchQuery"
-                placeholder="Cari nama atau no. WhatsApp tetangga..."
+                placeholder="Cari nama atau nomor WhatsApp..."
                 class="w-full h-11 pl-10 pr-8 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-xs sm:text-sm font-semibold text-[#0a193d] outline-hidden transition-all"
               />
               <button 
@@ -270,7 +285,7 @@ const shareWhatsAppReminder = (c) => {
             </button>
           </div>
 
-          <!-- Filter Status (Seragam dengan Style Tab/Chips Aplikasi) -->
+          <!-- Filter Status Chips -->
           <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
             <button 
               @click="activeFilter = 'unpaid'"
@@ -310,8 +325,8 @@ const shareWhatsAppReminder = (c) => {
           </div>
         </div>
 
-        <!-- Scrollable Customer Debt List -->
-        <div class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2">
+        <!-- Daftar Pelanggan: Nama, Tanggal di bawahnya, Nominal & Tombol Bayar di sampingnya -->
+        <div class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5">
           <!-- Empty State -->
           <div 
             v-if="filteredList.length === 0" 
@@ -322,49 +337,32 @@ const shareWhatsAppReminder = (c) => {
             <p class="text-[11px] text-slate-400 mt-0.5">Coba ubah kata kunci pencarian atau filter status</p>
           </div>
 
-          <!-- Customer Item Card (Simpel, Terstruktur & Jelas) -->
+          <!-- Baris Pelanggan (Sesuai Permintaan: Nama, Tanggal di Bawahnya, Nominal & Tombol Bayar di Sampingnya) -->
           <div 
             v-for="c in filteredList" 
             :key="c.id"
-            class="p-3 sm:p-3.5 bg-white hover:bg-slate-50/80 border border-slate-200/80 rounded-2xl transition-all shadow-2xs flex items-center justify-between gap-3 group"
+            class="p-4 bg-white hover:bg-slate-50/80 border border-slate-200/80 rounded-2xl transition-all shadow-2xs flex items-center justify-between gap-4"
           >
-            <!-- Info Pelanggan & Avatar -->
-            <div class="min-w-0 flex-1 flex items-center gap-3">
-              <!-- Avatar Monogram -->
-              <div class="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-sky-50 text-slate-700 group-hover:text-[#0284c7] flex items-center justify-center font-bold text-sm uppercase shrink-0 border border-slate-200/70 transition-colors">
-                {{ c.name ? c.name.charAt(0) : 'T' }}
-              </div>
-
-              <!-- Nama, WA & Status -->
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <h5 class="font-bold text-sm text-[#0a193d] truncate">{{ c.name }}</h5>
-                  <span 
-                    v-if="(c.totalDebt || 0) <= 0" 
-                    class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium shrink-0"
-                  >
-                    Lunas ✓
-                  </span>
-                </div>
-
-                <div class="flex items-center gap-2 mt-0.5 flex-wrap text-xs text-slate-500">
-                  <span v-if="c.phone" class="font-mono text-[11px] text-slate-600">
-                    {{ c.phone }}
-                  </span>
-                  <span class="text-[11px] text-slate-400">
-                    • {{ c.lastDate || 'Hari ini' }}
-                  </span>
-                </div>
-              </div>
+            <!-- Kolom Kiri: Nama & Tanggal di Bawahnya -->
+            <div class="min-w-0 flex-1">
+              <h4 class="font-bold text-base text-[#0a193d] leading-tight truncate">
+                {{ c.name }}
+              </h4>
+              
+              <!-- Tanggal ditampilkan jelas di bawah nama -->
+              <p class="text-xs text-slate-500 font-medium mt-1 flex items-center gap-1.5">
+                <Calendar class="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>{{ formatCustomerDate(c) }}</span>
+                <span v-if="c.phone" class="text-slate-400 font-mono text-[11px]">({{ c.phone }})</span>
+              </p>
             </div>
 
-            <!-- Sisa Bon & Tombol Aksi -->
+            <!-- Kolom Kanan: Nominal Utang & Tombol Bayar di Sampingnya -->
             <div class="flex items-center gap-3 shrink-0">
-              <!-- Nominal Bon -->
               <div class="text-right">
                 <span 
                   :class="[
-                    'font-mono font-bold text-sm sm:text-base block',
+                    'font-mono font-bold text-base sm:text-lg block leading-tight',
                     (c.totalDebt || 0) > 0 ? 'text-[#0a193d]' : 'text-slate-400'
                   ]"
                 >
@@ -372,46 +370,21 @@ const shareWhatsAppReminder = (c) => {
                 </span>
               </div>
 
-              <!-- Action Buttons -->
-              <div class="flex items-center gap-1.5 shrink-0">
-                <!-- Tombol Bayar (Navy Utama - Jelas & Tidak Ramai) -->
-                <button 
-                  v-if="(c.totalDebt || 0) > 0"
-                  @click="openPayView(c)"
-                  class="h-9 px-3 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
-                  title="Catat bayar atau cicilan bon"
-                >
-                  Bayar
-                </button>
-
-                <!-- Tombol Kirim WA (Ikon Bersih) -->
-                <button 
-                  v-if="(c.totalDebt || 0) > 0"
-                  @click="shareWhatsAppReminder(c)"
-                  class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-emerald-700 flex items-center justify-center cursor-pointer transition-colors"
-                  title="Kirim pengingat WhatsApp"
-                >
-                  <MessageSquare class="w-4 h-4" />
-                </button>
-
-                <!-- Tombol Edit Pelanggan -->
-                <button 
-                  @click="openEditForm(c)"
-                  class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors"
-                  title="Edit data pelanggan"
-                >
-                  <Edit2 class="w-3.5 h-3.5" />
-                </button>
-
-                <!-- Tombol Hapus Pelanggan -->
-                <button 
-                  @click="handleDeleteCustomer(c)"
-                  class="w-9 h-9 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center cursor-pointer transition-colors"
-                  title="Hapus pelanggan"
-                >
-                  <Trash2 class="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <!-- Tombol Bayar (langsung di samping nominal) -->
+              <button 
+                v-if="(c.totalDebt || 0) > 0"
+                @click="openPayView(c)"
+                class="h-10 px-4 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-xs shrink-0"
+              >
+                Bayar
+              </button>
+              
+              <span 
+                v-else 
+                class="h-9 px-3 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200/60 flex items-center shrink-0"
+              >
+                Lunas ✓
+              </span>
             </div>
 
           </div>
@@ -432,14 +405,12 @@ const shareWhatsAppReminder = (c) => {
 
       </div>
 
-      <!-- VIEW 2: FORM TAMBAH / EDIT TETANGGA -->
+      <!-- VIEW 2: FORM TAMBAH TETANGGA -->
       <div v-else-if="currentView === 'add'" class="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
         <!-- Sub-header Navigasi -->
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
-            <h4 class="font-bold text-sm text-[#0a193d]">
-              {{ customerForm.id ? 'Edit Data Tetangga' : 'Tambah Tetangga Baru' }}
-            </h4>
+            <h4 class="font-bold text-sm text-[#0a193d]">Tambah Tetangga Baru</h4>
           </div>
           <button 
             @click="currentView = 'list'"
@@ -526,7 +497,7 @@ const shareWhatsAppReminder = (c) => {
         </div>
       </div>
 
-      <!-- VIEW 3: FORM CATAT PEMBAYARAN / CICIL UTANG -->
+      <!-- VIEW 3: FORM CATAT PEMBAYARAN BON -->
       <div v-else-if="currentView === 'pay'" class="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
         <!-- Sub-header Navigasi -->
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -542,33 +513,78 @@ const shareWhatsAppReminder = (c) => {
           </button>
         </div>
 
-        <!-- Info Ringkasan Pelanggan -->
-        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between gap-3">
-          <div>
-            <p class="text-xs font-bold text-[#0a193d]">{{ selectedCustomer?.name }}</p>
-            <p class="text-xs text-slate-500 font-mono mt-0.5">
-              Total Bon: <span class="font-bold text-[#0a193d]">Rp {{ (selectedCustomer?.totalDebt || 0).toLocaleString('id-ID') }}</span>
-            </p>
+        <!-- Info Ringkasan Pelanggan & Tanggal -->
+        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-sm font-bold text-[#0a193d]">{{ selectedCustomer?.name }}</p>
+              <p class="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1">
+                <Calendar class="w-3 h-3 text-slate-400" />
+                <span>Tanggal bon: {{ formatCustomerDate(selectedCustomer) }}</span>
+              </p>
+            </div>
+
+            <div class="text-right">
+              <span class="text-[10px] uppercase font-bold text-slate-400 block">Total Bon Saat Ini</span>
+              <span class="font-mono font-bold text-base text-[#0a193d]">
+                Rp {{ (selectedCustomer?.totalDebt || 0).toLocaleString('id-ID') }}
+              </span>
+            </div>
           </div>
 
-          <div class="text-right">
-            <span class="text-[10px] uppercase font-bold text-slate-400 block">Sisa Setelah Bayar</span>
-            <span 
-              :class="[
-                'font-mono font-bold text-sm sm:text-base',
-                isFullyPaidPreview ? 'text-emerald-700' : 'text-[#0a193d]'
-              ]"
+          <!-- Opsi Kirim Pesan Pengingat WA jika ada no HP -->
+          <div v-if="(selectedCustomer?.totalDebt || 0) > 0" class="pt-2 border-t border-slate-200/70 flex items-center justify-between">
+            <span class="text-xs text-slate-500">Kirim rincian bon ke WhatsApp?</span>
+            <button 
+              type="button"
+              @click="shareWhatsAppReminder(selectedCustomer)"
+              class="h-7 px-2.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
             >
-              {{ isFullyPaidPreview ? 'Lunas ✓' : `Rp ${remainingDebtPreview.toLocaleString('id-ID')}` }}
-            </span>
+              <MessageSquare class="w-3 h-3 text-emerald-600" />
+              <span>Kirim WA</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Rincian Barang yang Diutang (Jika ada catatan transaksi) -->
+        <div v-if="customerDebtTransactions.length > 0" class="p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200/70 space-y-2">
+          <p class="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+            <Receipt class="w-3.5 h-3.5 text-slate-400" />
+            <span>Rincian Bon Belanja Terakhir:</span>
+          </p>
+          <div class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+            <div 
+              v-for="tx in customerDebtTransactions" 
+              :key="tx.invoiceNumber"
+              class="p-2 bg-white rounded-xl border border-slate-200/60 text-xs"
+            >
+              <div class="flex items-center justify-between font-semibold text-[#0a193d] mb-1">
+                <span>{{ tx.invoiceNumber }}</span>
+                <span class="font-mono">Rp {{ tx.totalAmount.toLocaleString('id-ID') }}</span>
+              </div>
+              <ul class="text-[11px] text-slate-500 space-y-0.5 pl-1">
+                <li v-for="item in tx.items" :key="item.id" class="flex justify-between">
+                  <span>• {{ item.name }} (x{{ item.qty }})</span>
+                  <span class="font-mono">Rp {{ (item.sellPrice * item.qty).toLocaleString('id-ID') }}</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
         <!-- Input Nominal Bayar -->
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-            Nominal Dibayarkan (Rp)
-          </label>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Nominal Dibayarkan (Rp)
+            </label>
+            <span class="text-xs font-medium text-slate-500">
+              Sisa Bon: 
+              <span :class="['font-mono font-bold', isFullyPaidPreview ? 'text-emerald-700' : 'text-[#0a193d]']">
+                {{ isFullyPaidPreview ? 'Lunas ✓' : `Rp ${remainingDebtPreview.toLocaleString('id-ID')}` }}
+              </span>
+            </span>
+          </div>
           <div class="relative">
             <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-bold text-slate-400 text-sm">
               Rp
