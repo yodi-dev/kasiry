@@ -15,6 +15,8 @@ import CameraScannerModal from './components/CameraScannerModal.vue'
 import ProductManagementModal from './components/ProductManagementModal.vue'
 
 import { useKasiryDB } from './composables/useKasiryDB'
+import { useHardwareScanner } from './composables/useHardwareScanner'
+import { playBeepSound } from './utils/sound'
 
 // Dexie Database Composable (IndexedDB Engine)
 const {
@@ -31,7 +33,9 @@ const {
   saveCustomer,
   recordDebtPayment,
   recordTransaction,
-  saveStoreProfile
+  saveStoreProfile,
+  exportBackupJSON,
+  importBackupJSON
 } = useKasiryDB()
 
 // State Keranjang Belanja Awal (Mulai Kosong agar Bar Pembayaran Muncul Hanya Saat Ada Barang)
@@ -197,6 +201,8 @@ const handleProcessCashPayment = async (data) => {
     items: [...cart.value]
   })
 
+  playBeepSound('success')
+
   receiptData.value = {
     invoiceNumber: invoice,
     time: timeStr,
@@ -225,6 +231,8 @@ const handleProcessDebtPayment = async (data) => {
     items: [...cart.value]
   })
 
+  playBeepSound('success')
+
   receiptData.value = {
     invoiceNumber: invoice,
     time: timeStr,
@@ -242,16 +250,48 @@ const handleProcessDebtPayment = async (data) => {
 // Record Pelunasan Utang (Tersimpan ke Dexie.js)
 const handleRecordDebtPayment = async ({ customerId, amount }) => {
   await recordDebtPayment({ customerId, amount })
+  playBeepSound('success')
 }
 
-// Handler Scan Barcode Kamera
+// Handler Scan Barcode (Hardware Scanner maupun Kamera)
 const handleBarcodeScan = (code) => {
   isCameraOpen.value = false
-  const found = products.value.find(p => p.barcode === code)
+  const cleanCode = String(code).trim()
+  const found = products.value.find(p => p.barcode === cleanCode)
   if (found) {
+    playBeepSound('beep')
     addToCart(found)
   } else {
-    triggerLazyInventory(code)
+    playBeepSound('warning')
+    triggerLazyInventory(cleanCode)
+  }
+}
+
+// Hardware Barcode Scanner Listener (Global USB/Bluetooth HID listener)
+useHardwareScanner({
+  onScan: (scannedCode) => {
+    searchQuery.value = ''
+    handleBarcodeScan(scannedCode)
+  }
+})
+
+// Backup & Restore Handlers (Cadangan Offline JSON)
+const handleExportBackup = async () => {
+  try {
+    await exportBackupJSON()
+  } catch (err) {
+    alert('Gagal mengekspor data cadangan: ' + err.message)
+  }
+}
+
+const handleImportBackup = async (content) => {
+  try {
+    const res = await importBackupJSON(content)
+    playBeepSound('success')
+    alert(`Berhasil memulihkan ${res.count} data produk & transaksi!`)
+  } catch (err) {
+    playBeepSound('warning')
+    alert('Gagal memulihkan cadangan: ' + err.message)
   }
 }
 
@@ -416,6 +456,8 @@ onMounted(async () => {
       @connectGoogle="handleConnectGoogle"
       @disconnectGoogle="handleDisconnectGoogle"
       @openGoogleSheet="handleOpenGoogleSheet"
+      @exportBackup="handleExportBackup"
+      @importBackup="handleImportBackup"
       @activateLicense="handleActivateLicense"
     />
 

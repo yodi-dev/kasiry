@@ -217,6 +217,83 @@ export function useKasiryDB() {
     })
   }
 
+  // Ekspor Cadangan ke File JSON
+  const exportBackupJSON = async () => {
+    const allProducts = await db.products.toArray()
+    const allCustomers = await db.customers.toArray()
+    const allTransactions = await db.transactions.toArray()
+    const allDebtPayments = await db.debtPayments.toArray()
+    const allSettings = await db.settings.toArray()
+
+    const backupData = {
+      app: 'Kasiry POS',
+      version: '2.2',
+      exportedAt: new Date().toISOString(),
+      storeProfile: storeProfile.value,
+      data: {
+        products: allProducts,
+        customers: allCustomers,
+        transactions: allTransactions,
+        debtPayments: allDebtPayments,
+        settings: allSettings
+      }
+    }
+
+    const jsonString = JSON.stringify(backupData, null, 2)
+    const blob = new Blob([jsonString], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const dateStr = new Date().toISOString().slice(0, 10)
+    const safeStoreName = (storeProfile.value.name || 'Kasiry').replace(/\s+/g, '_')
+    a.href = url
+    a.download = `Backup_${safeStoreName}_${dateStr}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    return true
+  }
+
+  // Impor / Pulihkan Cadangan dari File JSON
+  const importBackupJSON = async (jsonStringOrObj) => {
+    try {
+      const payload = typeof jsonStringOrObj === 'string' 
+        ? JSON.parse(jsonStringOrObj) 
+        : jsonStringOrObj
+
+      if (!payload || !payload.data) {
+        throw new Error('Format file cadangan tidak valid (tidak ada node data).')
+      }
+
+      const { products: inProducts, customers: inCustomers, transactions: inTransactions, debtPayments: inDebtPayments, settings: inSettings } = payload.data
+
+      // Gunakan Dexie transaction untuk atomic import
+      await db.transaction('rw', [db.products, db.customers, db.transactions, db.debtPayments, db.settings], async () => {
+        if (Array.isArray(inProducts) && inProducts.length > 0) {
+          await db.products.bulkPut(inProducts)
+        }
+        if (Array.isArray(inCustomers) && inCustomers.length > 0) {
+          await db.customers.bulkPut(inCustomers)
+        }
+        if (Array.isArray(inTransactions) && inTransactions.length > 0) {
+          await db.transactions.bulkPut(inTransactions)
+        }
+        if (Array.isArray(inDebtPayments) && inDebtPayments.length > 0) {
+          await db.debtPayments.bulkPut(inDebtPayments)
+        }
+        if (Array.isArray(inSettings) && inSettings.length > 0) {
+          await db.settings.bulkPut(inSettings)
+        }
+      })
+
+      await refreshAllData()
+      return { success: true, count: (inProducts?.length || 0) + (inTransactions?.length || 0) }
+    } catch (err) {
+      console.error('[Kasiry DB] Gagal memulihkan cadangan:', err)
+      throw err
+    }
+  }
+
   return {
     isDbReady,
     products,
@@ -232,6 +309,8 @@ export function useKasiryDB() {
     saveCustomer,
     recordDebtPayment,
     recordTransaction,
-    saveStoreProfile
+    saveStoreProfile,
+    exportBackupJSON,
+    importBackupJSON
   }
 }

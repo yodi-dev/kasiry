@@ -1,5 +1,5 @@
 <script setup>
-import { X, Printer, Check, ArrowRight } from '@lucide/vue'
+import { X, Printer, Check, ArrowRight, Share2 } from '@lucide/vue'
 
 const props = defineProps({
   isOpen: {
@@ -23,6 +23,47 @@ const emit = defineEmits(['close', 'newTransaction'])
 
 const printReceipt = () => {
   window.print()
+}
+
+const shareToWhatsApp = () => {
+  if (!props.receiptData) return
+  const r = props.receiptData
+  const store = props.storeProfile
+
+  let itemsText = ''
+  r.items.forEach(item => {
+    itemsText += `• ${item.qty}x ${item.name} = Rp ${(item.sellPrice * item.qty).toLocaleString('id-ID')}\n`
+  })
+
+  let bayarText = ''
+  if (r.paymentMethod === 'TUNAI') {
+    bayarText = `Bayar: Rp ${r.cashGiven.toLocaleString('id-ID')}\nKembalian: Rp ${r.changeAmount.toLocaleString('id-ID')}`
+  } else {
+    bayarText = `Status: Dicatat di Buku Utang (${r.customer?.name || 'Pelanggan'})`
+  }
+
+  const text = `*NOTA BELANJA - ${store.name.toUpperCase()}*\n` +
+    `No: ${r.invoiceNumber}\n` +
+    `Waktu: ${r.time}\n` +
+    `Metode: ${r.paymentMethod}\n` +
+    `--------------------------------\n` +
+    itemsText +
+    `--------------------------------\n` +
+    `*TOTAL: Rp ${r.totalAmount.toLocaleString('id-ID')}*\n` +
+    bayarText + `\n` +
+    `--------------------------------\n` +
+    `Matur nuwun atas kunjungannya!`
+
+  const encoded = encodeURIComponent(text)
+  const phone = prompt('Nomor WhatsApp Pembeli (Boleh kosong untuk pilih kontak di WA):', '')
+  if (phone !== null) {
+    let cleanPhone = phone.trim().replace(/\D/g, '')
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '62' + cleanPhone.slice(1)
+    }
+    const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encoded}` : `https://wa.me/?text=${encoded}`
+    window.open(url, '_blank')
+  }
 }
 </script>
 
@@ -48,8 +89,8 @@ const printReceipt = () => {
         </button>
       </div>
 
-      <!-- Kertas Struk Thermal Preview -->
-      <div class="flex-1 overflow-y-auto p-5 font-mono text-xs text-slate-700 space-y-2.5 bg-slate-50/50 border-b border-dashed border-slate-200">
+      <!-- Kertas Struk Thermal Preview (Dioptimasi untuk Printer Thermal 58mm & Layar HP) -->
+      <div class="thermal-receipt-paper flex-1 overflow-y-auto p-5 font-mono text-xs text-slate-700 space-y-2.5 bg-slate-50/50 border-b border-dashed border-slate-200">
         <!-- Kop Warung -->
         <div class="text-center space-y-0.5">
           <h4 class="font-bold text-sm text-slate-900 tracking-wider uppercase">{{ storeProfile.name }}</h4>
@@ -118,7 +159,7 @@ const printReceipt = () => {
         <!-- Footer Struk -->
         <div class="text-center pt-2 text-[10px] text-slate-500 space-y-0.5">
           <p class="font-medium">Matur Nuwun Atas Kunjungannya!</p>
-          <p>Kasiry POS • www.kasiry.id</p>
+          <p>Kasiry POS • Habiba Store</p>
         </div>
       </div>
 
@@ -127,14 +168,24 @@ const printReceipt = () => {
         <button 
           @click="printReceipt"
           class="h-10 px-3 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-slate-200 transition-colors"
+          title="Cetak struk ke printer thermal Bluetooth/USB"
         >
           <Printer class="w-3.5 h-3.5 text-slate-500" />
           <span>Cetak</span>
         </button>
 
         <button 
+          @click="shareToWhatsApp"
+          class="h-10 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-medium text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-emerald-200 transition-colors"
+          title="Kirim nota belanja digital via WhatsApp"
+        >
+          <Share2 class="w-3.5 h-3.5 text-emerald-700" />
+          <span>Kirim WA</span>
+        </button>
+
+        <button 
           @click="emit('newTransaction')"
-          class="flex-1 h-10 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+          class="flex-1 h-10 px-3 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-xs transition-colors"
         >
           <span>Transaksi Baru</span>
           <ArrowRight class="w-3.5 h-3.5" />
@@ -143,3 +194,30 @@ const printReceipt = () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+@media print {
+  body {
+    visibility: hidden !important;
+  }
+  .thermal-receipt-paper,
+  .thermal-receipt-paper * {
+    visibility: visible !important;
+  }
+  .thermal-receipt-paper {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 58mm !important;
+    max-width: 58mm !important;
+    margin: 0 !important;
+    padding: 3mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+  }
+}
+</style>

@@ -48,6 +48,7 @@ const formName = ref(props.storeProfile.name)
 const formOwner = ref(props.storeProfile.owner)
 const formPhone = ref(props.storeProfile.phone)
 const licenseInput = ref('')
+const fileInputRef = ref(null)
 
 const saveProfile = () => {
   emit('updateProfile', {
@@ -61,6 +62,26 @@ const handleLicense = () => {
   if (!licenseInput.value.trim()) return
   emit('activateLicense', licenseInput.value.trim())
   licenseInput.value = ''
+}
+
+const triggerImportFile = () => {
+  fileInputRef.value?.click()
+}
+
+const onFileSelected = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const content = e.target.result
+      emit('importBackup', content)
+    } catch (err) {
+      alert('Gagal membaca file: ' + err.message)
+    }
+  }
+  reader.readAsText(file)
+  event.target.value = ''
 }
 </script>
 
@@ -205,21 +226,28 @@ const handleLicense = () => {
             <h4 class="text-xs font-semibold text-slate-700 uppercase tracking-wider">Cadangan Offline (JSON)</h4>
           </div>
           <p class="text-xs text-slate-500 font-normal">
-            Simpan cadangan data produk, transaksi, dan buku utang ke file `.json`.
+            Simpan cadangan data produk, transaksi, dan buku utang ke file `.json` agar tidak hilang jika ganti HP.
           </p>
           <div class="grid grid-cols-2 gap-2">
             <button 
               @click="emit('exportBackup')"
-              class="h-9 bg-slate-50 hover:bg-slate-100 font-medium text-xs text-slate-700 rounded-lg border border-slate-200 cursor-pointer"
+              class="h-9 bg-slate-50 hover:bg-slate-100 font-medium text-xs text-slate-700 rounded-lg border border-slate-200 cursor-pointer flex items-center justify-center gap-1.5"
             >
               Unduh Backup (.json)
             </button>
             <button 
-              @click="emit('importBackup')"
-              class="h-9 bg-slate-50 hover:bg-slate-100 font-medium text-xs text-slate-700 rounded-lg border border-slate-200 cursor-pointer"
+              @click="triggerImportFile"
+              class="h-9 bg-slate-50 hover:bg-slate-100 font-medium text-xs text-slate-700 rounded-lg border border-slate-200 cursor-pointer flex items-center justify-center gap-1.5"
             >
               Pulihkan Backup
             </button>
+            <input 
+              type="file" 
+              ref="fileInputRef" 
+              accept=".json,application/json" 
+              class="hidden" 
+              @change="onFileSelected"
+            />
           </div>
         </div>
 
