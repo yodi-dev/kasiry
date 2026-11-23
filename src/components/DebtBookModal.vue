@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { 
   X, 
   BookOpen, 
@@ -8,10 +8,10 @@ import {
   Search, 
   UserPlus, 
   ArrowLeft, 
-  Phone,
-  User,
-  Calendar,
-  Receipt
+  Phone, 
+  User, 
+  Calendar, 
+  Receipt 
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -51,6 +51,23 @@ const customerForm = ref({
   phone: '',
   totalDebt: ''
 })
+
+// Selalu reset ke tampilan daftar saat modal dibuka
+watch(() => props.isOpen, (newVal) => {
+  if (newVal) {
+    currentView.value = 'list'
+    selectedCustomer.value = null
+    paymentAmount.value = ''
+    searchQuery.value = ''
+  }
+})
+
+const handleClose = () => {
+  currentView.value = 'list'
+  selectedCustomer.value = null
+  paymentAmount.value = ''
+  emit('close')
+}
 
 const unpaidCustomers = computed(() => {
   return props.customers.filter(c => (c.totalDebt || 0) > 0)
@@ -264,9 +281,20 @@ const shareWhatsAppReminder = (c) => {
       <!-- 1. Header Modal -->
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-[#0a193d] text-white flex items-center justify-center shadow-xs">
+          <!-- Tombol Kembali saat di sub-view (Tambah / Bayar) -->
+          <button 
+            v-if="currentView !== 'list'"
+            @click="currentView = 'list'"
+            class="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer transition-colors shadow-2xs shrink-0"
+            title="Kembali ke Daftar Buku Utang"
+          >
+            <ArrowLeft class="w-5 h-5" />
+          </button>
+          
+          <div v-else class="w-10 h-10 rounded-2xl bg-[#0a193d] text-white flex items-center justify-center shadow-xs shrink-0">
             <BookOpen class="w-5 h-5 text-sky-400" />
           </div>
+
           <div>
             <h3 class="text-base font-bold text-[#0a193d] leading-tight">
               {{ currentView === 'add' ? 'Tambah Tetangga Baru' : currentView === 'pay' ? 'Catat Pembayaran Bon' : 'Buku Utang Digital' }}
@@ -277,10 +305,12 @@ const shareWhatsAppReminder = (c) => {
           </div>
         </div>
 
+        <!-- Tombol X: jika sedang di sub-view, kembali ke daftar; jika di daftar, tutup modal -->
         <button 
-          @click="emit('close')"
+          @click="currentView !== 'list' ? currentView = 'list' : handleClose()"
           class="w-9 h-9 rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
-          aria-label="Tutup"
+          :title="currentView !== 'list' ? 'Kembali ke Daftar Buku Utang' : 'Tutup'"
+          aria-label="Tutup atau Kembali"
         >
           <X class="w-5 h-5" />
         </button>
@@ -453,7 +483,7 @@ const shareWhatsAppReminder = (c) => {
             Menampilkan {{ filteredList.length }} dari {{ customers.length }} tetangga
           </span>
           <button 
-            @click="emit('close')"
+            @click="handleClose"
             class="h-10 px-5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200/90 cursor-pointer transition-colors shadow-2xs"
           >
             Tutup

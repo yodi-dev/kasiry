@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { 
   X, 
   Plus, 
@@ -42,6 +42,21 @@ const defaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok
 
 // currentView: 'list' | 'form' | 'categories'
 const currentView = ref('list')
+
+// Selalu reset ke tampilan list saat modal dibuka kembali
+watch(() => props.isOpen, (newVal) => {
+  if (newVal) {
+    currentView.value = 'list'
+    searchQuery.value = ''
+    isAddingCategoryInline.value = false
+  }
+})
+
+const handleClose = () => {
+  currentView.value = 'list'
+  isAddingCategoryInline.value = false
+  emit('close')
+}
 
 const searchQuery = ref('')
 const selectedCategory = ref('Semua')
@@ -191,24 +206,37 @@ const handleDeleteCategory = (cat) => {
       <!-- 1. Header (Design System: Midnight Deep Navy & Azure Accent) -->
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-[#0a193d] text-white flex items-center justify-center shadow-xs">
+          <!-- Tombol Kembali saat di sub-view (Form Tambah/Edit atau Kelola Kategori) -->
+          <button 
+            v-if="currentView !== 'list'"
+            @click="currentView = 'list'"
+            class="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer transition-colors shadow-2xs shrink-0"
+            title="Kembali ke Daftar Barang"
+          >
+            <ArrowLeft class="w-5 h-5" />
+          </button>
+
+          <div v-else class="w-10 h-10 rounded-2xl bg-[#0a193d] text-white flex items-center justify-center shadow-xs shrink-0">
             <Tag v-if="currentView === 'categories'" class="w-5 h-5 text-sky-400" />
             <Package v-else class="w-5 h-5 text-sky-400" />
           </div>
+
           <div>
             <h3 class="text-base font-bold text-[#0a193d] leading-tight">
-              {{ currentView === 'categories' ? 'Kelola Kategori Barang' : 'Kelola Barang Toko' }}
+              {{ currentView === 'categories' ? 'Kelola Kategori Barang' : currentView === 'form' ? (currentProduct.id ? 'Edit Data Barang' : 'Tambah Barang Baru') : 'Kelola Barang Toko' }}
             </h3>
             <p class="text-xs text-slate-500 font-medium">
-              {{ currentView === 'categories' ? `Total ${availableCategories.length} kategori terdaftar` : `Total ${products.length} produk terdaftar` }}
+              {{ currentView === 'categories' ? `Total ${availableCategories.length} kategori terdaftar` : currentView === 'form' ? 'Lengkapi detail data barang' : `Total ${products.length} produk terdaftar` }}
             </p>
           </div>
         </div>
 
+        <!-- Tombol X: Jika di sub-view kembali ke list; jika di list tutup modal -->
         <button 
-          @click="emit('close')"
+          @click="currentView !== 'list' ? currentView = 'list' : handleClose()"
           class="w-9 h-9 rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
-          aria-label="Tutup"
+          :title="currentView !== 'list' ? 'Kembali ke Daftar Barang' : 'Tutup'"
+          aria-label="Tutup atau Kembali"
         >
           <X class="w-5 h-5" />
         </button>
@@ -349,7 +377,7 @@ const handleDeleteCategory = (cat) => {
             Menampilkan {{ filteredProducts.length }} dari {{ products.length }} barang
           </span>
           <button 
-            @click="emit('close')"
+            @click="handleClose"
             class="h-10 px-5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200/90 cursor-pointer transition-colors shadow-2xs"
           >
             Tutup
