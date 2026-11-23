@@ -6,6 +6,7 @@ const isDbReady = ref(false)
 const products = ref([])
 const customers = ref([])
 const transactions = ref([])
+const debtPayments = ref([])
 const storeProfile = ref({
   name: 'Habiba Store',
   owner: 'Habiba',
@@ -45,13 +46,20 @@ export function useKasiryDB() {
       .toArray()
     customers.value = allCustomers
 
-    // 3. Ambil Transaksi Terakhir (50 transaksi terbaru)
+    // 3. Ambil Transaksi Terakhir (100 transaksi terbaru)
     const recentTx = await db.transactions
       .orderBy('createdAt')
       .reverse()
-      .limit(50)
+      .limit(100)
       .toArray()
     transactions.value = recentTx
+
+    // 3b. Ambil Pelunasan Utang
+    const recentPayments = await db.debtPayments
+      .orderBy('paymentDate')
+      .reverse()
+      .toArray()
+    debtPayments.value = recentPayments
 
     // 4. Ambil Pengaturan Toko
     const profileSetting = await db.settings.get('storeProfile')
@@ -123,6 +131,16 @@ export function useKasiryDB() {
 
     await refreshAllData()
     return payload
+  }
+
+  const deleteCustomer = async (customerId) => {
+    const cust = await db.customers.get(customerId)
+    if (cust) {
+      cust.deleted = true
+      cust.updatedAt = Date.now()
+      await db.customers.put(cust)
+      await refreshAllData()
+    }
   }
 
   // Pelunasan / Cicilan Utang
@@ -300,6 +318,7 @@ export function useKasiryDB() {
     frequentProducts,
     customers,
     transactions,
+    debtPayments,
     storeProfile,
     licenseStatus,
     loadDatabase,
@@ -307,6 +326,7 @@ export function useKasiryDB() {
     saveProduct,
     deleteProduct,
     saveCustomer,
+    deleteCustomer,
     recordDebtPayment,
     recordTransaction,
     saveStoreProfile,

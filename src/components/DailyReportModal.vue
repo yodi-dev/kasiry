@@ -36,20 +36,31 @@ const todayFormatted = computed(() => {
 
 // Format pesan WhatsApp
 const generateWhatsAppText = () => {
+  const totalCash = (props.stats.todaySales || 0) + (props.stats.todayDebtPaid || 0)
   let text = `*📊 LAPORAN KASIR ${props.storeName.toUpperCase()}*\n`
   text += `📅 Tanggal: ${todayFormatted.value}\n`
   text += `--------------------------------\n`
-  text += `💰 *Uang Masuk:* Rp ${props.stats.todaySales.toLocaleString('id-ID')}\n`
-  text += `📈 *Perkiraan Untung:* Rp ${props.stats.todayProfit.toLocaleString('id-ID')}\n`
-  text += `🧾 *Jumlah Transaksi:* ${props.stats.transactionCount} kali\n`
-  text += `📋 *Bon/Utang Baru:* Rp ${props.stats.todayNewDebt.toLocaleString('id-ID')}\n`
+  text += `💵 *Total Uang Kas Masuk:* Rp ${totalCash.toLocaleString('id-ID')}\n`
+  text += `   • Penjualan Tunai: Rp ${(props.stats.todaySales || 0).toLocaleString('id-ID')}\n`
+  if (props.stats.todayDebtPaid > 0) {
+    text += `   • Pelunasan Bon: Rp ${props.stats.todayDebtPaid.toLocaleString('id-ID')}\n`
+  }
+  text += `📈 *Perkiraan Untung Bersih:* Rp ${(props.stats.todayProfit || 0).toLocaleString('id-ID')}\n`
+  text += `🧾 *Jumlah Transaksi:* ${props.stats.transactionCount || 0} struk\n`
+  if (props.stats.todayNewDebt > 0) {
+    text += `📋 *Bon/Utang Baru:* Rp ${props.stats.todayNewDebt.toLocaleString('id-ID')}\n`
+  }
   text += `--------------------------------\n`
   text += `⭐ *Barang Paling Laris Hari Ini:*\n`
-  props.stats.topProducts.forEach((p, idx) => {
-    text += `${idx + 1}. ${p.name} (${p.qty}x) = Rp ${p.subtotal.toLocaleString('id-ID')}\n`
-  })
+  if (props.stats.topProducts && props.stats.topProducts.length > 0) {
+    props.stats.topProducts.forEach((p, idx) => {
+      text += `${idx + 1}. ${p.name} (${p.qty}x) = Rp ${p.subtotal.toLocaleString('id-ID')}\n`
+    })
+  } else {
+    text += `(Belum ada data barang terjual hari ini)\n`
+  }
   text += `--------------------------------\n`
-  text += `Dicatat otomatis via Kasiry: Aplikasi Kasir Warung Paling Gampang.`
+  text += `Dicatat otomatis via Kasiry POS.`
   return text
 }
 
@@ -89,20 +100,23 @@ const shareToWhatsApp = () => {
       <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
         <!-- 4 Kotak Ringkasan Kas (Warna Muted & Rapi) -->
         <div class="grid grid-cols-2 gap-2.5">
-          <!-- Total Uang Masuk -->
+          <!-- Total Uang Kas Masuk -->
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-            <span class="text-xs font-medium text-slate-500 uppercase tracking-wide block">Uang Masuk</span>
+            <span class="text-xs font-medium text-slate-500 uppercase tracking-wide block">Total Kas Masuk</span>
             <p class="text-lg sm:text-xl font-bold text-slate-900 mt-1">
-              Rp {{ stats.todaySales.toLocaleString('id-ID') }}
+              Rp {{ ((stats.todaySales || 0) + (stats.todayDebtPaid || 0)).toLocaleString('id-ID') }}
             </p>
-            <p class="text-[11px] text-emerald-700 font-medium mt-0.5">Penjualan tunai</p>
+            <p class="text-[11px] text-slate-500 font-normal mt-0.5 truncate">
+              Tunai: Rp {{ (stats.todaySales || 0).toLocaleString('id-ID') }}
+              <span v-if="stats.todayDebtPaid > 0"> • Bon: Rp {{ stats.todayDebtPaid.toLocaleString('id-ID') }}</span>
+            </p>
           </div>
 
           <!-- Perkiraan Untung Bersih -->
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
             <span class="text-xs font-medium text-slate-500 uppercase tracking-wide block">Untung Bersih</span>
             <p class="text-lg sm:text-xl font-bold text-emerald-700 mt-1">
-              Rp {{ stats.todayProfit.toLocaleString('id-ID') }}
+              Rp {{ (stats.todayProfit || 0).toLocaleString('id-ID') }}
             </p>
             <p class="text-[11px] text-slate-500 font-normal mt-0.5">Estimasi selisih modal</p>
           </div>
@@ -111,7 +125,7 @@ const shareToWhatsApp = () => {
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
             <span class="text-xs font-medium text-slate-500 uppercase block">Transaksi</span>
             <p class="text-base sm:text-lg font-semibold text-slate-900 mt-0.5">
-              {{ stats.transactionCount }} Kali
+              {{ stats.transactionCount || 0 }} Kali
             </p>
             <p class="text-[11px] text-slate-500 font-normal">Struk dibuat</p>
           </div>
@@ -120,7 +134,7 @@ const shareToWhatsApp = () => {
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
             <span class="text-xs font-medium text-slate-500 uppercase block">Bon Baru</span>
             <p class="text-base sm:text-lg font-semibold text-red-600 mt-0.5">
-              Rp {{ stats.todayNewDebt.toLocaleString('id-ID') }}
+              Rp {{ (stats.todayNewDebt || 0).toLocaleString('id-ID') }}
             </p>
             <p class="text-[11px] text-slate-500 font-normal">Utang dicatat</p>
           </div>

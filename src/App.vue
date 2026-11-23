@@ -17,6 +17,7 @@ import ProductManagementModal from './components/ProductManagementModal.vue'
 import { useKasiryDB } from './composables/useKasiryDB'
 import { useHardwareScanner } from './composables/useHardwareScanner'
 import { playBeepSound } from './utils/sound'
+import { exportKasiryExcel } from './utils/excelExport'
 
 // Dexie Database Composable (IndexedDB Engine)
 const {
@@ -25,12 +26,14 @@ const {
   frequentProducts,
   customers,
   transactions,
+  debtPayments,
   storeProfile,
   licenseStatus,
   loadDatabase,
   saveProduct,
   deleteProduct,
   saveCustomer,
+  deleteCustomer,
   recordDebtPayment,
   recordTransaction,
   saveStoreProfile,
@@ -95,12 +98,17 @@ const stats = computed(() => {
     }
   })
 
+  const todayDebtPaid = debtPayments.value
+    .filter(p => p.paymentDate >= todayTimestamp)
+    .reduce((sum, p) => sum + (p.amount || 0), 0)
+
   const topProducts = Object.values(productCountMap)
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 5)
 
   return {
     todaySales: sales,
+    todayDebtPaid,
     todayProfit: Math.round(profit),
     transactionCount: todayTx.length,
     todayNewDebt: debt,
@@ -319,8 +327,28 @@ const handleOpenGoogleSheet = () => {
   window.open('https://docs.google.com/spreadsheets/', '_blank')
 }
 
+const handleSaveCustomer = async (custData) => {
+  await saveCustomer(custData)
+  playBeepSound('success')
+}
+
+const handleDeleteCustomer = async (custId) => {
+  await deleteCustomer(custId)
+}
+
 const handleDownloadExcel = () => {
-  alert('Mengunduh file: "Laporan_Habiba_Store.xlsx"')
+  try {
+    exportKasiryExcel({
+      storeProfile: storeProfile.value,
+      stats: stats.value,
+      transactions: transactions.value,
+      customers: customers.value,
+      debtPayments: debtPayments.value
+    })
+    playBeepSound('success')
+  } catch (err) {
+    alert('Gagal mengekspor file Excel: ' + err.message)
+  }
 }
 
 const handleActivateLicense = (code) => {
@@ -433,6 +461,8 @@ onMounted(async () => {
       :storeName="storeProfile.name"
       @close="isDebtBookOpen = false"
       @recordPayment="handleRecordDebtPayment"
+      @addCustomer="handleSaveCustomer"
+      @deleteCustomer="handleDeleteCustomer"
     />
 
     <!-- Modal Laporan Harian Warung -->
