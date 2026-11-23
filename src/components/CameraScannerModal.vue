@@ -204,20 +204,20 @@ onUnmounted(() => {
       </div>
 
       <!-- Kamera Viewfinder (Live Video Stream) -->
-      <div class="relative bg-black h-80 flex flex-col items-center justify-center overflow-hidden">
-        <!-- Video Stream -->
+      <div class="relative bg-black h-84 overflow-hidden flex items-center justify-center">
+        <!-- Video Stream: Menempati seluruh area latar belakang secara penuh -->
         <video 
           ref="videoRef"
           autoplay 
           playsinline 
           muted 
-          class="w-full h-full object-cover"
+          class="absolute inset-0 w-full h-full object-cover z-0"
         ></video>
 
         <!-- Loading Indicator -->
         <div 
           v-if="isLoading" 
-          class="absolute inset-0 bg-slate-950/80 flex flex-col items-center justify-center gap-2.5 z-10"
+          class="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center gap-2.5 z-30"
         >
           <RefreshCw class="w-6 h-6 text-sky-400 animate-spin" />
           <p class="text-xs text-slate-300 font-medium">Membuka kamera...</p>
@@ -226,7 +226,7 @@ onUnmounted(() => {
         <!-- Error State -->
         <div 
           v-if="hasError" 
-          class="absolute inset-0 bg-slate-950/95 p-6 flex flex-col items-center justify-center text-center gap-3 z-10"
+          class="absolute inset-0 bg-slate-950/95 p-6 flex flex-col items-center justify-center text-center gap-3 z-30"
         >
           <AlertCircle class="w-8 h-8 text-rose-500" />
           <p class="text-xs text-slate-300 font-medium leading-relaxed">{{ errorMessage }}</p>
@@ -238,17 +238,39 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <!-- Frame Bidik & Garis Laser Scanner (Muncul Saat Kamera Aktif) -->
+        <!-- Frame Bidik & Vignette Overlay (Muncul Saat Kamera Aktif) -->
         <template v-if="!isLoading && !hasError">
-          <!-- Laser Scan Line -->
-          <div class="absolute inset-x-8 top-1/2 -translate-y-1/2 h-0.5 bg-sky-400 shadow-[0_0_12px_#38bdf8] animate-pulse z-10 pointer-events-none"></div>
+          <!-- Vignette 3-Baris: Menggelapkan tepi luar, kotak tengah 100% tembus pandang ke kamera -->
+          <div class="absolute inset-0 pointer-events-none flex flex-col z-10">
+            <!-- Area Atas (Redup) -->
+            <div class="flex-1 bg-black/40"></div>
 
-          <!-- Frame Bidik Kaca -->
-          <div class="w-52 h-40 border-2 border-sky-400/90 rounded-2xl relative flex items-center justify-center z-10 pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"></div>
+            <!-- Baris Tengah: Samping Kiri Redup - Kotak Transparan - Samping Kanan Redup -->
+            <div class="flex h-44 shrink-0">
+              <div class="flex-1 bg-black/40"></div>
+              
+              <!-- Kotak Bidik Utama (100% Jelas Menampilkan Kamera) -->
+              <div class="w-60 h-44 relative border-2 border-sky-400/90 rounded-2xl overflow-hidden shadow-sm">
+                <!-- Laser Scan Line Animasi Naik Turun -->
+                <div class="absolute inset-x-0 h-0.5 bg-sky-400 shadow-[0_0_10px_#38bdf8] animate-scan-line"></div>
+
+                <!-- 4 Aksen Sudut L-Bracket Scanner -->
+                <div class="absolute top-0 left-0 w-4 h-4 border-t-3 border-l-3 border-sky-300 rounded-tl-md"></div>
+                <div class="absolute top-0 right-0 w-4 h-4 border-t-3 border-r-3 border-sky-300 rounded-tr-md"></div>
+                <div class="absolute bottom-0 left-0 w-4 h-4 border-b-3 border-l-3 border-sky-300 rounded-bl-md"></div>
+                <div class="absolute bottom-0 right-0 w-4 h-4 border-b-3 border-r-3 border-sky-300 rounded-br-md"></div>
+              </div>
+
+              <div class="flex-1 bg-black/40"></div>
+            </div>
+
+            <!-- Area Bawah (Redup) -->
+            <div class="flex-1 bg-black/40"></div>
+          </div>
 
           <!-- Petunjuk Pindai -->
-          <div class="absolute bottom-3 inset-x-4 text-center z-10 pointer-events-none">
-            <p class="text-[11px] text-white/90 font-medium bg-black/50 backdrop-blur-xs py-1 px-3 rounded-full inline-block">
+          <div class="absolute bottom-3 inset-x-4 text-center z-20 pointer-events-none">
+            <p class="text-[11px] text-white/95 font-medium bg-black/60 backdrop-blur-xs py-1 px-3.5 rounded-full inline-block border border-white/10 shadow-sm">
               Posisikan barcode di dalam kotak
             </p>
           </div>
@@ -291,3 +313,24 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes scanline {
+  0% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(168px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+}
+
+.animate-scan-line {
+  animation: scanline 2.2s ease-in-out infinite;
+}
+</style>
