@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import TopBar from './components/TopBar.vue'
 import BarcodeInputBar from './components/BarcodeInputBar.vue'
 import CartSection from './components/CartSection.vue'
