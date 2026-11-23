@@ -198,8 +198,7 @@ const submitPayment = () => {
       <!-- Total Tagihan Banner (Design System: Midnight Deep Navy & Sky Accent) -->
       <div class="mx-5 my-2.5 p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-[#0a193d] text-white flex items-center justify-between shadow-xs shrink-0">
         <div>
-          <span class="text-[11px] font-bold text-sky-300 uppercase tracking-wider block">Total Tagihan</span>
-          <p class="text-xs text-slate-300 mt-0.5">Harus dibayarkan pembeli</p>
+          <span class="text-xs font-bold text-sky-300 uppercase tracking-wider block">Total Tagihan</span>
         </div>
         <div class="text-right">
           <span class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white font-mono">
@@ -277,12 +276,6 @@ const submitPayment = () => {
             <div>
               <p :class="['text-xs font-bold uppercase tracking-wider', isCashSufficient ? 'text-emerald-800' : 'text-rose-700']">
                 {{ isCashSufficient ? 'Uang Kembalian:' : 'Uang Masih Kurang:' }}
-              </p>
-              <p v-if="!isCashSufficient" class="text-xs text-rose-600 font-medium mt-0.5 flex items-center gap-1">
-                <AlertCircle class="w-3.5 h-3.5" /> Pembeli belum bayar penuh
-              </p>
-              <p v-else class="text-xs text-emerald-600 font-medium mt-0.5">
-                Siap kembalikan ke pembeli
               </p>
             </div>
             <div class="text-right">
