@@ -174,8 +174,47 @@ const openPayView = (c) => {
   currentView.value = 'pay'
 }
 
-const setQuickAmount = (val) => {
-  paymentAmount.value = String(val)
+// Pecahan uang kertas standar (persis seperti di Kasa / PaymentModal)
+const standardBills = [2000, 5000, 10000, 20000, 50000, 100000]
+
+// Hitung saran pembulatan ke atas terdekat (persis seperti di Kasa)
+const roundedSuggestions = computed(() => {
+  const tot = selectedCustomer.value?.totalDebt || 0
+  const suggestions = []
+  if (tot <= 0) return []
+
+  const next10k = Math.ceil(tot / 10000) * 10000
+  if (next10k > tot && !suggestions.includes(next10k)) suggestions.push(next10k)
+
+  const next20k = Math.ceil(tot / 20000) * 20000
+  if (next20k > tot && !suggestions.includes(next20k)) suggestions.push(next20k)
+
+  const next50k = Math.ceil(tot / 50000) * 50000
+  if (next50k > tot && !suggestions.includes(next50k)) suggestions.push(next50k)
+
+  const next100k = Math.ceil(tot / 100000) * 100000
+  if (next100k > tot && !suggestions.includes(next100k)) suggestions.push(next100k)
+
+  return suggestions.slice(0, 3)
+})
+
+const setExactPayment = () => {
+  const tot = selectedCustomer.value?.totalDebt || 0
+  paymentAmount.value = String(tot)
+}
+
+const setPaymentAmount = (amount) => {
+  paymentAmount.value = String(amount)
+}
+
+const addPaymentAmount = (amount) => {
+  const current = parseInt(String(paymentAmount.value).replace(/\D/g, '') || '0', 10)
+  paymentAmount.value = String(current + amount)
+}
+
+const onManualPaymentInput = (e) => {
+  const num = parseInt(e.target.value.replace(/\D/g, '') || '0', 10)
+  paymentAmount.value = num > 0 ? String(num) : ''
 }
 
 const handleConfirmPayment = () => {
@@ -594,11 +633,11 @@ const shareWhatsAppReminder = (c) => {
           </div>
         </div>
 
-        <!-- Input Nominal Bayar -->
+        <!-- Input Nominal Bayar (Formatted dengan pemisah ribuan persis di Kasa) -->
         <div>
           <div class="flex items-center justify-between mb-1.5">
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Nominal Dibayarkan (Rp)
+            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
+              Nominal Dibayarkan:
             </label>
             <span class="text-xs font-medium text-slate-500">
               Sisa Bon: 
@@ -608,57 +647,54 @@ const shareWhatsAppReminder = (c) => {
             </span>
           </div>
           <div class="relative">
-            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-bold text-slate-400 text-sm">
+            <span class="absolute inset-y-0 left-0 pl-4 flex items-center font-bold text-slate-400 text-base">
               Rp
             </span>
             <input 
-              type="number" 
-              v-model="paymentAmount"
+              type="text" 
+              :value="paymentAmount ? parseInt(paymentAmount).toLocaleString('id-ID') : ''"
+              @input="onManualPaymentInput"
               placeholder="0"
-              class="w-full h-12 pl-12 pr-4 bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-xl font-bold font-mono text-[#0a193d] text-right outline-hidden transition-all shadow-2xs"
+              class="w-full h-13 pl-12 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/15 rounded-2xl text-xl sm:text-2xl font-bold text-[#0a193d] outline-hidden transition-all text-right font-mono"
             />
           </div>
         </div>
 
-        <!-- Tombol Cepat Nominal -->
+        <!-- Tombol Lunas Semua (Uang Pas) & Pembulatan Terdekat (Persis di Kasa) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <!-- Lunas Semua / Uang Pas -->
+          <button 
+            type="button"
+            @click="setExactPayment"
+            class="h-11 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200/80 cursor-pointer transition-all active:scale-95 shadow-2xs flex items-center justify-center gap-1.5"
+          >
+            <span>Lunas Semua</span>
+          </button>
+
+          <!-- Saran Pembulatan -->
+          <button 
+            type="button"
+            v-for="sug in roundedSuggestions" 
+            :key="sug"
+            @click="setPaymentAmount(sug)"
+            class="h-11 px-3 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition-all active:scale-95 shadow-2xs font-mono"
+          >
+            Rp {{ (sug / 1000) }}rb
+          </button>
+        </div>
+
+        <!-- Pecahan Nominal Uang Standar Rupiah (+2rb, +5rb, +10rb, dst Persis di Kasa) -->
         <div>
-          <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Pilihan Cepat:</p>
-          <div class="grid grid-cols-4 gap-2">
+          <p class="text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Tambah Pecahan Uang Kertas:</p>
+          <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
             <button 
               type="button"
-              @click="setQuickAmount(selectedCustomer?.totalDebt || 0)"
-              class="col-span-2 h-10 bg-slate-100 hover:bg-slate-200 text-[#0a193d] font-bold text-xs rounded-xl border border-slate-200/80 cursor-pointer transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+              v-for="bill in standardBills" 
+              :key="bill"
+              @click="addPaymentAmount(bill)"
+              class="h-10 bg-slate-100 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 text-slate-800 font-bold text-xs rounded-xl cursor-pointer border border-transparent transition-all active:scale-95 font-mono"
             >
-              <Check class="w-3.5 h-3.5 text-sky-600" />
-              <span>Lunas Semua</span>
-            </button>
-            <button 
-              type="button"
-              @click="setQuickAmount(10000)"
-              class="h-10 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 cursor-pointer transition-colors shadow-2xs"
-            >
-              10rb
-            </button>
-            <button 
-              type="button"
-              @click="setQuickAmount(20000)"
-              class="h-10 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 cursor-pointer transition-colors shadow-2xs"
-            >
-              20rb
-            </button>
-            <button 
-              type="button"
-              @click="setQuickAmount(50000)"
-              class="col-span-2 h-10 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 cursor-pointer transition-colors shadow-2xs"
-            >
-              50.000
-            </button>
-            <button 
-              type="button"
-              @click="setQuickAmount(100000)"
-              class="col-span-2 h-10 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 cursor-pointer transition-colors shadow-2xs"
-            >
-              100.000
+              +{{ bill >= 1000 ? (bill / 1000) + 'rb' : bill }}
             </button>
           </div>
         </div>
