@@ -219,8 +219,8 @@ const handleRecordDebtPayment = ({ customerId, amount }) => {
   }
 }
 
-// Simulasi Scan Kamera
-const handleSimulateScan = (code) => {
+// Handler Scan Barcode Kamera
+const handleBarcodeScan = (code) => {
   isCameraOpen.value = false
   const found = products.value.find(p => p.barcode === code)
   if (found) {
@@ -402,11 +402,12 @@ onMounted(() => {
       @newTransaction="isReceiptOpen = false"
     />
 
-    <!-- Modal Scanner Kamera Barcode Simulator -->
+    <!-- Modal Scanner Kamera Barcode -->
     <CameraScannerModal 
       :isOpen="isCameraOpen"
       @close="isCameraOpen = false"
-      @simulateScan="handleSimulateScan"
+      @scan="handleBarcodeScan"
+      @simulateScan="handleBarcodeScan"
     />
   </div>
 </template>
