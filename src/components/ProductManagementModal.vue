@@ -181,7 +181,7 @@ const handleDeleteCategory = (cat) => {
     v-if="isOpen"
     class="fixed inset-0 z-50 bg-[#0a193d]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-xl border border-slate-200/80 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[88vh]">
+    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[88vh]">
       
       <!-- 1. Header (Design System: Midnight Deep Navy & Azure Accent) -->
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
@@ -494,9 +494,9 @@ const handleDeleteCategory = (cat) => {
       <!-- ==================== SUB-VIEW: MODAL KELOLA KATEGORI ==================== -->
       <div 
         v-if="isManagingCategories" 
-        class="fixed inset-0 z-60 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+        class="fixed inset-0 z-60 bg-[#0a193d]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
       >
-        <div class="bg-white rounded-3xl w-full max-w-md shadow-xl border border-slate-200/80 overflow-hidden flex flex-col max-h-[82vh] animate-in zoom-in-95 duration-150">
+        <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[82vh] animate-in zoom-in-95 duration-150">
           <!-- Header Kelola Kategori -->
           <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
             <div class="flex items-center gap-2.5">
