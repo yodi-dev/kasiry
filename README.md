@@ -55,5 +55,16 @@
 
 ---
 
+## ☁️ Deployment ke Cloudflare Pages
+
+1. Hubungkan repo `yodi-dev/kasiry` di Cloudflare Pages.
+2. Pengaturan build:
+   - **Framework preset:** `None`
+   - **Build command:** `npm run build`
+   - **Build output directory:** `dist`
+3. Aplikasi otomatis ter-deploy sebagai PWA offline-first dengan CDN global.
+
+---
+
 ## 📄 Lisensi
 Dibuat dengan ❤️ untuk kemajuan UMKM dan Warung Kelontong Indonesia.
