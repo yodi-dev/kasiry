@@ -108,18 +108,17 @@ const triggerAction = (actionEvent) => {
       >
         <div>
           <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Menu Kasiry</span>
+            <div>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Toko</p>
+              <p class="text-base font-bold text-[#0a193d]">{{ storeName }}</p>
+            </div>
             <button 
               @click="isDrawerOpen = false"
-              class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer transition-colors"
+              class="w-9 h-9 rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
+              aria-label="Tutup Menu"
             >
-              <X class="w-4 h-4" />
+              <X class="w-5 h-5" />
             </button>
-          </div>
-
-          <div class="p-4 border-b border-slate-100 bg-[#edf5fd]/60">
-            <p class="text-xs text-slate-500 font-medium">Toko:</p>
-            <p class="text-base font-bold text-[#0a193d] mt-0.5">{{ storeName }}</p>
           </div>
 
           <nav class="p-3 space-y-1">
