@@ -69,7 +69,7 @@ const emit = defineEmits(['openAddProduct', 'openDailyReport', 'openDebtBook'])
           Rp {{ todaySales.toLocaleString('id-ID') }}
         </p>
         <div class="flex items-center justify-between mt-1 text-[11px] text-sky-200 font-medium">
-          <span>Habiba Store</span>
+          <span class="font-bold tracking-wide">Kasiry</span>
           <span>Hari ini</span>
         </div>
       </div>

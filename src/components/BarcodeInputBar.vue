@@ -26,8 +26,12 @@ const isFocused = ref(false)
 const focusInput = () => {
   nextTick(() => {
     if (inputRef.value) {
-      inputRef.value.focus({ preventScroll: true })
-      isFocused.value = true
+      const activeEl = document.activeElement
+      const isOtherInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl !== inputRef.value
+      if (!isOtherInput) {
+        inputRef.value.focus({ preventScroll: true })
+        isFocused.value = true
+      }
     }
   })
 }

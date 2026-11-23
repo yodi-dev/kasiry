@@ -160,7 +160,7 @@ const shareToWhatsApp = () => {
         <!-- Footer Struk -->
         <div class="text-center pt-2 text-[10px] text-slate-500 space-y-0.5">
           <p class="font-medium">Matur Nuwun Atas Kunjungannya!</p>
-          <p>Kasiry POS • Habiba Store</p>
+          <p>Kasiry</p>
         </div>
       </div>
 

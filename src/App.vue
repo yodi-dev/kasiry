@@ -438,9 +438,64 @@ const handleActivateLicense = (code) => {
   }
 }
 
+// Memastikan fokus kursor selalu aktif di input pencarian/barcode Kasa
+const ensureKasaFocus = () => {
+  nextTick(() => {
+    const isAnyModalOpen = isProductManageOpen.value ||
+      isCustomerManageOpen.value ||
+      isDebtBookOpen.value ||
+      isDailyReportOpen.value ||
+      isSettingsOpen.value ||
+      isCameraOpen.value ||
+      isLazyInventoryOpen.value ||
+      isPaymentOpen.value ||
+      isReceiptOpen.value
+
+    if (!isAnyModalOpen) {
+      barcodeInputBarRef.value?.focusInput()
+    }
+  })
+}
+
+// Watch setiap penutupan modal agar otomatis fokus kembali ke input barang di kasa
+watch(
+  [
+    isProductManageOpen,
+    isCustomerManageOpen,
+    isDebtBookOpen,
+    isDailyReportOpen,
+    isSettingsOpen,
+    isCameraOpen,
+    isLazyInventoryOpen,
+    isPaymentOpen,
+    isReceiptOpen
+  ],
+  (newVals, oldVals) => {
+    const wasOpen = oldVals && oldVals.some(v => Boolean(v))
+    const isNowAllClosed = newVals.every(v => !v)
+    if (wasOpen && isNowAllClosed) {
+      setTimeout(ensureKasaFocus, 50)
+      setTimeout(ensureKasaFocus, 150)
+      setTimeout(ensureKasaFocus, 300)
+    }
+  }
+)
+
+// Klik di area Kasa otomatis mengembalikan fokus kursor ke input barang
+const handleKasaClick = (e) => {
+  const target = e.target
+  const isInteractive = target.closest('button, a, input, textarea, select, [role="button"]')
+  const isModal = target.closest('.fixed.z-50')
+  if (!isInteractive && !isModal) {
+    ensureKasaFocus()
+  }
+}
+
 onMounted(async () => {
   await loadDatabase()
-  barcodeInputBarRef.value?.focusInput()
+  ensureKasaFocus()
+  setTimeout(ensureKasaFocus, 200)
+  setTimeout(ensureKasaFocus, 500)
   // Jika akun Google aktif, lakukan sinkronisasi otomatis diam-diam di latar belakang saat buka aplikasi
   if (isGoogleConnected.value) {
     const localPayload = await getFullDatabasePayload()
@@ -452,7 +507,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col antialiased pb-44 sm:pb-48">
+  <div class="min-h-screen flex flex-col antialiased pb-44 sm:pb-48" @click="handleKasaClick">
     <!-- 1. Top Bar Header -->
     <TopBar 
       :storeName="storeProfile.name"
@@ -466,6 +521,7 @@ onMounted(async () => {
       @openCamera="isCameraOpen = true"
       @openProductManage="isProductManageOpen = true"
       @openCustomerManage="isCustomerManageOpen = true"
+      @drawerClosed="ensureKasaFocus"
     />
 
     <!-- 2. Ergonomic Workspace (Keranjang Tetap di Paling Atas) -->

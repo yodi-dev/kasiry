@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { 
   X, 
   BookOpen, 
@@ -7,9 +7,9 @@ import {
   Settings, 
   Camera, 
   Store, 
-  ChevronRight,
-  Package,
-  Users
+  ChevronRight, 
+  Package, 
+  Users 
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -39,12 +39,24 @@ const emit = defineEmits([
   'openDebtBook', 
   'openDailyReport', 
   'openSettings', 
-  'openCamera',
-  'openProductManage',
-  'openCustomerManage'
+  'openCamera', 
+  'openProductManage', 
+  'openCustomerManage',
+  'drawerClosed'
 ])
 
 const isDrawerOpen = ref(false)
+
+const closeDrawer = () => {
+  isDrawerOpen.value = false
+  emit('drawerClosed')
+}
+
+watch(isDrawerOpen, (newVal) => {
+  if (!newVal) {
+    emit('drawerClosed')
+  }
+})
 
 const todayFormatted = computed(() => {
   return new Intl.DateTimeFormat('id-ID', {
@@ -103,7 +115,7 @@ const triggerAction = (actionEvent) => {
     <div 
       v-if="isDrawerOpen" 
       class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex justify-start transition-opacity duration-200"
-      @click.self="isDrawerOpen = false"
+      @click.self="closeDrawer"
     >
       <div 
         class="w-full max-w-xs bg-white h-full shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-left duration-200"
@@ -115,7 +127,7 @@ const triggerAction = (actionEvent) => {
               <p class="text-base font-bold text-[#0a193d]">{{ storeName }}</p>
             </div>
             <button 
-              @click="isDrawerOpen = false"
+              @click="closeDrawer"
               class="w-9 h-9 rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
               aria-label="Tutup Menu"
             >
@@ -184,7 +196,7 @@ const triggerAction = (actionEvent) => {
         </div>
 
         <div class="p-4 border-t border-slate-100 text-xs text-slate-500">
-          <p class="font-bold text-slate-700">{{ storeName }}</p>
+          <p class="font-bold text-slate-700">Kasiry</p>
           <p class="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
             <span>Crafted with ❤️ by</span>
             <a 

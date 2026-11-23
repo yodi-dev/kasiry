@@ -173,7 +173,7 @@ const toggleExpand = () => {
           Kosongkan Keranjang
         </button>
         <span class="font-medium text-[11px] text-slate-400">
-          Kasiry POS • Habiba Store
+          Kasiry
         </span>
       </div>
     </div>
