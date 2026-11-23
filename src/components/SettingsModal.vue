@@ -197,8 +197,8 @@ const onFileSelected = (event) => {
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             ]"
           >
-            <User class="w-4 h-4" />
-            <span>Nama Pemilik</span>
+            <Store class="w-4 h-4" />
+            <span>Profil Toko</span>
           </button>
 
           <button 
@@ -211,7 +211,7 @@ const onFileSelected = (event) => {
             ]"
           >
             <Cloud class="w-4 h-4" />
-            <span>Cadangan & Google</span>
+            <span>Pencadangan</span>
           </button>
         </div>
       </div>
@@ -219,7 +219,7 @@ const onFileSelected = (event) => {
       <!-- 4. Tab Body Scrollable -->
       <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         
-        <!-- ==================== TAB 1: NAMA PEMILIK ==================== -->
+        <!-- ==================== TAB 1: PROFIL TOKO ==================== -->
         <div v-if="activeTab === 'profile'" class="space-y-4">
           <div class="space-y-3">
             <div>
@@ -237,7 +237,6 @@ const onFileSelected = (event) => {
                   class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-bold text-[#0a193d] outline-hidden transition-all"
                 />
               </div>
-              <p class="text-[11px] text-slate-500 mt-1">Dicetak di bagian atas struk belanja & laporan harian.</p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -275,7 +274,6 @@ const onFileSelected = (event) => {
                 </div>
               </div>
             </div>
-            <p class="text-[11px] text-slate-500">Nomor WhatsApp digunakan saat mengirim struk belanja via WhatsApp ke pelanggan.</p>
           </div>
 
           <!-- Single Primary Save Button -->
