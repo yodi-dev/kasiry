@@ -253,7 +253,7 @@ onUnmounted(() => {
           <!-- Petunjuk Pindai -->
           <div class="absolute bottom-3 inset-x-4 text-center z-10 pointer-events-none">
             <p class="text-[11px] text-white/90 font-medium bg-black/50 backdrop-blur-xs py-1 px-3 rounded-full inline-block">
-              Posisikan barcode EAN-13 / Code-128 di tengah kotak
+              Posisikan barcode produk di dalam kotak
             </p>
           </div>
         </template>
