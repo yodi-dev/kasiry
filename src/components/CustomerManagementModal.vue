@@ -203,8 +203,13 @@ const handleSave = () => {
   currentView.value = 'list'
 }
 
-// Hapus Pelanggan dengan Proteksi Utang
+// Hapus Pelanggan dengan Proteksi Sistem & Utang
 const handleDelete = (c) => {
+  if (c.name?.toLowerCase() === 'umum') {
+    alert('Pelanggan "Umum" merupakan pelanggan bawaan sistem untuk transaksi tunai dan tidak dapat dihapus.')
+    return
+  }
+
   if ((c.totalDebt || 0) > 0) {
     alert(`Pelanggan "${c.name}" masih memiliki sisa bon sebesar Rp ${c.totalDebt.toLocaleString('id-ID')}.\n\nPelanggan dengan utang aktif tidak dapat dihapus sebelum bon dilunasi di Buku Utang.`)
     return
@@ -567,11 +572,11 @@ const openWhatsAppChat = (c) => {
                 @click="handleDelete(selectedCustomer)"
                 :class="[
                   'h-9 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors border shadow-2xs',
-                  (selectedCustomer?.totalDebt || 0) > 0 
+                  ((selectedCustomer?.totalDebt || 0) > 0 || selectedCustomer?.name?.toLowerCase() === 'umum')
                     ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed' 
                     : 'bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border-slate-200 cursor-pointer'
                 ]"
-                :title="(selectedCustomer?.totalDebt || 0) > 0 ? 'Tidak bisa dihapus karena masih ada bon' : 'Hapus Pelanggan'"
+                :title="selectedCustomer?.name?.toLowerCase() === 'umum' ? 'Pelanggan default sistem tidak dapat dihapus' : (selectedCustomer?.totalDebt || 0) > 0 ? 'Tidak bisa dihapus karena masih ada bon' : 'Hapus Pelanggan'"
               >
                 <Trash2 class="w-3.5 h-3.5" />
                 <span>Hapus</span>

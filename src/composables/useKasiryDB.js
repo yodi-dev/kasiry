@@ -78,11 +78,10 @@ export function useKasiryDB() {
     }
     customers.value = allCustomers
 
-    // 3. Ambil Transaksi Terakhir (100 transaksi terbaru)
+    // 3. Ambil seluruh riwayat transaksi terbaru agar rekap & statistik pelanggan selalu akurat
     const recentTx = await db.transactions
       .orderBy('createdAt')
       .reverse()
-      .limit(100)
       .toArray()
     transactions.value = recentTx
 
@@ -194,16 +193,20 @@ export function useKasiryDB() {
     if (!cust) return
 
     const now = Date.now()
-    const newDebt = Math.max(0, (cust.totalDebt || 0) - amount)
-    cust.totalDebt = newDebt
+    const currentDebt = cust.totalDebt || 0
+    // Catat kas masuk hanya sebatas nominal utang yang benar-benar terlunasi (tanpa uang kembalian)
+    const appliedAmount = Math.min(amount, currentDebt)
+    if (appliedAmount <= 0) return
+
+    cust.totalDebt = Math.max(0, currentDebt - appliedAmount)
     cust.lastDate = 'Hari ini'
     cust.updatedAt = now
     await db.customers.put(cust)
 
-    // Catat histori pelunasan
+    // Catat histori pelunasan sebesar nominal utang yang dibayarkan
     await db.debtPayments.add({
       customerId,
-      amount,
+      amount: appliedAmount,
       paymentDate: now,
       updatedAt: now
     })

@@ -10,6 +10,10 @@ const props = defineProps({
   searchResults: {
     type: Array,
     default: () => []
+  },
+  modalOpen: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -24,7 +28,9 @@ const inputRef = ref(null)
 const isFocused = ref(false)
 
 const focusInput = () => {
+  if (props.modalOpen) return
   nextTick(() => {
+    if (props.modalOpen) return
     if (inputRef.value) {
       const activeEl = document.activeElement
       const isOtherInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl !== inputRef.value
@@ -37,10 +43,11 @@ const focusInput = () => {
 }
 
 // Global keydown: jika kasir mulai mengetik karakter atau barcode scanner nembak,
-// langsung arahkan fokus ke input barcode secara otomatis
+// langsung arahkan fokus ke input barcode secara otomatis (kecuali jika ada modal terbuka)
 const handleGlobalKeyDown = (e) => {
+  if (props.modalOpen) return
   const activeEl = document.activeElement
-  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) return
   if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
     focusInput()
   }
@@ -82,7 +89,7 @@ const onSelect = (product) => {
 const onTriggerUnknown = () => {
   const code = props.searchQuery.trim() || '8999999888123'
   emit('triggerLazyInventory', code)
-  clearInput()
+  emit('update:searchQuery', '')
 }
 
 const handleEnter = () => {

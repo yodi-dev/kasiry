@@ -69,23 +69,28 @@ const handleClose = () => {
   emit('close')
 }
 
+// Kecualikan pelanggan default sistem "Umum" dari daftar Buku Utang
+const realCustomers = computed(() => {
+  return props.customers.filter(c => c.name?.toLowerCase() !== 'umum')
+})
+
 const unpaidCustomers = computed(() => {
-  return props.customers.filter(c => (c.totalDebt || 0) > 0)
+  return realCustomers.value.filter(c => (c.totalDebt || 0) > 0)
 })
 
 const paidCustomers = computed(() => {
-  return props.customers.filter(c => (c.totalDebt || 0) <= 0)
+  return realCustomers.value.filter(c => (c.totalDebt || 0) <= 0)
 })
 
 const unpaidCount = computed(() => unpaidCustomers.value.length)
 const paidCount = computed(() => paidCustomers.value.length)
 
 const totalAllDebt = computed(() => {
-  return props.customers.reduce((acc, c) => acc + (c.totalDebt || 0), 0)
+  return realCustomers.value.reduce((acc, c) => acc + (c.totalDebt || 0), 0)
 })
 
 const filteredList = computed(() => {
-  let list = props.customers
+  let list = realCustomers.value
 
   if (activeFilter.value === 'unpaid') {
     list = unpaidCustomers.value
@@ -158,6 +163,13 @@ const isFullyPaidPreview = computed(() => {
   return pay >= current && current > 0
 })
 
+const changeDebtPreview = computed(() => {
+  if (!selectedCustomer.value) return 0
+  const current = selectedCustomer.value.totalDebt || 0
+  const pay = parseInt(String(paymentAmount.value).replace(/\D/g, '') || '0', 10)
+  return Math.max(0, pay - current)
+})
+
 // Buka form tambah
 const openAddForm = () => {
   customerForm.value = {
@@ -170,12 +182,13 @@ const openAddForm = () => {
 
 // Simpan Tambah Pelanggan
 const handleSaveCustomer = () => {
-  if (!customerForm.value.name.trim()) return
+  const trimmedName = customerForm.value.name.trim()
+  if (!trimmedName || trimmedName.toLowerCase() === 'umum') return
 
   const initialDebt = parseInt(String(customerForm.value.totalDebt).replace(/\D/g, '') || '0', 10)
 
   emit('addCustomer', {
-    name: customerForm.value.name.trim(),
+    name: trimmedName,
     phone: customerForm.value.phone.trim(),
     totalDebt: initialDebt,
     lastDate: 'Hari ini'
@@ -387,7 +400,7 @@ const shareWhatsAppReminder = (c) => {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
               ]"
             >
-              Semua ({{ customers.length }})
+              Semua ({{ realCustomers.length }})
             </button>
 
             <button 
@@ -480,7 +493,7 @@ const shareWhatsAppReminder = (c) => {
         <!-- Modal Footer -->
         <div class="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between shrink-0">
           <span class="text-xs text-slate-500 font-medium">
-            Menampilkan {{ filteredList.length }} dari {{ customers.length }} pelanggan
+            Menampilkan {{ filteredList.length }} dari {{ realCustomers.length }} pelanggan
           </span>
           <button 
             @click="handleClose"
@@ -575,7 +588,7 @@ const shareWhatsAppReminder = (c) => {
           </button>
           <button 
             @click="handleSaveCustomer"
-            :disabled="!customerForm.name.trim()"
+            :disabled="!customerForm.name.trim() || customerForm.name.trim().toLowerCase() === 'umum'"
             class="h-11 px-6 bg-[#0a193d] hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-2xl shadow-sm flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed transition-all active:scale-95"
           >
             <Check class="w-4 h-4 text-sky-400" />
@@ -673,6 +686,9 @@ const shareWhatsAppReminder = (c) => {
               Sisa Bon: 
               <span :class="['font-mono font-bold', isFullyPaidPreview ? 'text-emerald-700' : 'text-[#0a193d]']">
                 {{ isFullyPaidPreview ? 'Lunas ✓' : `Rp ${remainingDebtPreview.toLocaleString('id-ID')}` }}
+              </span>
+              <span v-if="changeDebtPreview > 0" class="ml-2 text-emerald-700 font-bold font-mono">
+                • Kembalian: Rp {{ changeDebtPreview.toLocaleString('id-ID') }}
               </span>
             </span>
           </div>

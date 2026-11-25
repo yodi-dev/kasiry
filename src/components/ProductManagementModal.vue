@@ -190,7 +190,7 @@ const handleDeleteCategory = (cat) => {
       selectedCategory.value = 'Semua'
     }
     if (currentProduct.value.category === cat) {
-      currentProduct.value = availableCategories.value[0] || 'Sembako'
+      currentProduct.value.category = availableCategories.value[0] || 'Sembako'
     }
   }
 }

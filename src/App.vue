@@ -91,6 +91,26 @@ const isCustomerManageOpen = ref(false)
 // State Transaksi Struk
 const receiptData = ref(null)
 
+// Status apakah ada modal yang sedang terbuka
+const isAnyModalOpen = computed(() => {
+  return isProductManageOpen.value ||
+    isCustomerManageOpen.value ||
+    isDebtBookOpen.value ||
+    isDailyReportOpen.value ||
+    isSettingsOpen.value ||
+    isCameraOpen.value ||
+    isLazyInventoryOpen.value ||
+    isPaymentOpen.value ||
+    isReceiptOpen.value
+})
+
+// Jumlah pelanggan aktif yang masih memiliki sisa bon (mengecualikan "Umum")
+const unpaidDebtCount = computed(() => {
+  return customers.value.filter(
+    c => c.name?.toLowerCase() !== 'umum' && (c.totalDebt || 0) > 0
+  ).length
+})
+
 // Computed Laporan Kasir Real-time dari Transaksi Hari Ini
 const stats = computed(() => {
   const startOfDay = new Date()
@@ -113,7 +133,7 @@ const stats = computed(() => {
 
     if (t.items) {
       t.items.forEach(item => {
-        const itemProfit = (item.sellPrice - (item.buyPrice || item.sellPrice * 0.8)) * item.qty
+        const itemProfit = (item.sellPrice - (item.buyPrice ?? item.sellPrice * 0.8)) * item.qty
         profit += itemProfit
 
         if (!productCountMap[item.name]) {
@@ -280,13 +300,23 @@ const handleProcessDebtPayment = async (data) => {
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
   const invoice = `BON-${Date.now().toString().slice(-6)}`
 
+  let custObj = data.customer
+  if (custObj?.name) {
+    const cleanName = custObj.name.trim()
+    if (cleanName.toLowerCase() === 'umum') return
+    const existing = customers.value.find(c => c.name?.toLowerCase() === cleanName.toLowerCase())
+    if (existing) {
+      custObj = existing
+    }
+  }
+
   const txPayload = {
     invoiceNumber: invoice,
     totalAmount: data.totalAmount,
     paymentMethod: 'UTANG / BON',
-    customer: data.customer,
-    customerId: data.customer?.id || null,
-    customerName: data.customer?.name || '',
+    customer: custObj,
+    customerId: custObj?.id || null,
+    customerName: custObj?.name || '',
     items: [...cart.value]
   }
 
@@ -301,7 +331,7 @@ const handleProcessDebtPayment = async (data) => {
     time: timeStr,
     totalAmount: data.totalAmount,
     paymentMethod: 'UTANG / BON',
-    customer: data.customer,
+    customer: custObj,
     items: [...cart.value]
   }
 
@@ -333,6 +363,7 @@ const handleBarcodeScan = (code) => {
 // Hardware Barcode Scanner Listener (Global USB/Bluetooth HID listener)
 useHardwareScanner({
   onScan: (scannedCode) => {
+    if (isAnyModalOpen.value) return
     searchQuery.value = ''
     handleBarcodeScan(scannedCode)
   }
@@ -445,17 +476,7 @@ const handleActivateLicense = (code) => {
 // Memastikan fokus kursor selalu aktif di input pencarian/barcode Kasa
 const ensureKasaFocus = () => {
   nextTick(() => {
-    const isAnyModalOpen = isProductManageOpen.value ||
-      isCustomerManageOpen.value ||
-      isDebtBookOpen.value ||
-      isDailyReportOpen.value ||
-      isSettingsOpen.value ||
-      isCameraOpen.value ||
-      isLazyInventoryOpen.value ||
-      isPaymentOpen.value ||
-      isReceiptOpen.value
-
-    if (!isAnyModalOpen) {
+    if (!isAnyModalOpen.value) {
       barcodeInputBarRef.value?.focusInput()
     }
   })
@@ -516,7 +537,7 @@ onMounted(async () => {
     <TopBar 
       :storeName="storeProfile.name"
       :isOnline="isOnline"
-      :totalDebtCount="customers.length"
+      :totalDebtCount="unpaidDebtCount"
       :isGoogleConnected="isGoogleConnected"
       :googleUser="googleUser"
       @openDebtBook="isDebtBookOpen = true"
@@ -561,6 +582,7 @@ onMounted(async () => {
         ref="barcodeInputBarRef"
         v-model:searchQuery="searchQuery"
         :searchResults="searchResults"
+        :modalOpen="isAnyModalOpen"
         @selectProduct="addToCart"
         @openCamera="isCameraOpen = true"
         @triggerLazyInventory="triggerLazyInventory"

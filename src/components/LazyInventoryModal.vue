@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { X, Plus, Barcode } from '@lucide/vue'
 
 const props = defineProps({
@@ -15,6 +15,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'saveAndAddToCart'])
 
+const nameInputRef = ref(null)
 const productName = ref('')
 const sellPrice = ref('')
 const buyPrice = ref('')
@@ -28,12 +29,15 @@ watch(() => props.isOpen, (newVal) => {
     sellPrice.value = ''
     buyPrice.value = ''
     category.value = 'Makanan'
+    nextTick(() => {
+      nameInputRef.value?.focus()
+    })
   }
 })
 
 const handleSave = () => {
-  const sell = parseInt(sellPrice.value.replace(/\D/g, '') || '0', 10)
-  const buy = parseInt(buyPrice.value.replace(/\D/g, '') || '0', 10)
+  const sell = parseInt(String(sellPrice.value ?? '').replace(/\D/g, '') || '0', 10)
+  const buy = parseInt(String(buyPrice.value ?? '').replace(/\D/g, '') || '0', 10)
   if (!productName.value.trim() || sell <= 0) return
 
   emit('saveAndAddToCart', {
@@ -78,12 +82,12 @@ const handleSave = () => {
             Nama Barang:
           </label>
           <input 
+            ref="nameInputRef"
             type="text" 
             v-model="productName"
             placeholder="Contoh: Biskuit Regal 250g"
             required
             class="w-full h-11 px-3.5 bg-white border border-slate-200 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 rounded-xl text-sm font-medium text-[#0a193d] outline-hidden transition-all"
-            autofocus
           />
         </div>
 

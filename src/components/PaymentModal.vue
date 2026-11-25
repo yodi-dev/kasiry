@@ -108,10 +108,11 @@ watch(() => props.isOpen, (newVal) => {
   }
 })
 
-// Sinkronkan jika data savedCustomers tiba dari IndexedDB setelah modal terbuka
+// Sinkronkan jika data savedCustomers tiba atau pelanggan baru mendapat ID dari IndexedDB
 watch(() => props.savedCustomers, (newCustomers) => {
-  if (selectedCashCustomer.value && selectedCashCustomer.value.name.toLowerCase() === 'umum' && !selectedCashCustomer.value.id) {
-    const found = newCustomers.find(c => c.name.toLowerCase() === 'umum')
+  if (selectedCashCustomer.value && !selectedCashCustomer.value.id && selectedCashCustomer.value.name) {
+    const targetName = selectedCashCustomer.value.name.trim().toLowerCase()
+    const found = newCustomers.find(c => c.name?.toLowerCase() === targetName)
     if (found) selectedCashCustomer.value = found
   }
 }, { deep: true })
@@ -234,6 +235,16 @@ const handleSaveQuickCustomer = () => {
   const name = newCustName.value.trim()
   if (!name) return
 
+  const existing = props.savedCustomers.find(c => c.name?.toLowerCase() === name.toLowerCase())
+  if (existing) {
+    selectedCashCustomer.value = existing
+    isAddingCustomer.value = false
+    isCustomerDropdownOpen.value = false
+    newCustName.value = ''
+    newCustPhone.value = ''
+    return
+  }
+
   const newCust = {
     id: null,
     name,
@@ -253,6 +264,13 @@ const handleSaveQuickCustomer = () => {
 const createAndSelectCashCustomer = () => {
   const newName = cashCustomerQuery.value.trim()
   if (!newName) return
+
+  const existing = props.savedCustomers.find(c => c.name?.toLowerCase() === newName.toLowerCase())
+  if (existing) {
+    selectCashCustomer(existing)
+    return
+  }
+
   const newCust = { id: null, name: newName, totalDebt: 0, phone: '' }
   emit('saveCustomer', newCust)
   selectedCashCustomer.value = newCust
@@ -288,6 +306,24 @@ const filteredCustomers = computed(() => {
   )
 })
 
+const isDebtQueryUmum = computed(() => {
+  return customerQuery.value.trim().toLowerCase() === 'umum'
+})
+
+const isDebtReady = computed(() => {
+  if (selectedCustomer.value) {
+    return selectedCustomer.value.name?.toLowerCase() !== 'umum'
+  }
+  const q = customerQuery.value.trim()
+  return q.length > 0 && q.toLowerCase() !== 'umum'
+})
+
+const onDebtCustomerQueryInput = () => {
+  if (selectedCustomer.value && customerQuery.value.trim().toLowerCase() !== selectedCustomer.value.name.toLowerCase()) {
+    selectedCustomer.value = null
+  }
+}
+
 const selectCustomer = (c) => {
   selectedCustomer.value = c
   customerQuery.value = c.name
@@ -295,7 +331,14 @@ const selectCustomer = (c) => {
 
 const createAndSelectCustomer = () => {
   const newName = customerQuery.value.trim()
-  if (!newName) return
+  if (!newName || newName.toLowerCase() === 'umum') return
+
+  const existing = props.savedCustomers.find(c => c.name?.toLowerCase() === newName.toLowerCase())
+  if (existing) {
+    selectCustomer(existing)
+    return
+  }
+
   const newCust = { id: Date.now(), name: newName, totalDebt: 0, phone: '' }
   selectedCustomer.value = newCust
 }
@@ -311,12 +354,19 @@ const submitPayment = () => {
       customer: selectedCashCustomer.value || getUmumCustomer()
     })
   } else {
-    if (!selectedCustomer.value && !customerQuery.value.trim()) return
-    const cust = selectedCustomer.value || {
-      id: Date.now(),
-      name: customerQuery.value.trim(),
-      phone: '',
-      totalDebt: 0
+    if (!isDebtReady.value) return
+    const qName = customerQuery.value.trim()
+    let cust = selectedCustomer.value
+    if (!cust) {
+      const existing = props.savedCustomers.find(
+        c => c.name?.toLowerCase() === qName.toLowerCase() && c.name?.toLowerCase() !== 'umum'
+      )
+      cust = existing || {
+        id: Date.now(),
+        name: qName,
+        phone: '',
+        totalDebt: 0
+      }
     }
     emit('processDebtPayment', {
       totalAmount: props.totalAmount,
@@ -653,13 +703,23 @@ const submitPayment = () => {
               ref="debtCustomerInputRef"
               type="text" 
               v-model="customerQuery"
+              @input="onDebtCustomerQueryInput"
               placeholder="Ketik nama pelanggan..."
               class="w-full h-12 px-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/15 rounded-2xl text-sm font-semibold text-[#0a193d] outline-hidden transition-all"
             />
           </div>
 
+          <!-- Peringatan jika mengetik "Umum" pada mode Utang -->
+          <div v-if="isDebtQueryUmum" class="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2 font-medium">
+            <AlertCircle class="w-4 h-4 shrink-0 text-amber-600" />
+            <span>Pelanggan <strong>"Umum"</strong> khusus transaksi tunai dan tidak dapat dicatat sebagai utang/bon.</span>
+          </div>
+
           <!-- Tombol Tambah Pelanggan Baru -->
-          <div v-if="customerQuery.trim() && !selectedCustomer" class="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+          <div 
+            v-else-if="customerQuery.trim() && !selectedCustomer && !filteredCustomers.some(c => c.name.toLowerCase() === customerQuery.trim().toLowerCase())" 
+            class="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between"
+          >
             <div class="text-xs text-slate-700 font-medium">
               Nama baru: <strong class="text-[#0a193d]">{{ customerQuery }}</strong>
             </div>
@@ -720,7 +780,7 @@ const submitPayment = () => {
         </button>
 
         <button 
-          :disabled="activeTab === 'cash' ? !isCashSufficient : (!selectedCustomer && !customerQuery.trim())"
+          :disabled="activeTab === 'cash' ? !isCashSufficient : !isDebtReady"
           @click="submitPayment"
           class="flex-1 h-12 px-6 bg-[#0a193d] hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-sm cursor-pointer disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-98"
         >

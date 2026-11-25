@@ -70,7 +70,15 @@ export function exportKasiryExcel({
       .map(i => `${i.qty}x ${i.name}`)
       .join(', ')
 
-    const txDate = t.createdAt ? new Date(t.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'
+    const txDate = t.createdAt
+      ? new Date(t.createdAt).toLocaleString('id-ID', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : '-'
 
     return [
       idx + 1,
@@ -88,7 +96,7 @@ export function exportKasiryExcel({
   const wsTx = XLSX.utils.aoa_to_sheet([txHeader, ...txRows])
   wsTx['!cols'] = [
     { wch: 6 },
-    { wch: 10 },
+    { wch: 18 },
     { wch: 16 },
     { wch: 16 },
     { wch: 22 },
@@ -166,14 +174,16 @@ export function exportKasiryExcel({
     'Terakhir Belanja / Transaksi',
     'Status'
   ]
-  const debtRows = customers.map((c, idx) => [
-    idx + 1,
-    c.name,
-    c.phone || '-',
-    c.totalDebt || 0,
-    c.lastDate || 'Hari ini',
-    (c.totalDebt || 0) > 0 ? 'Belum Lunas' : 'Lunas'
-  ])
+  const debtRows = customers
+    .filter(c => c.name?.toLowerCase() !== 'umum' || (c.totalDebt || 0) > 0)
+    .map((c, idx) => [
+      idx + 1,
+      c.name,
+      c.phone || '-',
+      c.totalDebt || 0,
+      c.lastDate || 'Hari ini',
+      (c.totalDebt || 0) > 0 ? 'Belum Lunas' : 'Lunas'
+    ])
   const wsDebt = XLSX.utils.aoa_to_sheet([debtHeader, ...debtRows])
   wsDebt['!cols'] = [
     { wch: 6 },
