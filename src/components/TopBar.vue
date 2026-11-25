@@ -192,6 +192,19 @@ const triggerAction = (actionEvent) => {
               </div>
               <ChevronRight class="w-4 h-4 text-slate-400" />
             </button>
+
+            <button 
+              @click="triggerAction('openSettings')"
+              class="w-full p-3 rounded-2xl hover:bg-slate-50 flex items-center justify-between text-left transition-colors cursor-pointer group"
+            >
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200/80">
+                  <Settings class="w-4 h-4" />
+                </div>
+                <p class="text-sm font-semibold text-[#0a193d]">Pengaturan & Cadangan</p>
+              </div>
+              <ChevronRight class="w-4 h-4 text-slate-400" />
+            </button>
           </nav>
         </div>
 

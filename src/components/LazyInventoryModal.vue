@@ -86,7 +86,6 @@ const handleSave = () => {
             type="text" 
             v-model="productName"
             placeholder="Contoh: Biskuit Regal 250g"
-            required
             class="w-full h-11 px-3.5 bg-white border border-slate-200 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 rounded-xl text-sm font-medium text-[#0a193d] outline-hidden transition-all"
           />
         </div>
@@ -98,9 +97,9 @@ const handleSave = () => {
             </label>
             <input 
               type="number" 
+              min="1"
               v-model="sellPrice"
               placeholder="12000"
-              required
               class="w-full h-11 px-3.5 bg-white border border-slate-200 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 rounded-xl text-sm font-bold text-sky-800 text-right outline-hidden transition-all"
             />
           </div>
@@ -150,7 +149,8 @@ const handleSave = () => {
           </button>
           <button 
             type="submit"
-            class="h-10 px-5 bg-[#0a193d] hover:bg-[#102b66] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
+            :disabled="!productName.trim() || Number(String(sellPrice ?? '').replace(/\D/g, '') || 0) <= 0"
+            class="h-10 px-5 bg-[#0a193d] hover:bg-[#102b66] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-all active:scale-95"
           >
             <Plus class="w-3.5 h-3.5" />
             Simpan & Masuk Keranjang

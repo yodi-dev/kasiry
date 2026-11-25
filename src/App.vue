@@ -213,10 +213,12 @@ const decreaseQty = (productId) => {
 
 const removeItem = (productId) => {
   cart.value = cart.value.filter(i => i.id !== productId)
+  ensureKasaFocus()
 }
 
 const clearCart = () => {
   cart.value = []
+  ensureKasaFocus()
 }
 
 // Product Management (CRUD dengan Dexie.js)

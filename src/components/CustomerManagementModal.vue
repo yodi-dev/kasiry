@@ -569,6 +569,7 @@ const openWhatsAppChat = (c) => {
 
               <button 
                 type="button"
+                :disabled="(selectedCustomer?.totalDebt || 0) > 0 || selectedCustomer?.name?.toLowerCase() === 'umum'"
                 @click="handleDelete(selectedCustomer)"
                 :class="[
                   'h-9 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors border shadow-2xs',

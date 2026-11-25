@@ -1,6 +1,12 @@
 import { ref, computed } from 'vue'
 import { db, initDatabase } from '../db/index'
 
+// Helper agar objek/array reaktif Vue (Proxy) selalu dikonversi menjadi plain JS sebelum disimpan ke IndexedDB
+const toPlain = (val) => {
+  if (val === undefined) return undefined
+  return JSON.parse(JSON.stringify(val))
+}
+
 // Shared Reactive State
 const isDbReady = ref(false)
 const products = ref([])
@@ -111,7 +117,7 @@ export function useKasiryDB() {
       categoryList.value = [...initialDefaultCategories]
       await db.settings.put({
         key: 'categories',
-        value: categoryList.value,
+        value: toPlain(categoryList.value),
         updatedAt: Date.now()
       })
     }
@@ -127,11 +133,11 @@ export function useKasiryDB() {
   // CRUD Produk
   const saveProduct = async (productData) => {
     const now = Date.now()
-    const payload = {
+    const payload = toPlain({
       ...productData,
       updatedAt: now,
       deleted: false
-    }
+    })
 
     if (payload.id) {
       await db.products.put(payload)
@@ -158,11 +164,11 @@ export function useKasiryDB() {
   // CRUD Pelanggan (Buku Utang)
   const saveCustomer = async (custData) => {
     const now = Date.now()
-    const payload = {
+    const payload = toPlain({
       ...custData,
       updatedAt: now,
       deleted: false
-    }
+    })
 
     if (payload.id) {
       await db.customers.put(payload)
@@ -219,7 +225,7 @@ export function useKasiryDB() {
     const now = Date.now()
     
     // 1. Simpan Transaksi Induk
-    const txId = await db.transactions.add({
+    const txId = await db.transactions.add(toPlain({
       invoiceNumber,
       createdAt: now,
       totalAmount,
@@ -232,12 +238,12 @@ export function useKasiryDB() {
         id: item.id,
         name: item.name,
         sellPrice: item.sellPrice,
-        buyPrice: item.buyPrice || Math.round(item.sellPrice * 0.8),
+        buyPrice: item.buyPrice ?? Math.round(item.sellPrice * 0.8),
         qty: item.qty,
         subtotal: item.sellPrice * item.qty
       })),
       updatedAt: now
-    })
+    }))
 
     // 2. Jika Metode Utang, akumulasikan saldo utang pelanggan
     if (paymentMethod === 'UTANG / BON' && customer) {
@@ -246,9 +252,9 @@ export function useKasiryDB() {
         cust.totalDebt = (cust.totalDebt || 0) + totalAmount
         cust.lastDate = 'Hari ini'
         cust.updatedAt = now
-        await db.customers.put(cust)
+        await db.customers.put(toPlain(cust))
       } else {
-        cust = {
+        cust = toPlain({
           id: customer.id || now,
           name: customer.name,
           phone: customer.phone || '',
@@ -256,7 +262,7 @@ export function useKasiryDB() {
           lastDate: 'Hari ini',
           updatedAt: now,
           deleted: false
-        }
+        })
         await db.customers.add(cust)
       }
     }
@@ -265,7 +271,7 @@ export function useKasiryDB() {
     licenseStatus.value.txCount += 1
     await db.settings.put({
       key: 'licenseStatus',
-      value: licenseStatus.value,
+      value: toPlain(licenseStatus.value),
       updatedAt: now
     })
 
@@ -275,10 +281,11 @@ export function useKasiryDB() {
 
   // Simpan Profil Toko
   const saveStoreProfile = async (newProfile) => {
-    storeProfile.value = { ...newProfile }
+    const cleanProfile = toPlain(newProfile)
+    storeProfile.value = cleanProfile
     await db.settings.put({
       key: 'storeProfile',
-      value: storeProfile.value,
+      value: cleanProfile,
       updatedAt: Date.now()
     })
   }
@@ -338,22 +345,22 @@ export function useKasiryDB() {
 
       const { products: inProducts, customers: inCustomers, transactions: inTransactions, debtPayments: inDebtPayments, settings: inSettings } = payload.data
 
-      // Gunakan Dexie transaction untuk atomic import
+      // Gunakan Dexie transaction untuk atomic import (konversi ke plain JS)
       await db.transaction('rw', [db.products, db.customers, db.transactions, db.debtPayments, db.settings], async () => {
         if (Array.isArray(inProducts) && inProducts.length > 0) {
-          await db.products.bulkPut(inProducts)
+          await db.products.bulkPut(toPlain(inProducts))
         }
         if (Array.isArray(inCustomers) && inCustomers.length > 0) {
-          await db.customers.bulkPut(inCustomers)
+          await db.customers.bulkPut(toPlain(inCustomers))
         }
         if (Array.isArray(inTransactions) && inTransactions.length > 0) {
-          await db.transactions.bulkPut(inTransactions)
+          await db.transactions.bulkPut(toPlain(inTransactions))
         }
         if (Array.isArray(inDebtPayments) && inDebtPayments.length > 0) {
-          await db.debtPayments.bulkPut(inDebtPayments)
+          await db.debtPayments.bulkPut(toPlain(inDebtPayments))
         }
         if (Array.isArray(inSettings) && inSettings.length > 0) {
-          await db.settings.bulkPut(inSettings)
+          await db.settings.bulkPut(toPlain(inSettings))
         }
       })
 
@@ -373,7 +380,7 @@ export function useKasiryDB() {
       categoryList.value = [...categoryList.value, trimmed]
       await db.settings.put({
         key: 'categories',
-        value: categoryList.value,
+        value: toPlain(categoryList.value),
         updatedAt: Date.now()
       })
     }
@@ -389,7 +396,7 @@ export function useKasiryDB() {
     categoryList.value = categoryList.value.filter(c => c !== catName)
     await db.settings.put({
       key: 'categories',
-      value: categoryList.value,
+      value: toPlain(categoryList.value),
       updatedAt: Date.now()
     })
     return { success: true }

@@ -119,7 +119,7 @@ const handleEnter = () => {
           autofocus
           :value="searchQuery"
           @input="handleInput"
-          @keydown.enter="handleEnter"
+          @keydown.enter.prevent="handleEnter"
           @focus="isFocused = true"
           @blur="isFocused = false"
           placeholder="Cari nama barang atau scan barcode..."
