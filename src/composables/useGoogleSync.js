@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 
 const DEFAULT_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-  '10475823948-6l2qk1g1313g4c8afujo6md17t51th20.apps.googleusercontent.com'
+  '1057500468203-6pa94u5k9b18hq6jjdkb5bg1sb4541lt.apps.googleusercontent.com'
 
 const SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
@@ -325,7 +325,7 @@ export function useGoogleSync() {
   }
 
   // Cari atau Buat Spreadsheet Buku Kas Warung (dinamis sesuai nama toko)
-  const ensureSpreadsheet = async (storeName = 'Toko') => {
+  const ensureSpreadsheet = async (storeName = 'Toko', interactive = false) => {
     if (linkedSheetId.value) {
       return linkedSheetId.value
     }
@@ -338,7 +338,10 @@ export function useGoogleSync() {
         `name='${sheetTitle.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`
       )
       const res = await fetchWithAuth(
-        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=5`
+        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=5`,
+        {},
+        false,
+        interactive
       )
       if (res.ok) {
         const data = await res.json()
@@ -382,11 +385,16 @@ export function useGoogleSync() {
         ]
       }
 
-      const createRes = await fetchWithAuth('https://sheets.googleapis.com/v4/spreadsheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      })
+      const createRes = await fetchWithAuth(
+        'https://sheets.googleapis.com/v4/spreadsheets',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        },
+        false,
+        interactive
+      )
 
       if (createRes.ok) {
         const createData = await createRes.json()
@@ -427,8 +435,8 @@ export function useGoogleSync() {
     persistPendingQueue([...pendingSheetQueue.value, entry])
   }
 
-  const appendRowsBatch = async (rows, storeName = 'Toko') => {
-    const sheetId = await ensureSpreadsheet(storeName)
+  const appendRowsBatch = async (rows, storeName = 'Toko', interactive = false) => {
+    const sheetId = await ensureSpreadsheet(storeName, interactive)
     if (!sheetId) {
       throw new Error('Spreadsheet Buku Kas belum tersedia.')
     }
@@ -439,7 +447,9 @@ export function useGoogleSync() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ values: rows })
-      }
+      },
+      false,
+      interactive
     )
 
     if (!res.ok) {
@@ -450,14 +460,14 @@ export function useGoogleSync() {
   }
 
   // Kirim seluruh antrean baris Google Sheets yang tertunda saat offline
-  const flushPendingSheetQueue = async (storeName = 'Toko') => {
+  const flushPendingSheetQueue = async (storeName = 'Toko', interactive = false) => {
     if (!isConnected.value || !navigator.onLine || pendingSheetQueue.value.length === 0) {
       return { flushed: 0, remaining: pendingSheetQueue.value.length }
     }
 
     const snapshot = [...pendingSheetQueue.value]
     try {
-      await appendRowsBatch(snapshot.map(item => item.row), storeName)
+      await appendRowsBatch(snapshot.map(item => item.row), storeName, interactive)
       const sentIds = new Set(snapshot.map(item => item.id))
       const remaining = pendingSheetQueue.value.filter(item => !sentIds.has(item.id))
       persistPendingQueue(remaining)
@@ -522,7 +532,7 @@ export function useGoogleSync() {
       // KASUS 1: File belum ada di Google Drive (Upload pertama kali)
       if (!fileId) {
         const newFileId = await uploadToDrive(localData, null, interactive)
-        await flushPendingSheetQueue(localData.storeProfile?.name)
+        await flushPendingSheetQueue(localData.storeProfile?.name, interactive)
         markDrivePending(false)
         const nowIso = new Date().toISOString()
         lastSyncTime.value = nowIso
@@ -628,7 +638,7 @@ export function useGoogleSync() {
 
       // Upload kembali data gabungan paling mutakhir ke Google Drive & flush antrean Sheets
       await uploadToDrive(mergedPayload, fileId, interactive)
-      await flushPendingSheetQueue(mergedPayload.storeProfile?.name)
+      await flushPendingSheetQueue(mergedPayload.storeProfile?.name, interactive)
       markDrivePending(false)
 
       const nowIso = new Date().toISOString()

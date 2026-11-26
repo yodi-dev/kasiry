@@ -476,7 +476,7 @@ const handleSyncCloud = async () => {
   const localPayload = await getFullDatabasePayload()
   const res = await syncWithCloud(localPayload, async (mergedPayload) => {
     await importBackupJSON(mergedPayload, 'merge')
-  }, false)
+  }, true)
 
   if (res.success) {
     playBeepSound('success')
@@ -489,7 +489,7 @@ const handleSyncCloud = async () => {
 const handleOpenGoogleSheet = async () => {
   let sheetId = linkedSheetId.value
   if (!sheetId) {
-    sheetId = await ensureSpreadsheet(storeProfile.value?.name)
+    sheetId = await ensureSpreadsheet(storeProfile.value?.name, true)
   }
   if (sheetId) {
     window.open(`https://docs.google.com/spreadsheets/d/${sheetId}`, '_blank')
