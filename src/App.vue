@@ -781,8 +781,10 @@ onUnmounted(() => {
     <LazyInventoryModal 
       :isOpen="isLazyInventoryOpen"
       :scannedBarcode="scannedBarcode"
+      :categories="categories"
       @close="isLazyInventoryOpen = false"
       @saveAndAddToCart="saveAndAddToCart"
+      @addCategory="handleAddCategory"
     />
 
     <!-- Modal Buku Utang Warung -->
