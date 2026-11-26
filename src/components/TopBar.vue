@@ -46,10 +46,19 @@ const emit = defineEmits([
   'openCamera', 
   'openProductManage', 
   'openCustomerManage',
+  'drawerOpened',
   'drawerClosed'
 ])
 
 const isDrawerOpen = ref(false)
+
+const openDrawer = () => {
+  if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur()
+  }
+  isDrawerOpen.value = true
+  emit('drawerOpened')
+}
 
 const closeDrawer = () => {
   isDrawerOpen.value = false
@@ -130,7 +139,7 @@ const navItems = computed(() => [
       <!-- Mobile Left: Sleek 2-Line Hamburger Menu Icon -->
       <button 
         type="button"
-        @click="isDrawerOpen = true"
+        @click="openDrawer"
         class="md:hidden w-11 h-11 rounded-2xl bg-white/80 hover:bg-white text-[#0a193d] flex flex-col items-start justify-center gap-1.5 px-3 shadow-xs border border-white/80 cursor-pointer transition-all shrink-0"
         aria-label="Buka Menu"
       >

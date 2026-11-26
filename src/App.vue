@@ -224,6 +224,7 @@ const addToCart = (product) => {
 const increaseQty = (productId) => {
   const item = cart.value.find(i => i.id === productId)
   if (item) item.qty += 1
+  if (isTouchViewport()) blurKasaInputs()
 }
 
 const decreaseQty = (productId) => {
@@ -231,6 +232,7 @@ const decreaseQty = (productId) => {
   if (!item) return
   if (item.qty > 1) {
     item.qty -= 1
+    if (isTouchViewport()) blurKasaInputs()
   } else {
     removeItem(productId)
   }
@@ -538,10 +540,30 @@ const handleActivateLicense = (code) => {
   }
 }
 
-// Memastikan fokus kursor selalu aktif di input pencarian/barcode Kasa yang sedang tampil
+// Cek apakah perangkat dominan layar sentuh / mobile (jangan paksa virtual keyboard muncul otomatis)
+const isTouchViewport = () => {
+  if (typeof window === 'undefined') return false
+  const isCoarse = window.matchMedia?.('(pointer: coarse)')?.matches ||
+    window.matchMedia?.('(any-pointer: coarse)')?.matches
+  return window.innerWidth < 1024 || isCoarse || (navigator.maxTouchPoints || 0) > 0
+}
+
+// Kunci & lepaskan fokus keyboard Kasa pada perangkat sentuh saat melakukan aksi di luar input field
+const blurKasaInputs = () => {
+  mobileBarcodeRef.value?.blurInput()
+  desktopBarcodeRef.value?.blurInput()
+  if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur()
+  }
+}
+
+// Memastikan fokus kursor hanya aktif otomatis pada Desktop non-sentuh, dan menutup keyboard di HP
 const ensureKasaFocus = () => {
   nextTick(() => {
-    if (!isAnyModalOpen.value) {
+    if (isAnyModalOpen.value) return
+    if (isTouchViewport()) {
+      blurKasaInputs()
+    } else {
       mobileBarcodeRef.value?.focusInput()
       desktopBarcodeRef.value?.focusInput()
     }
@@ -556,7 +578,13 @@ const handleGlobalCheckoutShortcut = (e) => {
   }
 }
 
-// Watch setiap penutupan modal agar otomatis fokus kembali ke input barang di kasa
+// Watch pembukaan/penutupan modal agar keyboard HP tertutup saat modal dibuka & tidak muncul paksa saat ditutup
+watch(isAnyModalOpen, (isOpenNow) => {
+  if (isOpenNow && isTouchViewport()) {
+    blurKasaInputs()
+  }
+})
+
 watch(
   [
     isProductManageOpen,
@@ -573,29 +601,39 @@ watch(
     const wasOpen = oldVals && oldVals.some(v => Boolean(v))
     const isNowAllClosed = newVals.every(v => !v)
     if (wasOpen && isNowAllClosed) {
-      setTimeout(ensureKasaFocus, 50)
-      setTimeout(ensureKasaFocus, 150)
-      setTimeout(ensureKasaFocus, 300)
+      if (isTouchViewport()) {
+        blurKasaInputs()
+      } else {
+        setTimeout(ensureKasaFocus, 50)
+        setTimeout(ensureKasaFocus, 150)
+        setTimeout(ensureKasaFocus, 300)
+      }
     }
   }
 )
 
-// Klik di area Kasa otomatis mengembalikan fokus kursor ke input barang
+// Klik di area kosong Kasa: di HP menutup keyboard jika terbuka; di Desktop kembalikan fokus input barang
 const handleKasaClick = (e) => {
   const target = e.target
   const isInteractive = target.closest('button, a, input, textarea, select, [role="button"]')
   const isModal = target.closest('.fixed.z-50')
   if (!isInteractive && !isModal) {
-    ensureKasaFocus()
+    if (isTouchViewport()) {
+      blurKasaInputs()
+    } else {
+      ensureKasaFocus()
+    }
   }
 }
 
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalCheckoutShortcut)
   await loadDatabase()
-  ensureKasaFocus()
-  setTimeout(ensureKasaFocus, 200)
-  setTimeout(ensureKasaFocus, 500)
+  if (!isTouchViewport()) {
+    ensureKasaFocus()
+    setTimeout(ensureKasaFocus, 200)
+    setTimeout(ensureKasaFocus, 500)
+  }
   // Jika akun Google aktif, kirim antrean tertunda lalu lakukan sinkronisasi otomatis diam-diam
   if (isGoogleConnected.value && isOnline.value) {
     await flushPendingSheetQueue(storeProfile.value?.name)
@@ -631,6 +669,7 @@ onUnmounted(() => {
       @openCamera="isCameraOpen = true"
       @openProductManage="isProductManageOpen = true"
       @openCustomerManage="isCustomerManageOpen = true"
+      @drawerOpened="blurKasaInputs"
       @drawerClosed="ensureKasaFocus"
     />
 

@@ -35,23 +35,64 @@ const isVisibleInstance = () => {
   return Boolean(inputRef.value && inputRef.value.offsetParent !== null)
 }
 
-// Hindari autofocus otomatis di perangkat sentuh / ponsel agar virtual keyboard tidak langsung muncul
-const shouldAutoFocus = () => {
+// Deteksi ketat apakah perangkat adalah Desktop non-sentuh berlayar lebar (boleh autofocus otomatis)
+const isDesktopAutoFocus = () => {
   if (typeof window === 'undefined') return false
-  const isCoarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches
-  const isMobileWidth = window.innerWidth < 768
-  return !isCoarsePointer && !isMobileWidth
+  const isCoarse = window.matchMedia?.('(pointer: coarse)')?.matches ||
+    window.matchMedia?.('(any-pointer: coarse)')?.matches
+  const hasTouch = (navigator.maxTouchPoints || 0) > 0
+  return window.innerWidth >= 1024 && !isCoarse && !hasTouch
+}
+
+// Pada HP/layar sentuh, kunci virtual keyboard sampai input benar-benar disentuh pengguna
+const touchUnlocked = ref(isDesktopAutoFocus())
+
+const syncInputKeyboardLock = (allowSoftKeyboard) => {
+  const el = inputRef.value
+  if (!el) return
+  if (allowSoftKeyboard || isDesktopAutoFocus()) {
+    el.removeAttribute('readonly')
+    el.inputMode = 'search'
+  } else {
+    el.setAttribute('readonly', 'readonly')
+    el.inputMode = 'none'
+  }
+}
+
+const handleInputTouchIntent = () => {
+  if (props.modalOpen) return
+  touchUnlocked.value = true
+  syncInputKeyboardLock(true)
+}
+
+const handleInputFocus = () => {
+  // Pengaman ganda: jika di perangkat sentuh fokus datang tanpa sentuhan langsung pada input, langsung blur
+  if (!isDesktopAutoFocus() && !touchUnlocked.value) {
+    blurInput()
+    return
+  }
+  isFocused.value = true
+}
+
+const handleInputBlur = () => {
+  isFocused.value = false
+  if (!isDesktopAutoFocus()) {
+    touchUnlocked.value = false
+    syncInputKeyboardLock(false)
+  }
 }
 
 const focusInput = (force = false) => {
   if (props.modalOpen || !isVisibleInstance()) return
-  if (!force && !shouldAutoFocus()) return
+  if (!force && !isDesktopAutoFocus()) return
   nextTick(() => {
     if (props.modalOpen || !isVisibleInstance()) return
     if (inputRef.value) {
       const activeEl = document.activeElement
       const isOtherInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl !== inputRef.value
       if (!isOtherInput) {
+        touchUnlocked.value = true
+        syncInputKeyboardLock(true)
         inputRef.value.focus({ preventScroll: true })
         isFocused.value = true
       }
@@ -60,14 +101,18 @@ const focusInput = (force = false) => {
 }
 
 const blurInput = () => {
+  if (!isDesktopAutoFocus()) {
+    touchUnlocked.value = false
+    syncInputKeyboardLock(false)
+  }
   inputRef.value?.blur()
   isFocused.value = false
 }
 
-// Global keydown: hanya fokus otomatis input di Desktop/keyboard fisik (tidak memicu soft keyboard di HP)
+// Global keydown: hanya fokus otomatis input di Desktop ber-keyboard fisik (tidak memicu soft keyboard di HP)
 const handleGlobalKeyDown = (e) => {
   if (props.modalOpen || !isVisibleInstance()) return
-  if (!shouldAutoFocus()) return
+  if (!isDesktopAutoFocus()) return
   const activeEl = document.activeElement
   if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) return
   if (e.key === '/') {
@@ -81,14 +126,21 @@ const handleGlobalKeyDown = (e) => {
 }
 
 const handleWindowFocus = () => {
-  focusInput()
+  if (isDesktopAutoFocus()) {
+    focusInput()
+  }
 }
 
-// Autofocus hanya pada desktop/keyboard non-sentuh
+// Autofocus hanya pada desktop non-sentuh; pastikan atribut lock aktif di perangkat sentuh saat mount
 onMounted(() => {
-  if (shouldAutoFocus()) {
+  if (isDesktopAutoFocus()) {
+    touchUnlocked.value = true
+    syncInputKeyboardLock(true)
     focusInput()
     setTimeout(focusInput, 150)
+  } else {
+    touchUnlocked.value = false
+    syncInputKeyboardLock(false)
   }
   window.addEventListener('focus', handleWindowFocus)
   window.addEventListener('keydown', handleGlobalKeyDown)
@@ -110,7 +162,7 @@ const handleInput = (e) => {
 
 const clearInput = () => {
   emit('update:searchQuery', '')
-  if (shouldAutoFocus()) {
+  if (isDesktopAutoFocus()) {
     focusInput()
   } else {
     blurInput()
@@ -120,7 +172,7 @@ const clearInput = () => {
 const onSelect = (product) => {
   emit('selectProduct', product)
   emit('update:searchQuery', '')
-  if (shouldAutoFocus()) {
+  if (isDesktopAutoFocus()) {
     focusInput()
   } else {
     blurInput()
@@ -131,7 +183,7 @@ const onTriggerUnknown = () => {
   const code = props.searchQuery.trim() || '8999999888123'
   emit('triggerLazyInventory', code)
   emit('update:searchQuery', '')
-  if (!shouldAutoFocus()) {
+  if (!isDesktopAutoFocus()) {
     blurInput()
   }
 }
@@ -139,6 +191,7 @@ const onTriggerUnknown = () => {
 const handleEnter = (e) => {
   // Jangan submit jika IME keyboard sedang menyusun kata/komposisi
   if (e?.isComposing || e?.keyCode === 229) return
+  e?.preventDefault()
   if (props.searchResults && props.searchResults.length > 0) {
     onSelect(props.searchResults[0])
   } else if (props.searchQuery.trim().length > 0) {
@@ -148,7 +201,7 @@ const handleEnter = (e) => {
 </script>
 
 <template>
-  <div class="relative w-full">
+  <search class="relative block w-full">
     <!-- Form Input Barcode & Search -->
     <div class="flex items-center gap-2">
       <div class="relative flex-1 min-w-0">
@@ -163,14 +216,24 @@ const handleEnter = (e) => {
           ref="inputRef"
           type="text"
           :value="searchQuery"
+          :readonly="!touchUnlocked"
+          :inputmode="touchUnlocked ? 'search' : 'none'"
+          :virtualkeyboardpolicy="touchUnlocked ? 'auto' : 'manual'"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="none"
+          spellcheck="false"
+          enterkeyhint="search"
+          @pointerdown="handleInputTouchIntent"
+          @touchstart.passive="handleInputTouchIntent"
           @input="handleInput"
           @keydown.enter="handleEnter"
           @keydown.esc="clearInput"
-          @focus="isFocused = true"
-          @blur="isFocused = false"
+          @focus="handleInputFocus"
+          @blur="handleInputBlur"
           :placeholder="variant === 'inline' ? 'Cari nama barang atau scan barcode...' : 'Cari barang / scan barcode...'"
           aria-label="Cari nama barang atau scan barcode"
-          class="w-full h-11 sm:h-11 pl-10 pr-10 text-base sm:text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border-2 transition-all outline-none"
+          class="w-full h-11 sm:h-11 pl-10 pr-10 text-base lg:text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border-2 transition-all outline-none"
           :class="[
             variant === 'inline' ? 'shadow-xs' : 'shadow-md',
             isFocused ? 'border-sky-500 ring-4 ring-sky-500/20 bg-white' : 'border-slate-200/80 hover:border-slate-300'
@@ -244,5 +307,5 @@ const handleEnter = (e) => {
         </button>
       </div>
     </div>
-  </div>
+  </search>
 </template>

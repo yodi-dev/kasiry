@@ -1,6 +1,6 @@
 <script setup>
-import { ref, watch, onUnmounted, nextTick } from 'vue'
-import { X, Camera, SwitchCamera, Zap, AlertCircle, RefreshCw } from '@lucide/vue'
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
+import { X, Camera, SwitchCamera, Zap, ZoomIn, AlertCircle, RefreshCw } from '@lucide/vue'
 import {
   BarcodeFormat,
   BinaryBitmap,
@@ -27,8 +27,9 @@ const errorMessage = ref('')
 const isScanning = ref(false)
 const isTorchOn = ref(false)
 const isTorchSupported = ref(false)
+const isZoomed = ref(false)
+const hasHardwareZoom = ref(false)
 const facingMode = ref('environment') // Kamera belakang secara default
-const scannerEngineLabel = ref('Siap memindai')
 
 let stream = null
 let scanTimerId = null
@@ -37,6 +38,22 @@ let zxingReader = null
 let scanCanvas = null
 let scanCtx = null
 let frameCounter = 0
+let cameraSessionId = 0
+let hwZoomRange = { min: 1, max: 1 }
+
+const scannerHintText = computed(() => {
+  return facingMode.value === 'user'
+    ? 'Kamera depan • Jaga jarak ±25–35 cm agar fokus'
+    : 'Posisikan barcode di dalam kotak'
+})
+
+const videoTransformStyle = computed(() => {
+  const zoomScale = isZoomed.value && !hasHardwareZoom.value ? 1.65 : 1
+  const flipX = facingMode.value === 'user' ? -1 : 1
+  return {
+    transform: `scale(${flipX * zoomScale}, ${zoomScale})`
+  }
+})
 
 // Buat instance ZXing MultiFormatReader sekali saja untuk performa pemindaian kontinyu
 const getZxingReader = () => {
@@ -78,7 +95,7 @@ const initNativeDetector = async () => {
   }
 }
 
-// Audio Beep saat barcode berhasil terdeteksi (seperti kasir supermarket)
+// Audio Beep saat barcode berhasil terdeteksi
 const playBeep = () => {
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext
@@ -108,7 +125,34 @@ const handleDetectedCode = (rawCode) => {
   emit('scan', cleanCode)
 }
 
-// Gambar frame video ke kanvas tersembunyi (fokus area tengah atau penuh secara bergantian)
+// Tingkatkan kontras luminansi untuk barcode soft-focus / pantulan cahaya kamera depan
+const boostBarcodeContrast = (ctx, w, h) => {
+  const imageData = ctx.getImageData(0, 0, w, h)
+  const data = imageData.data
+  let minLuma = 255
+  let maxLuma = 0
+
+  for (let i = 0; i < data.length; i += 8) {
+    const luma = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8
+    if (luma < minLuma) minLuma = luma
+    if (luma > maxLuma) maxLuma = luma
+  }
+
+  const range = maxLuma - minLuma
+  if (range < 12 || range > 210) return
+
+  const scale = 255 / range
+  for (let i = 0; i < data.length; i += 4) {
+    const luma = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8
+    const stretched = Math.max(0, Math.min(255, Math.round((luma - minLuma) * scale)))
+    data[i] = stretched
+    data[i + 1] = stretched
+    data[i + 2] = stretched
+  }
+  ctx.putImageData(imageData, 0, 0)
+}
+
+// Gambar frame video ke kanvas dengan variasi crop, mirror kamera depan, rotasi 90°, & boost kontras
 const captureFrameToCanvas = (video) => {
   const vw = video.videoWidth
   const vh = video.videoHeight
@@ -121,28 +165,77 @@ const captureFrameToCanvas = (video) => {
   if (!scanCtx) return false
 
   frameCounter += 1
-  const useFullFrame = frameCounter % 4 === 0
-  const cropRatioW = useFullFrame ? 1 : 0.82
-  const cropRatioH = useFullFrame ? 1 : 0.62
+  const mode = frameCounter % 5
+  const isFront = facingMode.value === 'user'
+
+  // Saat mode Zoom 2x digital (tanpa hardware zoom) atau pass fokus rapat, persempit crop tengah
+  const tightZoom = isZoomed.value || mode === 1 || mode === 3
+  const fullFrame = !isZoomed.value && mode === 4 && !isFront
+
+  const cropRatioW = fullFrame ? 1 : tightZoom ? 0.58 : 0.84
+  const cropRatioH = fullFrame ? 1 : tightZoom ? 0.42 : 0.62
 
   const sw = Math.max(1, Math.round(vw * cropRatioW))
   const sh = Math.max(1, Math.round(vh * cropRatioH))
   const sx = Math.round((vw - sw) / 2)
   const sy = Math.round((vh - sh) / 2)
 
-  // Skala sisi terpanjang maksimal 760px agar decode ZXing tetap cepat di orientasi portrait & landscape
+  // Rotasi 90° berkala untuk menangkap barcode yang dipegang vertikal
+  const rotate90 = mode === 4 && isFront
+  const maxTarget = 840
   const maxDim = Math.max(sw, sh)
-  const scale = maxDim > 760 ? 760 / maxDim : 1
-  const dw = Math.max(1, Math.round(sw * scale))
-  const dh = Math.max(1, Math.round(sh * scale))
+  const scale = maxDim > maxTarget ? maxTarget / maxDim : 1
+  const rw = Math.max(1, Math.round(sw * scale))
+  const rh = Math.max(1, Math.round(sh * scale))
+
+  const dw = rotate90 ? rh : rw
+  const dh = rotate90 ? rw : rh
 
   if (scanCanvas.width !== dw || scanCanvas.height !== dh) {
     scanCanvas.width = dw
     scanCanvas.height = dh
   }
 
-  scanCtx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh)
+  scanCtx.save()
+  scanCtx.setTransform(1, 0, 0, 1, 0, 0)
+
+  const flipHorizontally = isFront && (mode === 2 || mode === 3)
+  if (rotate90) {
+    scanCtx.translate(dw / 2, dh / 2)
+    scanCtx.rotate(Math.PI / 2)
+    if (flipHorizontally) scanCtx.scale(-1, 1)
+    scanCtx.drawImage(video, sx, sy, sw, sh, -rw / 2, -rh / 2, rw, rh)
+  } else {
+    if (flipHorizontally) {
+      scanCtx.translate(dw, 0)
+      scanCtx.scale(-1, 1)
+    }
+    scanCtx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh)
+  }
+  scanCtx.restore()
+
+  // Pada kamera depan / kondisi blur close-up, tingkatkan kontras hitam-putih pada pass tertentu
+  if (mode === 3 || (isFront && mode === 1)) {
+    boostBarcodeContrast(scanCtx, dw, dh)
+  }
+
   return true
+}
+
+const decodeWithZxing = (reader, luminance, useHistogramFirst) => {
+  const tryBinarizer = (BinarizerClass) => {
+    try {
+      const result = reader.decodeWithState(new BinaryBitmap(new BinarizerClass(luminance)))
+      return result?.getText?.() || null
+    } catch {
+      return null
+    }
+  }
+
+  if (useHistogramFirst) {
+    return tryBinarizer(GlobalHistogramBinarizer) || tryBinarizer(HybridBinarizer)
+  }
+  return tryBinarizer(HybridBinarizer) || tryBinarizer(GlobalHistogramBinarizer)
 }
 
 // Loop pemindaian hybrid: coba native BarcodeDetector (jika ada), lalu fallback ke ZXing JS
@@ -160,33 +253,22 @@ const scanFrame = async () => {
           return
         }
       } catch {
-        // Jika gagal saat runtime, nonaktifkan native agar langsung memakai ZXing
         nativeDetector = null
       }
     }
 
-    // 2. Fallback universal via @zxing/library (jalan di iOS Safari, Android Chrome/WebView, Firefox, Desktop)
-    try {
-      const reader = getZxingReader()
-      const luminance = new HTMLCanvasElementLuminanceSource(scanCanvas)
-      const useHistogram = frameCounter % 2 === 0
-      const binarizer = useHistogram
-        ? new GlobalHistogramBinarizer(luminance)
-        : new HybridBinarizer(luminance)
-      const bitmap = new BinaryBitmap(binarizer)
-      const result = reader.decodeWithState(bitmap)
-      const text = result?.getText?.()
-      if (text) {
-        handleDetectedCode(text)
-        return
-      }
-    } catch {
-      // NotFoundException normal saat frame belum memuat barcode
+    // 2. Decode via @zxing/library (coba GlobalHistogram + Hybrid pada kamera depan untuk tahan blur)
+    const reader = getZxingReader()
+    const luminance = new HTMLCanvasElementLuminanceSource(scanCanvas)
+    const decoded = decodeWithZxing(reader, luminance, facingMode.value === 'user' || frameCounter % 2 === 0)
+    if (decoded) {
+      handleDetectedCode(decoded)
+      return
     }
   }
 
   if (isScanning.value && props.isOpen) {
-    scanTimerId = window.setTimeout(scanFrame, 110)
+    scanTimerId = window.setTimeout(scanFrame, 105)
   }
 }
 
@@ -212,14 +294,74 @@ const releaseStream = (targetStream) => {
   targetStream.getTracks().forEach(track => track.stop())
 }
 
-const startCamera = async () => {
+const acquireCameraStream = async (targetFacing) => {
+  const attempts = [
+    {
+      audio: false,
+      video: {
+        facingMode: { exact: targetFacing },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    },
+    {
+      audio: false,
+      video: {
+        facingMode: { ideal: targetFacing },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    },
+    {
+      audio: false,
+      video: { facingMode: targetFacing }
+    }
+  ]
+
+  let lastErr = null
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints)
+    } catch (err) {
+      lastErr = err
+      const isConstraintIssue = err?.name === 'OverconstrainedError' || err?.name === 'ConstraintNotSatisfiedError'
+      if (!isConstraintIssue) throw err
+    }
+  }
+  throw lastErr
+}
+
+const applyZoomConstraint = async (zoomEnabled) => {
+  if (!stream || !hasHardwareZoom.value) return
+  const track = stream.getVideoTracks()[0]
+  if (!track || typeof track.applyConstraints !== 'function') return
+  const target = zoomEnabled
+    ? Math.min(hwZoomRange.max, Math.max(hwZoomRange.min, hwZoomRange.min + (hwZoomRange.max - hwZoomRange.min) * 0.35, 1.8))
+    : hwZoomRange.min
+  try {
+    await track.applyConstraints({ advanced: [{ zoom: target }] })
+  } catch {
+    // Jatuh kembali ke zoom digital crop jika constraint ditolak driver
+    hasHardwareZoom.value = false
+  }
+}
+
+const startCamera = async (delayMs = 0) => {
   stopCamera()
+  const session = ++cameraSessionId
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true
   isTorchOn.value = false
   isTorchSupported.value = false
+  isZoomed.value = false
+  hasHardwareZoom.value = false
   frameCounter = 0
+
+  if (delayMs > 0) {
+    await new Promise(resolve => window.setTimeout(resolve, delayMs))
+    if (session !== cameraSessionId || !props.isOpen) return
+  }
 
   if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     isLoading.value = false
@@ -229,29 +371,10 @@ const startCamera = async () => {
   }
 
   try {
-    let acquiredStream = null
-    try {
-      acquiredStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          facingMode: { ideal: facingMode.value },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      })
-    } catch (constraintErr) {
-      if (constraintErr?.name === 'OverconstrainedError' || constraintErr?.name === 'ConstraintNotSatisfiedError') {
-        acquiredStream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode: facingMode.value }
-        })
-      } else {
-        throw constraintErr
-      }
-    }
+    const acquiredStream = await acquireCameraStream(facingMode.value)
 
-    // Jika modal keburu ditutup saat izin kamera baru selesai diberikan, langsung matikan stream
-    if (!props.isOpen) {
+    // Jika modal ditutup atau kamera diganti lagi saat izin/stream menunggu, langsung matikan stream
+    if (!props.isOpen || session !== cameraSessionId) {
       releaseStream(acquiredStream)
       return
     }
@@ -265,11 +388,23 @@ const startCamera = async () => {
       await waitForVideoReady(video)
     }
 
-    // Periksa dukungan senter (torch) & autofokus kontinu pada lensa HP
+    if (!props.isOpen || session !== cameraSessionId) {
+      stopCamera()
+      return
+    }
+
+    // Periksa dukungan senter, zoom optik/digital, & autofokus kontinu
     const track = stream.getVideoTracks()[0]
     if (track && 'getCapabilities' in track) {
       const capabilities = track.getCapabilities()
       isTorchSupported.value = !!capabilities.torch
+      if (capabilities.zoom && typeof capabilities.zoom.max === 'number' && capabilities.zoom.max > 1) {
+        hasHardwareZoom.value = true
+        hwZoomRange = {
+          min: capabilities.zoom.min || 1,
+          max: capabilities.zoom.max
+        }
+      }
       if (Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes('continuous')) {
         track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
       }
@@ -277,18 +412,23 @@ const startCamera = async () => {
 
     nativeDetector = await initNativeDetector()
     getZxingReader()
-    scannerEngineLabel.value = nativeDetector ? 'Pindai otomatis aktif (Hybrid)' : 'Pindai otomatis aktif'
+
+    if (!props.isOpen || session !== cameraSessionId) {
+      stopCamera()
+      return
+    }
 
     isLoading.value = false
     isScanning.value = true
     scanTimerId = window.setTimeout(scanFrame, 120)
   } catch (err) {
+    if (session !== cameraSessionId) return
     isLoading.value = false
     hasError.value = true
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
       errorMessage.value = 'Izin kamera ditolak. Silakan berikan izin akses kamera pada peramban Anda.'
     } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-      errorMessage.value = 'Perangkat kamera tidak ditemukan di perangkat ini.'
+      errorMessage.value = 'Perangkat kamera yang dipilih tidak ditemukan di perangkat ini.'
     } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
       errorMessage.value = 'Kamera sedang dipakai aplikasi lain. Tutup aplikasi kamera lain lalu coba lagi.'
     } else {
@@ -328,9 +468,16 @@ const toggleTorch = async () => {
   }
 }
 
+const toggleZoom = async () => {
+  isZoomed.value = !isZoomed.value
+  if (hasHardwareZoom.value) {
+    await applyZoomConstraint(isZoomed.value)
+  }
+}
+
 const toggleCamera = () => {
   facingMode.value = facingMode.value === 'environment' ? 'user' : 'environment'
-  startCamera()
+  startCamera(150)
 }
 
 watch(() => props.isOpen, (newVal) => {
@@ -339,11 +486,13 @@ watch(() => props.isOpen, (newVal) => {
       startCamera()
     })
   } else {
+    cameraSessionId += 1
     stopCamera()
   }
 })
 
 onUnmounted(() => {
+  cameraSessionId += 1
   stopCamera()
   zxingReader = null
   nativeDetector = null
@@ -375,13 +524,14 @@ onUnmounted(() => {
 
       <!-- Kamera Viewfinder (Live Video Stream) -->
       <div class="relative bg-black h-84 overflow-hidden flex items-center justify-center">
-        <!-- Video Stream: Menempati seluruh area latar belakang secara penuh -->
+        <!-- Video Stream: Cermin otomatis di kamera depan & support zoom optik/digital -->
         <video 
           ref="videoRef"
           autoplay 
           playsinline 
           muted 
-          class="absolute inset-0 w-full h-full object-cover z-0"
+          :style="videoTransformStyle"
+          class="absolute inset-0 w-full h-full object-cover z-0 transition-transform duration-200"
         ></video>
 
         <!-- Loading Indicator -->
@@ -441,20 +591,21 @@ onUnmounted(() => {
           <!-- Petunjuk Pindai -->
           <div class="absolute bottom-3 inset-x-4 text-center z-20 pointer-events-none">
             <p class="text-[11px] text-white/95 font-medium bg-black/60 backdrop-blur-xs py-1 px-3.5 rounded-full inline-block border border-white/10 shadow-sm">
-              Posisikan barcode di dalam kotak • {{ scannerEngineLabel }}
+              {{ scannerHintText }}
             </p>
           </div>
         </template>
       </div>
 
-      <!-- Kamera Control Toolbar (Senter & Putar Kamera) -->
-      <div class="p-3.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-2">
+      <!-- Kamera Control Toolbar (Senter, Zoom, & Putar Kamera) -->
+      <div class="p-3.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-2 shrink-0">
+        <div class="flex items-center gap-1.5 flex-wrap">
           <!-- Tombol Senter (Torch) -->
           <button 
             v-if="isTorchSupported"
             type="button"
             @click="toggleTorch"
+            :aria-pressed="isTorchOn"
             class="h-10 px-3 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
             :class="isTorchOn ? 'bg-amber-400/20 border-amber-400 text-amber-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'"
             title="Senter"
@@ -463,22 +614,36 @@ onUnmounted(() => {
             <span>{{ isTorchOn ? 'Senter Aktif' : 'Senter' }}</span>
           </button>
 
+          <!-- Tombol Zoom 1x / 2x (Membantu kamera depan fokus dari jarak ~25-35 cm) -->
+          <button
+            v-if="!isLoading && !hasError"
+            type="button"
+            @click="toggleZoom"
+            :aria-pressed="isZoomed"
+            class="h-10 px-2.5 sm:px-3 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+            :class="isZoomed ? 'bg-sky-500/20 border-sky-400 text-sky-200' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'"
+            title="Perbesar area bidik"
+          >
+            <ZoomIn aria-hidden="true" class="w-3.5 h-3.5 text-sky-400" />
+            <span>{{ isZoomed ? '2×' : '1×' }}</span>
+          </button>
+
           <!-- Tombol Balik Kamera (Depan / Belakang) -->
           <button 
             type="button"
             @click="toggleCamera"
-            class="h-10 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
-            title="Ganti Kamera"
+            class="h-10 px-2.5 sm:px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+            :title="facingMode === 'user' ? 'Pindah ke Kamera Belakang' : 'Pindah ke Kamera Depan'"
           >
             <SwitchCamera aria-hidden="true" class="w-3.5 h-3.5 text-sky-400" />
-            <span>Balik</span>
+            <span>{{ facingMode === 'user' ? 'Belakang' : 'Depan' }}</span>
           </button>
         </div>
 
         <button 
           type="button"
           @click="emit('close')"
-          class="h-10 px-4 bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs rounded-xl cursor-pointer transition-colors"
+          class="h-10 px-4 bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs rounded-xl cursor-pointer transition-colors shrink-0"
         >
           Tutup
         </button>
