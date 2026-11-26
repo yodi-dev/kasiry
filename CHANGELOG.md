@@ -6,6 +6,16 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.7.1] - 2026-11-26 (Tahap 3: Sinkronisasi Dokumentasi & Checklist Rilis)
+
+### Changed
+- Memperbarui `README.md` dengan dokumentasi lengkap arsitektur fitur mutakhir, struktur proyek aktual, perintah pengujian `npm test` / `npm run test:watch`, serta konfigurasi deploy & OAuth.
+- Memperbarui `PRD_v2.0.md` (menjadi v2.7) mencakup layout Bento Workstation Desktop/Tablet, Hybrid ZXing Camera & mobile soft-keyboard lock, Lazy Inventory kategori inline, jendela memori 90 hari + arsip tahunan, migrasi Dexie v2, benchmark ukuran bundle, automated test Vitest, serta checklist final rilis produksi & verifikasi Google OAuth.
+- Memperbarui `SITEMAP.md` mencerminkan arsitektur dual-mode responsif (Mobile Thumb-Zone vs Bento Workstation Desktop), daftar 14 komponen aktif (`CustomerManagementModal` + 9 modal async), terminologi baku `"Pelanggan"`, dan alur Arsip Tahunan.
+- Menyelaraskan versi rilis paket & badge UI ke `v2.7.1`.
+
+---
+
 ## [2.7.0] - 2026-11-26 (Tahap 2: Automated Tests & Bersih-Bersih Kode Warisan)
 
 ### Added

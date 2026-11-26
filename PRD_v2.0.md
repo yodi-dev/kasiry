@@ -1,179 +1,148 @@
 # Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry (Habiba Store)
 
-**Versi Dokumen:** 2.2 (Final Prototype Sign-Off, Ergonomi Terbalik, & Desain Glassmorphism Modern)  
-**Status:** Approved for Implementation  
+**Versi Dokumen:** 2.7 (Sinkronisasi Implementasi Produksi, Dual Responsive Bento, Skalabilitas Multi-Tahun & Automated Testing)  
+**Status:** Production-Ready & Terverifikasi Build/Unit-Integration Test  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
-**Identitas Toko:** Habiba Store (Pemilik: Habiba | WA: 081234567890)  
-**Platform Target:** Progressive Web App (PWA) Mobile-First & Desktop POS  
+**Identitas Toko Acuan:** Habiba Store (Pemilik: Habiba | WA: 081234567890)  
+**Platform Target:** Progressive Web App (PWA) Mobile-First, Tablet & Desktop POS  
 **Repository GitHub:** `https://github.com/yodi-dev/kasiry.git`  
 **Workspace:** `d:\web\kasiryy`  
 
 ---
 
-## 📌 Dokumen Kontrol & Riwayat Versi (Changelog)
+## Dokumen Kontrol & Riwayat Versi (Changelog Ringkas)
 
-| Versi | Tanggal | Penulis | Ringkasan Perubahan Utama |
-| :---: | :---: | :---: | :--- |
-| **v2.2** | 22 November 2026 | Yodi & AI Assistant | **Penyelarasan Ergonomi Inverted & Identitas Toko Habiba Store:**<br>1. **Identitas Toko Resmi:** Diselaraskan menjadi **Habiba Store** (Owner: Habiba).<br>2. **Ergonomi Tata Letak Terbalik (*Inverted Ergonomic Flow*):**<br>&nbsp;&nbsp;&nbsp;• **Glance Zone (Atas):** *Struk Belanjaan (Cart)* ditempatkan di paling atas layar agar kasir leluasa membaca barang tanpa tertutup tangan/jempol.<br>&nbsp;&nbsp;&nbsp;• **Quick Tap Zone (Tengah):** *Barang Sering Terjual* (6–8 barang terlaris warung, tanpa ikon berlebihan, harga lugas).<br>&nbsp;&nbsp;&nbsp;• **Floating Sticky Bottom Console (Bawah / Thumb Zone):** Konsol melayang di jangkauan jempol bawah terdiri dari dua lapis:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Lapis Atas: Form Input Barcode & Pencarian Barang (dengan **Autofocus tangguh**, *ring glow*, dan pop-up hasil pencarian mengambang ke **atas** / `bottom-full`).<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Lapis Bawah: Bar Total Tagihan & tombol **"Pembayaran"**, bersifat kondisional (hanya muncul saat ada barang di keranjang).<br>3. **Desain Visual Glassmorphism Modern:** Mengadopsi palet ethereal soft light-blue (`#e2effb` ke `#edf5fd`), kartu frosted glass putih (`bg-white/90 rounded-3xl`), dan tombol Deep Midnight Navy (`#0a193d`) dengan aksen Azure Sky Blue (`#0284c7`).<br>4. **Pembersihan Anti-Slop & Anti-Jargon:** Menghapus seluruh teks teknis dan jargon akuntansi rumit (*COGS, Gross Profit, Accordion slop*). Menggunakan bahasa pasar murni (*Uang Masuk, Perkiraan Untung, Buku Utang, Pembayaran*). |
-| **v2.1** | 22 November 2026 | Yodi & AI Assistant | Evolusi ke Progressive Web App (PWA) & Ekosistem Google ($0 Cost): Vue 3, Tailwind CSS v4, Dexie.js IndexedDB, Google Sheets & GIS auth, dan ekspor Excel offline. |
-| **v2.0** | 22 November 2026 | Yodi | Konsolidasi konsep awal, branding warung kelontong, dan model bisnis beli-putus. |
+> Riwayat perubahan detail tiap rilis tercatat di [`CHANGELOG.md`](CHANGELOG.md).
+
+| Versi | Tanggal | Ringkasan Milestone |
+| :---: | :---: | :--- |
+| **v2.7.1** | 26 November 2026 | **Tahap 3 (Sinkronisasi Dokumen & Checklist Rilis):** Pembaruan menyeluruh `README.md`, `PRD_v2.0.md`, `SITEMAP.md`, serta checklist final verifikasi Google OAuth & uji perangkat fisik. |
+| **v2.7.0** | 26 November 2026 | **Tahap 2 (Automated Testing & Bersih-Bersih Kode):** Setup Vitest + `fake-indexeddb` (5 suite, 12 skenario test), perbaikan bug `DAY_MS` pada modul arsip, penghapusan sisa `licenseStatus`, 6 file prototipe mati, serta migrasi skema Dexie `v1 -> v2` (`transactionItems: null`). |
+| **v2.6.0** | 26 November 2026 | **Tahap 1 (Pemecahan Bundle / Code Splitting):** Pemisahan chunk `vendor-vue`, `vendor-dexie`, `vendor-xlsx`, `vendor-zxing`, dynamic `import('xlsx')`, `defineAsyncComponent` untuk seluruh 9 modal sekunder + idle pre-warm jalur checkout, serta `{ immediate: true }` pada watcher open modal. |
+| **v2.5.0** | 26 November 2026 | **Bento UI, Hybrid Scanner & Skalabilitas Multi-Tahun:** Layout Bento 2-kolom untuk Tablet/Desktop, kunci soft-keyboard HP hingga disentuh, hybrid `BarcodeDetector` + `@zxing/library` + kamera depan, tambah kategori inline di Lazy Inventory, jendela RAM 90 hari, `buildCustomerStatsMap` $O(N)$, batching Drive, & **Arsip Data Tahunan**. |
+| **v2.4.2** | 25 November 2026 | **QA Browser & Stabilisasi:** Modal Manajemen Pelanggan, pelanggan default `"Umum"`, helper `toPlain()` pencegah `DataCloneError`, validasi kembalian cicilan bon pecahan besar. |
+| **v2.4.0** | 23 November 2026 | **Cloud Sync Google $0:** GIS login 1-klik, snapshot Google Drive (`kasiry-backup.json`), Buku Kas Google Sheets, dan two-way sync dengan antrean offline. |
+| **v2.3.0** | 23 November 2026 | **Tahap 1–3 Core:** Dexie.js IndexedDB (`KasiryDB`), scanner USB/BT + audio beep, struk 58mm & WA, Buku Utang Digital, Laporan Harian & ekspor Excel multi-sheet. |
+| **v2.2.0** | 22 November 2026 | **Ergonomi Terbalik & Glassmorphism Modern:** *Inverted Ergonomic Flow*, identitas Habiba Store, dan palet Midnight Deep Navy `#0a193d` + Azure Sky `#0284c7`. |
 
 ---
 
 ## 1. Ringkasan Eksekutif & Identitas Brand
 
 ### 1.1 Filosofi Produk
-**Kasiry** adalah aplikasi kasir (*Point of Sale*) Progressive Web App (PWA) yang dirancang khusus untuk **warung kelontong dan pedagang UMKM mikro di Indonesia**.
+**Kasiry** adalah aplikasi kasir (*Point of Sale*) Progressive Web App (PWA) *offline-first* yang dirancang khusus untuk **warung kelontong dan UMKM mikro Indonesia**.
 
 **Prinsip Inti:**
-1. **Nol Hambatan Login (*Zero Login Wall*):** Buka aplikasi web langsung masuk ke mode kasir siap melayani transaksi pembeli.
-2. **100% Berfungsi Tanpa Internet (*Offline-First*):** Seluruh data transaksi, struk, dan pencatatan utang tersimpan di IndexedDB browser lokal (Dexie.js).
-3. **Ergonomi Jempol Ekstrem:** Area input dan tombol aksi utama berada di separuh bawah layar yang mudah dijangkau satu tangan (*Thumb Zone*), sementara area pembacaan struk berada di separuh atas (*Glance Zone*).
-4. **Cloud Backup Gratis ($0 Server Cost):** Menggunakan Google Sheets dan Google Drive milik pengguna via Google Identity Services (GIS).
-
-### 1.2 Identitas Merek (Brand Identity)
-* **Nama Produk:** **Kasiry**
-* **Toko Acuan / Prototipe:** **Habiba Store**
-* **Tagline:** *"Kasiry: Aplikasi Kasir Warung Paling Gampang."*
-* **Palet Warna Utama (Modern Ethereal Glassmorphism):**
-  * **Midnight Deep Navy (`#0a193d`):** Warna utama teks, tombol primer, dan kartu checkout, memberikan kesan profesional, kokoh, dan berwibawa.
-  * **Azure / Sky Blue (`#0284c7` / `#38bdf8`):** Warna aksen interaktif, tombol aksi checkout, dan indikator aktif/fokus.
-  * **Ambient Radial Background (`#e2effb` ke `#edf5fd`):** Latar belakang gradien biru lembut yang menyejukkan mata kasir seharian dan bebas silau.
-  * **Frosted Glass Surface (`rgba(255, 255, 255, 0.9)`):** Kartu putih tembus pandang dengan efek blur (`backdrop-blur-md`) dan sudut membulat lebar (`rounded-3xl`).
-  * **Alert / Utang (`#ef4444`):** Penanda tegas buku utang dan penghapusan data.
+1. **Nol Hambatan Login (*Zero Login Wall*):** Buka aplikasi langsung masuk ke layar Kasa siap bertransaksi.
+2. **100% Berfungsi Tanpa Internet (*Offline-First*):** Seluruh katalog, transaksi, dan piutang tersimpan di IndexedDB (`Dexie.js`) dan aset/chunk JS di-precache oleh Service Worker Workbox.
+3. **Ergonomi Adaptif per Perangkat:** Mobile memakai ergonomi jangkauan jempol di bawah (*Thumb Zone*) tanpa footer pengganggu; Tablet & Desktop memakai stasiun kerja *Bento 2-Kolom* lengkap dengan filter kategori & pintasan keyboard.
+4. **Cloud Backup Gratis ($0 Server Cost):** Menggunakan Google Sheets & Google Drive milik pemilik warung via Google Identity Services (GIS).
+5. **Ringan Lintas Tahun:** Arsitektur memori berjendela (*90-day RAM window*) + alat arsip tahunan memastikan aplikasi tetap cepat meski riwayat transaksi menumpuk puluhan ribu baris.
 
 ---
 
 ## 2. Target Pengguna (User Persona)
 
-### Persona 1: Ibu Habiba (48 Tahun) - Pemilik Warung Kelontong
-* **Karakter:** Mengelola warung kelontong dari pagi hingga malam. Menggunakan smartphone Android kelas menengah.
-* **Kebiasaan:** Menggunakan WhatsApp dan kalkulator fisik. Sering lupa menagih utang pelanggan karena buku kertas sering terselip.
-* **Kebutuhan:** Tampilan yang bersih, mudah dibaca tanpa kacamata tebal, pencatatan utang instan, dan laporan harian yang bisa dikirim ke WhatsApp dalam 1 kali ketuk.
-
-### Persona 2: Penjaga Toko Pengganti / Anak Pemilik
-* **Karakter:** Sering menjaga toko bergantian saat pemilik pergi belanja ke agen grosir.
-* **Kebiasaan:** Menggunakan barcode scanner fisik atau kamera HP untuk barang berkemasan, dan tombol cepat untuk barang curah (Gas LPG, Telur, Minyak).
-* **Kebutuhan:** Barcode scanner langsung terbaca otomatis (*autofocus*), tidak perlu memilih-milih menu yang rumit.
+- **Persona 1 — Ibu Habiba (Pemilik Warung):** Mengoperasikan kasir harian dari ponsel Android kelas menengah, butuh tampilan kontras tinggi yang mudah dibaca, Buku Utang digital berurutan rapi + pengingat WhatsApp sopan, dan laporan harian dalam 1 ketukan.
+- **Persona 2 — Penjaga Toko Pengganti / Kasir Desktop:** Menggunakan barcode scanner USB/Bluetooth atau kamera HP (depan/belakang) untuk barang kemasan, serta tombol cepat terkurasi & kategori untuk barang curah (Gas LPG, Galon, Telur, Beras).
 
 ---
 
-## 3. Arsitektur Informasi & Tata Letak Layar Tunggal (POS Hub)
+## 3. Arsitektur Antarmuka & Tata Letak Adaptif (`App.vue`)
 
-Aplikasi Kasiry beroperasi dengan prinsip **"Single-Screen POS Hub"**: seluruh aktivitas transaksi jual-beli diselesaikan di layar utama tanpa berpindah-pindah URL.
+Aplikasi beroperasi sebagai **Single-Screen POS Hub** dengan dua mode layout adaptif:
 
 ```mermaid
 flowchart TD
-    App([Layar Kasir Utama / POS Hub])
-    
-    subgraph TopSection["1. Glance Zone (Atas)"]
-        TopBar[TopBar: Habiba Store, Tanggal, Avatar & Hamburger]
-        Cart[Struk Belanjaan / CartSection: Daftar Barang, Stepper Qty, Subtotal]
-    end
-    
-    subgraph MiddleSection["2. Quick Tap Zone (Tengah)"]
-        Frequent[Barang Sering Terjual: 6-8 Tombol Cepat Barang Terlaris]
-    end
-    
-    subgraph BottomSection["3. Floating Sticky Bottom Console (Bawah / Thumb Zone)"]
-        BarcodeInput[Input Barcode & Cari: Autofocus, Enter Trigger, Kamera]
-        CheckoutBar[Bar Pembayaran: Total Tagihan + Tombol Pembayaran]
-    end
-    
-    App --> TopSection
-    TopSection --> MiddleSection
-    MiddleSection --> BottomSection
-    
-    BarcodeInput -.->|Barcode Belum Ada| ModalLazy[Modal: Input Cepat Barang Baru]
-    CheckoutBar -->|Tekan Pembayaran| ModalPay[Modal: Pembayaran Tunai & Utang]
-    
-    TopBar -->|Hamburger Menu| Drawer[Slide-Over Drawer]
-    Drawer --> ModalDebt[Modal: Buku Utang Warung]
-    Drawer --> ModalReport[Modal: Laporan Harian 1-Klik WA]
-    Drawer --> ModalProduct[Modal: Kelola Barang CRUD]
-    Drawer --> ModalSettings[Modal: Pengaturan & Google Sync]
+    App["App.vue (Single-Screen POS Hub)"]
+    App --> TopBar["TopBar: Nama Toko, Indikator Online/Offline & Cloud, Slide-Over Drawer"]
+    App --> MobileMode["Mode Mobile < 768px (Inverted Thumb-Zone)"]
+    App --> DesktopMode["Mode Tablet/Desktop >= 768px (Bento 2-Kolom)"]
+
+    MobileMode --> M_Cart["Atas: CartSection (Struk Belanjaan)"]
+    MobileMode --> M_Freq["Tengah: FrequentProductsSection (Terlaris / Semua)"]
+    MobileMode --> M_Dock["Bawah Sticky: BarcodeInputBar (Touch-Locked) + StickyBottomBar"]
+
+    DesktopMode --> D_Left["Kolom Kiri (5/12 - 4/12): CartSection + Tombol Pembayaran"]
+    DesktopMode --> D_Right["Kolom Kanan (7/12 - 8/12): BarcodeInputBar Inline + Tab Kategori + Grid Adaptif"]
+    DesktopMode --> D_Foot["Footer Desktop >= 1024px: Pintasan (/ & F2) + Privacy & Terms"]
+
+    App -.->|"Lazy Async Chunks (defineAsyncComponent)"| Modals["9 Modal Fitur: Payment, Receipt, LazyInventory, ProductCRUD, CustomerCRUD, DebtBook, DailyReport, Settings, CameraScanner"]
 ```
 
-### Rincian Zona Tampilan Utama:
-1. **TopBar:**
-   - Ikon Hamburger 2-garis minimalis di kiri (membuka Navigation Drawer).
-   - Nama Toko: **Habiba Store** & Tanggal hari ini di tengah.
-   - Avatar Profil Toko + Dot status online hijau di kanan.
-2. **Struk Belanjaan (CartSection - Atas):**
-   - Menampilkan jumlah jenis barang dan total pcs.
-   - Daftar item belanjaan dengan nama, harga satuan, tombol kuantitas `[-] [qty] [+]`, dan subtotal.
-   - Tombol "Kosongkan" saat ingin membatalkan seluruh transaksi.
-   - Ketinggian maksimal dibatasi (`max-h-[35vh]`) dengan scroll internal agar tetap proporsional.
-3. **Barang Sering Terjual (FrequentProductsSection - Tengah):**
-   - Menampilkan 6 hingga 8 kartu barang terlaris warung (Gas LPG 3kg, Galon Aqua, Telur 1kg, Indomie, Minyak Goreng, Beras).
-   - Bersih tanpa kategori rumit dan tanpa ikon dekoratif yang berlebihan.
-4. **Floating Sticky Bottom Console (Konsol Melayang di Bawah):**
-   - **Form Input Barcode & Pencarian:** Melayang di atas bar tagihan. Memiliki autofocus aktif saat halaman dibuka, halo ring fokus biru, dan dropdown hasil pencarian yang mengambang ke arah **atas** (`bottom-full mb-2.5`).
-   - **Bar Total Tagihan & Pembayaran:** Kapsul Deep Navy berisi total tagihan nominal rupiah dan tombol **"Pembayaran"**. Hanya muncul saat ada barang di keranjang (`itemCount > 0`).
+---
+
+## 4. Spesifikasi Fungsional Implementasi Aktual
+
+### 4.1 Barcode Scanner Hardware (HID), Kamera Hybrid & Keyboard Lock
+- **Desktop Non-Sentuh (`isDesktopAutoFocus`):** Mendukung *autofocus* penuh, tombol pintas `/` untuk cari & `F2` untuk langsung membuka Pembayaran, serta global key capture ke input pencarian.
+- **Perangkat Sentuh / Mobile:** Input kasa menerapkan kunci soft-keyboard (`inputMode="none"` hingga input disentuh langsung) agar keyboard virtual Android/iOS tidak otomatis menyembul setelah ketuk barang cepat atau menutup sidebar/modal.
+- **Scanner Kamera Hybrid (`CameraScannerModal.vue`):** Menggabungkan `BarcodeDetector` native dengan fallback `@zxing/library` (`MultiFormatReader` `TRY_HARDER`), switch kamera depan/belakang (flip horizontal + panduan jarak), zoom hardware/digital, lampu flash (*torch*), dan sinyal beep audio.
+
+### 4.2 Lazy Inventory & Kategori Dinamis
+- Pemindaian atau pencarian barcode yang belum terdaftar membuka `LazyInventoryModal.vue` dengan barcode terisi otomatis.
+- Kasir dapat memilih kategori atau membuat **kategori baru secara inline** tanpa keluar modal, mengisi harga jual & estimasi modal (default 80%), lalu barang langsung masuk katalog IndexedDB sekaligus keranjang belanja.
+
+### 4.3 Pembayaran Tunai, Utang/Bon & Manajemen Pelanggan
+- **Tunai:** Pelanggan default **"Umum"** (dapat diganti via dropdown pencarian yang otomatis diurutkan berdasarkan frekuensi belanja $O(N)$ lewat `buildCustomerStatsMap`), nominal uang pas, saran pembulatan, dan pecahan rupiah standar.
+- **Utang / Bon:** Akun `"Umum"` otomatis diblokir baik di UI (`PaymentModal.vue`) maupun di lapisan database (`useKasiryDB.js`) agar utang selalu terikat ke pelanggan nyata. Pencarian nama atau daftar pelanggan baru berlangsung instan tanpa formulir panjang.
+- **Manajemen Pelanggan (`CustomerManagementModal.vue`) & Buku Utang (`DebtBookModal.vue`):** Dilengkapi riwayat belanja penuh per pelanggan lewat query indeks on-demand (`getCustomerTransactions`), cicilan utang dengan pembatasan nominal lunas vs uang kembalian (`Math.min(amount, currentDebt)`), serta tombol pengingat WhatsApp sopan.
+
+### 4.4 Laporan Harian, Excel Dinamis & Arsip Data Tahunan
+- **Laporan Harian (`DailyReportModal.vue`):** Menampilkan Uang Masuk Kas, Penjualan Tunai, Pelunasan Bon, Perkiraan Untung Bersih, Bon Baru, Top 5 Barang Terlaris, tab Riwayat Transaksi Hari Ini, kirim rekap WhatsApp, serta ekspor **Excel 4 sheet** (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`) via dynamic `import('xlsx')` yang menarik semua transaksi lintas tahun (`getAllTransactionsForExport()`).
+- **Skalabilitas & Arsip Data Tahunan (`SettingsModal.vue`):**
+  - Memori runtime (`useKasiryDB.js`) memakai `shallowRef([])`, hanya memuat **90 hari terakhir** ke UI Kasa harian (`ACTIVE_HISTORY_DAYS = 90`), serta melakukan pembaruan state parsial setelah checkout & CRUD.
+  - Fitur **Kesehatan & Arsip Data Tahunan** menyediakan pilihan retensi `> 3 Bulan`, `> 6 Bulan`, dan `> 1 Tahun` yang otomatis mengunduh file `Arsip_<NamaToko>_sd_<Tanggal>.json` (+ mengunggah salinan arsip ke Google Drive bila terhubung & online), menyimpan `archiveState.cutoffAt`, lalu membersihkan baris lama di IndexedDB tanpa mengubah produk maupun `totalDebt` pelanggan.
+
+### 4.5 Cloud Sync `$0` (Google Drive, Google Sheets & Kepatuhan OAuth)
+- Koneksi Google 1-klik via Google Identity Services (`useGoogleSync.js`), mendukung offline queue untuk Google Sheets (`flushPendingSheetQueue`), merge two-way LWW berbasis `updatedAt`, penghormatan `archiveState` antar-perangkat (sementara impor JSON manual tetap dapat memulihkan file arsip lama via `honorArchiveCutoff: false`), dan *adaptive Drive batching* (10 transaksi / 3 menit saat transaksi $\ge 200$).
+- Mendukung penayangan di Cloudflare Pages dengan `/privacy.html`, `/terms.html`, `_headers` COOP (`same-origin-allow-popups`), serta bypass SW fallback di `vite.config.js`.
 
 ---
 
-## 4. Spesifikasi Fungsional Fitur Utama
-
-### 4.1 Barcode Scanner Hardware (HID) & Autofocus
-* **Autofocus Berlapis:** Input pencarian memiliki `autofocus` HTML5, `nextTick()` focus pada `onMounted`, serta pemulihan fokus otomatis saat jendela peramban kembali aktif (`window.focus`).
-* **Global Typing Capture:** Mengetik tombol alfanumerik di mana saja pada layar kasir otomatis mengalihkan fokus ke input barcode tanpa menghapus karakter pertama.
-* **Deteksi Enter Scanner:** Tembakan barcode scanner fisik mengirim sinyal `Enter`. Sistem otomatis memeriksa kecocokan barang:
-  * Jika barang ditemukan $\rightarrow$ langsung masuk ke keranjang belanjaan!
-  * Jika barang belum ada $\rightarrow$ membuka *Lazy Inventory Modal* untuk mendaftarkan barang baru dalam hitungan detik.
-
-### 4.2 Lazy Inventory (Input Kilat Barang Baru)
-* Kasir tidak perlu meninggalkan layar transaksi jika ada produk baru yang discan.
-* Pop-up meminta: Nama Barang, Harga Jual, dan Harga Modal (otomatis disarankan 80% dari harga jual).
-* Sekali klik simpan, barang tersimpan ke IndexedDB dan langsung masuk ke keranjang belanjaan saat itu juga.
-
-### 4.3 Pembayaran Cerdas: Tunai vs Bon/Utang
-* **Mode Tunai:**
-  * Tombol Uang Pas.
-  * Saran pembulatan ke atas (misal total Rp 24.500 disarankan Rp 25.000, Rp 30.000, Rp 50.000).
-  * Pecahan rupiah standar (Rp 2.000, Rp 5.000, Rp 10.000, Rp 20.000, Rp 50.000, Rp 100.000).
-  * Tampilan uang kembalian besar dan jelas.
-* **Mode Utang / Bon:**
-  * Pencarian cepat nama tetangga/pelanggan.
-  * Jika pelanggan baru, cukup ketik nama langsung tersimpan tanpa formulir bertele-tele.
-  * Masuk otomatis ke Buku Utang Digital.
-
-### 4.4 Buku Utang Digital & Tagih WhatsApp
-* Mencatat saldo utang per pelanggan dan tanggal transaksi terakhir.
-* Tombol catat cicilan / pelunasan utang.
-* Tombol **"Kirim WA Pengingat"**: membuka tautan WhatsApp dengan pesan sopan dan ramah yang dirancang khusus untuk budaya desa.
-
-### 4.5 Laporan Harian Warung (1-Klik WA & Excel)
-* Rekap Uang Masuk, Perkiraan Untung Bersih, Jumlah Transaksi, dan Bon/Utang Baru.
-* Daftar barang paling laris hari ini.
-* Tombol **"Kirim ke WhatsApp"**: menghasilkan teks rekap rapi dan membuka WhatsApp pemilik warung.
-* Tombol **"Unduh Excel"**: mengekspor laporan pembukuan lengkap dalam format `.xlsx` secara offline.
-
-### 4.6 Sinkronisasi Cloud $0 (Google Sheets & Drive)
-* Menghubungkan Google Spreadsheet pemilik toko tanpa memerlukan server berbayar.
-* Data transaksi, barang terjual, dan saldo utang tersimpan rapi di Google Sheets sehingga pemilik dapat memantau warung dari mana saja.
-
----
-
-## 5. Model Data Lokal (Dexie.js IndexedDB)
+## 5. Model Data Lokal (Dexie.js `KasiryDB` v2)
 
 ```javascript
-// Database Schema: KasiryDatabase (v1)
+// src/db/index.js — KasiryDatabase
 db.version(1).stores({
-  products: '++id, barcode, name, category, sellPrice, buyPrice, isMacro, createdAt',
-  transactions: '++id, invoiceNumber, createdAt, totalAmount, paymentMethod, customerId, status',
-  transactionItems: '++id, transactionId, productId, name, sellPrice, buyPrice, qty, subtotal',
-  customers: '++id, name, phone, totalDebt, updatedAt',
-  debtPayments: '++id, customerId, amount, paymentDate, notes',
-  settings: 'key, value'
+  products: '++id, barcode, name, category, isMacro, updatedAt, deleted',
+  transactions: '++id, invoiceNumber, createdAt, paymentMethod, customerId, updatedAt',
+  transactionItems: '++id, transactionId, productId, updatedAt',
+  customers: '++id, name, phone, totalDebt, updatedAt, deleted',
+  debtPayments: '++id, customerId, paymentDate, updatedAt',
+  settings: 'key, updatedAt'
+})
+
+// Migrasi bersih ke v2: item belanja disimpan inline pada transactions.items
+db.version(2).stores({
+  transactionItems: null
 })
 ```
+*Catatan `settings` keys:* `storeProfile`, `categories`, `archiveState` (`{ cutoffAt }`). Format backup JSON eksternal mempertahankan `version: '2.4'`.
 
 ---
 
-## 6. Standar Kualitas & Non-Fungsional (NFR)
+## 6. Standar Kualitas, Arsitektur Build & Automated Testing
 
-1. **Kecepatan Build & Render:** Waktu kompilasi Vite $< 1.5$ detik, ukuran bundle gzip $< 60$ KB.
-2. **Respon Sentuh:** Responsivitas tap $< 50$ ms tanpa lag.
-3. **PWA Standar:** Lolos audit PWA Lighthouse (Service Worker Workbox, Offline Cache, App Manifest, Icon 192px/512px).
-4. **Keamanan Data:** Data tersimpan lokal di IndexedDB dengan `navigator.storage.persist()` untuk mencegah penghapusan otomatis oleh peramban saat memori HP menipis.
+1. **Code Splitting & Bundle Budget:**
+   - Konfigurasi Rolldown `codeSplitting.groups` di `vite.config.js` memisahkan `vendor-vue`, `vendor-dexie`, `vendor-xlsx`, dan `vendor-zxing`.
+   - Entry bundle `index` terjaga di kisaran **`~94 kB` (`~29 kB` gzip)** (< target 60 KB gzip per chunk utama), bebas chunk warning `> 500 kB`, dengan 9 modal sekunder terpisah sebagai async chunks (`prewarmCheckoutChunks` menghangatkan `PaymentModal`, `LazyInventoryModal`, dan `ReceiptModal` saat browser luang).
+2. **Offline PWA Precaching:** Workbox men-generate `precache 45 entries` di `dist/sw.js` sehingga seluruh chunk pecahan & aset statis tetap berjalan offline 100%.
+3. **Automated Tests:** Dijalankan melalui `npm test` (`Vitest` + `fake-indexeddb`) mencakup unit & integration test di folder `tests/` (`customerStats`, `useKasiryDB`, `useGoogleSync`, `dbMigration` `v1 -> v2`, dan `excelExport`).
+4. **Penyimpanan Persisten & Render Katalog:** `navigator.storage.persist()` aktif saat inisialisasi DB, dan kartu katalog di bawah lipatan layar (`idx >= 16`) memakai `.offscreen-card-defer` (`content-visibility: auto; contain-intrinsic-size: auto none auto 92px;`).
+
+---
+
+## 7. Checklist Rilis Produksi & Uji Perangkat Fisik
+
+Status terbaru sebelum rilis penuh ke pemilik warung:
+- [x] Build produksi bersih (`npm run build`), 0 error & 0 warning ukuran chunk.
+- [x] Automated tests Vitest lulus (`npm test`: 5 suite, 12 skenario).
+- [x] Verifikasi domain Google Search Console aktif (`public/google50a425d7a5de8ecd.html`).
+- [x] Halaman `/privacy.html`, `/terms.html`, ikon OAuth (`kasiry-oauth-120x120.png`), serta COOP header tersedia di `public/`.
+- [ ] **Uji Perangkat Fisik Manual (Final Field Check):**
+  - Test hardware barcode scanner USB OTG / Bluetooth di HP Android & PC.
+  - Test kamera belakang & depan langsung di HP terhadap barcode kemasan nyata (`CameraScannerModal`).
+  - Test cetak struk asli ke printer thermal 58mm via `window.print()` (`ReceiptModal`) & alur kirim nota/tagihan WhatsApp.
+  - Test mode restore **Timpa Total (Reset)**, **Arsip Tahunan + Drive**, dan reload offline PWA (`npm run preview` / `https://kasiry.pages.dev`).
+  - Pastikan status **Google OAuth Consent Screen** di Google Cloud Console berstatus *Published / Verified* agar akun Google toko baru tidak terkena batasan *Testing mode*.
