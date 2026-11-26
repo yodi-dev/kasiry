@@ -6,6 +6,17 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.8.2] - 2026-11-26 (Optimasi Tampilan Laptop Modal Bayar & Isolasi Cetak Termal)
+
+### Fixed
+- **Tampilan Kembalian di Laptop/Desktop (`src/components/PaymentModal.vue`):** Memindahkan tampilan **Uang Kembalian / Masih Kurang** menjadi kartu KPI berdampingan dengan **Total Tagihan** di atas area scroll, memperlebar modal pada tablet/laptop (`md:max-w-2xl lg:max-w-3xl`), dan menata mode Tunai/QRIS ke layout 2 kolom agar seluruh kontrol pembayaran dan nominal kembalian terlihat sekaligus tanpa scroll.
+- **Notifikasi / Header Ikut Tercetak (`src/components/ReceiptModal.vue`):** Menghilangkan `<style scoped>` pada aturan `@media print` agar `body, body * { visibility: hidden !important; }` benar-benar menyembunyikan elemen halaman & header *"Transaksi Selesai"* (plus class `print:hidden` pada header/footer modal serta `overflow: visible` pada kertas struk 58mm).
+
+### Added
+- Menambahkan topik pembahasan lanjutan **Koneksi Printer Thermal (Bluetooth ESC/POS / USB / 58mm-80mm)** ke backlog di `PRD_v2.0.md`.
+
+---
+
 ## [2.8.1] - 2026-11-26 (Hotfix Modal Pembayaran Utang & Vue SFC UI Tests)
 
 ### Fixed

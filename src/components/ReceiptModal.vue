@@ -76,8 +76,8 @@ const shareToWhatsApp = () => {
     class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
     <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-      <!-- Header Struk (Clean White & Emerald Check) -->
-      <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0">
+      <!-- Header Struk (Clean White & Emerald Check - disembunyikan saat cetak) -->
+      <div class="print:hidden px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2">
           <div class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
             <Check class="w-3.5 h-3.5" />
@@ -177,8 +177,8 @@ const shareToWhatsApp = () => {
         </div>
       </div>
 
-      <!-- Action Buttons -->
-      <div class="p-3 bg-white flex items-center justify-between gap-2 shrink-0">
+      <!-- Action Buttons (disembunyikan saat cetak) -->
+      <div class="print:hidden p-3 bg-white flex items-center justify-between gap-2 shrink-0">
         <button 
           @click="printReceipt"
           class="h-10 px-3 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-slate-200 transition-colors"
@@ -209,9 +209,13 @@ const shareToWhatsApp = () => {
   </div>
 </template>
 
-<style scoped>
+<style>
 @media print {
-  body {
+  @page {
+    margin: 0;
+  }
+  body,
+  body * {
     visibility: hidden !important;
   }
   .thermal-receipt-paper,
@@ -224,6 +228,9 @@ const shareToWhatsApp = () => {
     top: 0 !important;
     width: 58mm !important;
     max-width: 58mm !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
     margin: 0 !important;
     padding: 3mm !important;
     background: #ffffff !important;

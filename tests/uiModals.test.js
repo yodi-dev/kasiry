@@ -58,9 +58,22 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
       }
     })
 
-    // 1. Default tab Tunai & customer dropdown
+    // 1. Default tab Tunai, KPI kembalian live & customer dropdown
     expect(wrapper.text()).toContain('Selesaikan Pembayaran')
     expect(wrapper.text()).toContain('Umum')
+    expect(wrapper.text()).toContain('Uang Kembalian:')
+
+    // Ketik nominal kurang -> KPI berubah ke Uang Masih Kurang; ketik lebih -> Uang Kembalian akurat
+    const cashInput = wrapper.find('input[placeholder="0"]')
+    await cashInput.setValue('20000')
+    await nextTick()
+    expect(wrapper.text()).toContain('Uang Masih Kurang:')
+    expect(wrapper.text()).toContain('Rp 9.000')
+
+    await cashInput.setValue('50000')
+    await nextTick()
+    expect(wrapper.text()).toContain('Uang Kembalian:')
+    expect(wrapper.text()).toContain('Rp 21.000')
 
     // Buka dropdown pelanggan di tab Tunai -> pastikan getCustomerTxCount & sorting tidak error
     await wrapper.find('[title="Sentuh untuk ganti pelanggan"]').trigger('click')

@@ -381,7 +381,7 @@ const submitPayment = () => {
     v-if="isOpen"
     class="fixed inset-0 z-50 bg-[#0a193d]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+    <div class="bg-white rounded-3xl w-full max-w-lg md:max-w-2xl lg:max-w-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
       <!-- Modal Header (Design System: Deep Navy & Clean Subtitle) -->
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2.5">
@@ -445,23 +445,68 @@ const submitPayment = () => {
         </div>
       </div>
 
-      <!-- Total Tagihan Banner (Design System: Midnight Deep Navy & Sky Accent) -->
-      <div class="mx-5 my-2.5 p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-[#0a193d] text-white flex items-center justify-between shadow-xs shrink-0">
-        <div>
-          <span class="text-xs font-bold text-sky-300 uppercase tracking-wider block">Total Tagihan</span>
-        </div>
-        <div class="text-right">
-          <span class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white font-mono">
+      <!-- KPI Strip Atas (Selalu Terlihat Tanpa Scroll di Laptop & HP: Total Tagihan | Kembalian / Status) -->
+      <div class="mx-5 my-2.5 grid grid-cols-2 gap-2.5 shrink-0">
+        <div class="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 to-[#0a193d] text-white shadow-xs flex flex-col justify-center">
+          <span class="text-[10px] sm:text-xs font-bold text-sky-300 uppercase tracking-wider">Total Tagihan</span>
+          <span class="text-lg sm:text-2xl font-extrabold tracking-tight text-white font-mono mt-0.5 truncate">
             Rp {{ totalAmount.toLocaleString('id-ID') }}
+          </span>
+        </div>
+
+        <div
+          v-if="activeTab === 'cash'"
+          :class="[
+            'p-3 sm:p-3.5 rounded-2xl border shadow-xs flex flex-col justify-center transition-colors',
+            isCashSufficient
+              ? 'bg-emerald-50 border-emerald-200'
+              : 'bg-rose-50 border-rose-200'
+          ]"
+        >
+          <span
+            :class="[
+              'text-[10px] sm:text-xs font-bold uppercase tracking-wider',
+              isCashSufficient ? 'text-emerald-800' : 'text-rose-700'
+            ]"
+          >
+            {{ isCashSufficient ? 'Uang Kembalian:' : 'Uang Masih Kurang:' }}
+          </span>
+          <span
+            :class="[
+              'text-lg sm:text-2xl font-extrabold font-mono mt-0.5 truncate',
+              isCashSufficient ? 'text-emerald-700' : 'text-rose-600'
+            ]"
+          >
+            Rp {{ isCashSufficient ? changeAmount.toLocaleString('id-ID') : (totalAmount - cashGiven).toLocaleString('id-ID') }}
+          </span>
+        </div>
+
+        <div
+          v-else-if="activeTab === 'qris'"
+          class="p-3 sm:p-3.5 rounded-2xl border border-sky-200 bg-sky-50/90 shadow-xs flex flex-col justify-center"
+        >
+          <span class="text-[10px] sm:text-xs font-bold text-[#0284c7] uppercase tracking-wider">Metode QRIS</span>
+          <span class="text-base sm:text-xl font-extrabold text-[#0a193d] mt-0.5 truncate">
+            Uang Pas (Non-Tunai)
+          </span>
+        </div>
+
+        <div
+          v-else
+          class="p-3 sm:p-3.5 rounded-2xl border border-amber-200 bg-amber-50/90 shadow-xs flex flex-col justify-center"
+        >
+          <span class="text-[10px] sm:text-xs font-bold text-amber-800 uppercase tracking-wider">Masuk Buku Bon</span>
+          <span class="text-sm sm:text-base font-extrabold text-[#0a193d] mt-0.5 truncate">
+            {{ selectedCustomer?.name || (customerQuery.trim() && !isDebtQueryUmum ? customerQuery.trim() : 'Pilih Pelanggan') }}
           </span>
         </div>
       </div>
 
       <!-- Modal Body Scrollable -->
       <div class="flex-1 overflow-y-auto">
-        <div v-if="activeTab === 'cash' || activeTab === 'qris'" class="px-5 py-2 space-y-3.5">
+        <div v-if="activeTab === 'cash' || activeTab === 'qris'" class="px-5 py-2 md:py-3 grid grid-cols-1 md:grid-cols-12 gap-3.5 md:gap-4 items-start">
           <!-- Bagian Data Pelanggan (Default: Umum) -->
-          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+          <div class="md:col-span-5 p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
             <!-- Header Judul (Tanpa teks opsional) -->
             <div class="flex items-center justify-between">
               <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -625,120 +670,96 @@ const submitPayment = () => {
             </div>
           </div>
 
-          <template v-if="activeTab === 'cash'">
-            <!-- Input Nominal Diterima -->
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
-                Uang Diterima dari Pembeli:
-              </label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-4 flex items-center font-bold text-slate-400 text-base">Rp</span>
-                <input 
-                  type="text" 
-                  :value="cashInputStr ? parseInt(cashInputStr).toLocaleString('id-ID') : ''"
-                  @input="onManualCashInput"
-                  placeholder="0"
-                  class="w-full h-13 pl-12 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/15 rounded-2xl text-xl sm:text-2xl font-bold text-[#0a193d] outline-hidden transition-all text-right font-mono"
-                />
+          <div class="md:col-span-7 space-y-3">
+            <template v-if="activeTab === 'cash'">
+              <!-- Input Nominal Diterima -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
+                  Uang Diterima dari Pembeli:
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-4 flex items-center font-bold text-slate-400 text-base">Rp</span>
+                  <input 
+                    type="text" 
+                    :value="cashInputStr ? parseInt(cashInputStr).toLocaleString('id-ID') : ''"
+                    @input="onManualCashInput"
+                    placeholder="0"
+                    class="w-full h-12 sm:h-13 pl-12 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/15 rounded-2xl text-xl sm:text-2xl font-bold text-[#0a193d] outline-hidden transition-all text-right font-mono"
+                  />
+                </div>
               </div>
-            </div>
 
-            <!-- Tombol Uang Pas & Pembulatan Terdekat -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <!-- Uang Pas -->
-              <button 
-                @click="setExactCash"
-                class="h-11 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200/80 cursor-pointer transition-all active:scale-95 shadow-2xs flex items-center justify-center gap-1.5"
-              >
-                <span>Uang Pas</span>
-              </button>
-
-              <!-- Saran Pembulatan -->
-              <button 
-                v-for="sug in roundedSuggestions" 
-                :key="sug"
-                @click="setCashAmount(sug)"
-                class="h-11 px-3 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition-all active:scale-95 shadow-2xs"
-              >
-                Rp {{ (sug / 1000) }}rb
-              </button>
-            </div>
-
-            <!-- Pecahan Nominal Uang Standar Rupiah -->
-            <div>
-              <p class="text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Tambah Pecahan Uang Kertas:</p>
-              <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+              <!-- Tombol Uang Pas & Pembulatan Terdekat -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <!-- Uang Pas -->
                 <button 
-                  v-for="bill in standardBills" 
-                  :key="bill"
-                  @click="addCash(bill)"
-                  class="h-10 bg-slate-100 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 text-slate-800 font-bold text-xs rounded-xl cursor-pointer border border-transparent transition-all active:scale-95 font-mono"
+                  @click="setExactCash"
+                  class="h-10 sm:h-11 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200/80 cursor-pointer transition-all active:scale-95 shadow-2xs flex items-center justify-center gap-1.5"
                 >
-                  +{{ bill >= 1000 ? `${bill/1000}rb` : bill }}
+                  <span>Uang Pas</span>
+                </button>
+
+                <!-- Saran Pembulatan -->
+                <button 
+                  v-for="sug in roundedSuggestions" 
+                  :key="sug"
+                  @click="setCashAmount(sug)"
+                  class="h-10 sm:h-11 px-3 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                >
+                  Rp {{ (sug / 1000) }}rb
                 </button>
               </div>
-            </div>
 
-            <!-- Display Uang Kembalian -->
-            <div 
-              :class="[
-                'p-4 rounded-2xl border transition-all flex items-center justify-between',
-                isCashSufficient 
-                  ? 'bg-emerald-50/70 border-emerald-200/80' 
-                  : 'bg-rose-50/70 border-rose-200/80'
-              ]"
-            >
+              <!-- Pecahan Nominal Uang Standar Rupiah -->
               <div>
-                <p :class="['text-xs font-bold uppercase tracking-wider', isCashSufficient ? 'text-emerald-800' : 'text-rose-700']">
-                  {{ isCashSufficient ? 'Uang Kembalian:' : 'Uang Masih Kurang:' }}
-                </p>
-              </div>
-              <div class="text-right">
-                <p 
-                  :class="[
-                    'text-2xl sm:text-3xl font-extrabold font-mono', 
-                    isCashSufficient ? 'text-emerald-700' : 'text-rose-600'
-                  ]"
-                >
-                  Rp {{ isCashSufficient ? changeAmount.toLocaleString('id-ID') : (totalAmount - cashGiven).toLocaleString('id-ID') }}
-                </p>
-              </div>
-            </div>
-          </template>
-
-          <!-- MODE QRIS (Otomatis Uang Pas Non-Tunai) -->
-          <div
-            v-else-if="activeTab === 'qris'"
-            class="p-4 rounded-2xl bg-sky-50/80 border border-sky-200/80 space-y-2.5"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex items-center gap-2.5">
-                <div class="w-10 h-10 rounded-xl bg-[#0284c7] text-white flex items-center justify-center shrink-0 shadow-xs">
-                  <QrCode class="w-5 h-5" />
-                </div>
-                <div>
-                  <p class="text-xs font-bold text-[#0a193d] uppercase tracking-wider">Pembayaran QRIS (Uang Pas)</p>
-                  <p class="text-[11px] text-slate-600">Pastikan pembeli sudah scan &amp; konfirmasi berhasil.</p>
+                <p class="text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Tambah Pecahan Uang Kertas:</p>
+                <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                  <button 
+                    v-for="bill in standardBills" 
+                    :key="bill"
+                    @click="addCash(bill)"
+                    class="h-10 bg-slate-100 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 text-slate-800 font-bold text-xs rounded-xl cursor-pointer border border-transparent transition-all active:scale-95 font-mono"
+                  >
+                    +{{ bill >= 1000 ? `${bill/1000}rb` : bill }}
+                  </button>
                 </div>
               </div>
-            </div>
+            </template>
 
-            <div class="p-3 bg-white rounded-xl border border-sky-100 flex items-center justify-between">
-              <span class="text-xs font-semibold text-slate-600">Nominal Pas Non-Tunai:</span>
-              <span class="text-lg sm:text-xl font-extrabold font-mono text-[#0284c7]">
-                Rp {{ totalAmount.toLocaleString('id-ID') }}
-              </span>
-            </div>
+            <!-- MODE QRIS (Otomatis Uang Pas Non-Tunai) -->
+            <div
+              v-else-if="activeTab === 'qris'"
+              class="p-4 rounded-2xl bg-sky-50/80 border border-sky-200/80 space-y-2.5"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-10 h-10 rounded-xl bg-[#0284c7] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <QrCode class="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p class="text-xs font-bold text-[#0a193d] uppercase tracking-wider">Pembayaran QRIS (Uang Pas)</p>
+                    <p class="text-[11px] text-slate-600">Pastikan pembeli sudah scan &amp; konfirmasi berhasil.</p>
+                  </div>
+                </div>
+              </div>
 
-            <p class="text-[11px] text-slate-500 flex items-center gap-1.5">
-              <CheckCircle class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Tidak ada kembalian tunai. Tercatat terpisah dari uang kertas di laci.</span>
-            </p>
+              <div class="p-3 bg-white rounded-xl border border-sky-100 flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-600">Nominal Pas Non-Tunai:</span>
+                <span class="text-lg sm:text-xl font-extrabold font-mono text-[#0284c7]">
+                  Rp {{ totalAmount.toLocaleString('id-ID') }}
+                </span>
+              </div>
+
+              <p class="text-[11px] text-slate-500 flex items-center gap-1.5">
+                <CheckCircle class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Tidak ada kembalian tunai. Tercatat terpisah dari uang kertas di laci.</span>
+              </p>
+            </div>
           </div>
         </div>
 
         <!-- TAB 2: MODE UTANG / BON -->
-        <div v-else class="px-5 py-2 space-y-3.5">
+        <div v-else class="px-5 py-2 md:py-3 space-y-3.5">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
               Nama Pelanggan:
