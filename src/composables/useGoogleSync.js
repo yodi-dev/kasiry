@@ -11,8 +11,18 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email'
 ].join(' ')
 
-const BACKUP_FILENAME = 'kasiry-habiba-backup.json'
-const SHEET_FILENAME = 'Kasiry - Buku Kas Habiba Store'
+const BACKUP_FILENAME = 'kasiry-backup.json'
+const LEGACY_BACKUP_FILENAME = 'kasiry-habiba-backup.json'
+const getSheetFilename = (storeName) => `Kasiry - Buku Kas ${storeName?.trim() || 'Toko'}`
+
+const loadJsonStorage = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
+  } catch {
+    return fallback
+  }
+}
 
 // Persistent reactive state
 const getSavedToken = () => {
@@ -25,26 +35,46 @@ const getSavedToken = () => {
 }
 
 const accessToken = ref(getSavedToken())
-const userProfile = ref(
-  JSON.parse(localStorage.getItem('kasiry_gdrive_user') || 'null')
-)
-const lastSyncTime = ref(
-  localStorage.getItem('kasiry_gdrive_last_sync') || null
-)
-const linkedSheetId = ref(
-  localStorage.getItem('kasiry_linked_sheet_id') || null
-)
-const customClientId = ref(
-  localStorage.getItem('kasiry_custom_client_id') || ''
-)
+const userProfile = ref(loadJsonStorage('kasiry_gdrive_user', null))
+const lastSyncTime = ref(localStorage.getItem('kasiry_gdrive_last_sync') || null)
+const linkedSheetId = ref(localStorage.getItem('kasiry_linked_sheet_id') || null)
+const customClientId = ref(localStorage.getItem('kasiry_custom_client_id') || '')
+const pendingSheetQueue = ref(loadJsonStorage('kasiry_pending_sheet_queue', []))
+const hasPendingDriveBackup = ref(localStorage.getItem('kasiry_pending_drive_sync') === 'true')
 
 const isConnecting = ref(false)
 const isSyncing = ref(false)
 const statusMessage = ref('')
+let driveAutoBackupTimer = null
 
 export function useGoogleSync() {
   const isConnected = computed(() => !!userProfile.value)
   const activeClientId = computed(() => customClientId.value.trim() || DEFAULT_CLIENT_ID)
+  const pendingQueueCount = computed(() => pendingSheetQueue.value.length)
+
+  const setCustomClientId = (clientId) => {
+    const clean = (clientId || '').trim()
+    customClientId.value = clean
+    if (clean) {
+      localStorage.setItem('kasiry_custom_client_id', clean)
+    } else {
+      localStorage.removeItem('kasiry_custom_client_id')
+    }
+  }
+
+  const persistPendingQueue = (nextQueue) => {
+    pendingSheetQueue.value = nextQueue
+    localStorage.setItem('kasiry_pending_sheet_queue', JSON.stringify(nextQueue))
+  }
+
+  const markDrivePending = (flag) => {
+    hasPendingDriveBackup.value = flag
+    if (flag) {
+      localStorage.setItem('kasiry_pending_drive_sync', 'true')
+    } else {
+      localStorage.removeItem('kasiry_pending_drive_sync')
+    }
+  }
 
   // Inisialisasi & Permintaan Token GIS (Google Identity Services)
   const requestToken = (promptType = '') => {
@@ -172,6 +202,8 @@ export function useGoogleSync() {
     userProfile.value = null
     linkedSheetId.value = null
     lastSyncTime.value = null
+    persistPendingQueue([])
+    markDrivePending(false)
     localStorage.removeItem('kasiry_gdrive_token')
     localStorage.removeItem('kasiry_gdrive_token_expires')
     localStorage.removeItem('kasiry_gdrive_user')
@@ -180,24 +212,27 @@ export function useGoogleSync() {
     statusMessage.value = 'Akun Google telah diputuskan.'
   }
 
-  // Cari File Backup di Google Drive
+  // Cari File Backup di Google Drive (cek kasiry-backup.json lalu fallback nama lama)
   const findBackupFileId = async (interactive = false) => {
-    const q = encodeURIComponent(`name='${BACKUP_FILENAME}' and trashed=false`)
-    const res = await fetchWithAuth(
-      `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)`,
-      {},
-      false,
-      interactive
-    )
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}))
-      throw new Error(errJson.error?.message || 'Gagal memeriksa file backup di Google Drive.')
+    const queryFile = async (fileName) => {
+      const q = encodeURIComponent(`name='${fileName}' and trashed=false`)
+      const res = await fetchWithAuth(
+        `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)`,
+        {},
+        false,
+        interactive
+      )
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}))
+        throw new Error(errJson.error?.message || 'Gagal memeriksa file backup di Google Drive.')
+      }
+      const data = await res.json()
+      return data.files && data.files.length > 0 ? data.files[0].id : null
     }
-    const data = await res.json()
-    if (data.files && data.files.length > 0) {
-      return data.files[0].id
-    }
-    return null
+
+    const primaryId = await queryFile(BACKUP_FILENAME)
+    if (primaryId) return primaryId
+    return await queryFile(LEGACY_BACKUP_FILENAME)
   }
 
   // Simpan Snapshot ke Google Drive
@@ -270,16 +305,18 @@ export function useGoogleSync() {
     return await res.json()
   }
 
-  // Cari atau Buat Spreadsheet Buku Kas Warung
-  const ensureSpreadsheet = async () => {
+  // Cari atau Buat Spreadsheet Buku Kas Warung (dinamis sesuai nama toko)
+  const ensureSpreadsheet = async (storeName = 'Toko') => {
     if (linkedSheetId.value) {
       return linkedSheetId.value
     }
 
+    const sheetTitle = getSheetFilename(storeName)
+
     try {
       // 1. Cek apakah sudah pernah ada
       const q = encodeURIComponent(
-        `name='${SHEET_FILENAME}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`
+        `name='${sheetTitle.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`
       )
       const res = await fetchWithAuth(
         `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=5`
@@ -295,7 +332,7 @@ export function useGoogleSync() {
 
       // 2. Buat via Sheets API
       const body = {
-        properties: { title: SHEET_FILENAME },
+        properties: { title: sheetTitle },
         sheets: [
           {
             properties: {
@@ -344,39 +381,109 @@ export function useGoogleSync() {
     return null
   }
 
-  // Tambahkan Baris Transaksi Baru ke Google Sheets
-  const appendTransactionToSheet = async (txData) => {
-    if (!isConnected.value) return
-    try {
-      const sheetId = await ensureSpreadsheet()
-      if (!sheetId) return
+  // Format baris standar untuk pencatatan Google Sheets (Tunai, Bon Baru, & Pelunasan Bon)
+  const formatSheetRow = (txData) => {
+    const itemsText = txData.itemsText || (txData.items || [])
+      .map(i => `${i.qty}x ${i.name}`)
+      .join(', ')
 
-      const itemsText = (txData.items || [])
-        .map(i => `${i.qty}x ${i.name}`)
-        .join(', ')
+    return [
+      new Date(txData.createdAt || Date.now()).toLocaleString('id-ID'),
+      txData.invoiceNumber || '-',
+      txData.paymentMethod || 'TUNAI',
+      txData.customerName || (txData.paymentMethod === 'TUNAI' ? 'Umum' : '-'),
+      txData.totalAmount || 0,
+      txData.cashGiven ?? txData.totalAmount ?? 0,
+      txData.changeAmount || 0,
+      itemsText || '-'
+    ]
+  }
 
-      const row = [
-        new Date(txData.createdAt || Date.now()).toLocaleString('id-ID'),
-        txData.invoiceNumber || '-',
-        txData.paymentMethod || 'TUNAI',
-        txData.customerName || (txData.paymentMethod === 'TUNAI' ? 'Pelanggan Umum' : '-'),
-        txData.totalAmount || 0,
-        txData.cashGiven || txData.totalAmount || 0,
-        txData.changeAmount || 0,
-        itemsText
-      ]
-
-      await fetchWithAuth(
-        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Rekap Transaksi Kasir!A1:append?valueInputOption=USER_ENTERED`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [row] })
-        }
-      )
-    } catch (err) {
-      console.warn('Gagal mencatat transaksi ke Google Sheets:', err)
+  const enqueueSheetRow = (row) => {
+    const entry = {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      row,
+      createdAt: Date.now()
     }
+    persistPendingQueue([...pendingSheetQueue.value, entry])
+  }
+
+  const appendRowsBatch = async (rows, storeName = 'Toko') => {
+    const sheetId = await ensureSpreadsheet(storeName)
+    if (!sheetId) {
+      throw new Error('Spreadsheet Buku Kas belum tersedia.')
+    }
+
+    const res = await fetchWithAuth(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Rekap Transaksi Kasir!A1:append?valueInputOption=USER_ENTERED`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: rows })
+      }
+    )
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}))
+      throw new Error(errBody.error?.message || 'Gagal menulis data ke Google Sheets.')
+    }
+    return true
+  }
+
+  // Kirim seluruh antrean baris Google Sheets yang tertunda saat offline
+  const flushPendingSheetQueue = async (storeName = 'Toko') => {
+    if (!isConnected.value || !navigator.onLine || pendingSheetQueue.value.length === 0) {
+      return { flushed: 0, remaining: pendingSheetQueue.value.length }
+    }
+
+    const snapshot = [...pendingSheetQueue.value]
+    try {
+      await appendRowsBatch(snapshot.map(item => item.row), storeName)
+      const sentIds = new Set(snapshot.map(item => item.id))
+      const remaining = pendingSheetQueue.value.filter(item => !sentIds.has(item.id))
+      persistPendingQueue(remaining)
+      return { flushed: snapshot.length, remaining: remaining.length }
+    } catch (err) {
+      console.warn('Antrean Google Sheets belum bisa dikirim:', err)
+      return { flushed: 0, remaining: pendingSheetQueue.value.length, error: err.message }
+    }
+  }
+
+  // Tambahkan Baris Transaksi Baru ke Google Sheets (dengan fallback antrean offline)
+  const appendTransactionToSheet = async (txData, storeName = 'Toko') => {
+    if (!isConnected.value) return { queued: false, skipped: true }
+
+    const row = formatSheetRow(txData)
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      enqueueSheetRow(row)
+      return { queued: true, offline: true }
+    }
+
+    try {
+      if (pendingSheetQueue.value.length > 0) {
+        await flushPendingSheetQueue(storeName)
+      }
+      await appendRowsBatch([row], storeName)
+      return { sent: true, queued: false }
+    } catch (err) {
+      console.warn('Gagal kirim ke Google Sheets, disimpan ke antrean offline:', err)
+      enqueueSheetRow(row)
+      return { queued: true, error: err.message }
+    }
+  }
+
+  // Catat Pelunasan / Cicilan Bon ke Google Sheets melalui pipeline antrean yang sama
+  const appendDebtPaymentToSheet = async ({ customerName, amount, remainingDebt = 0, paymentDate = Date.now() }, storeName = 'Toko') => {
+    return appendTransactionToSheet({
+      invoiceNumber: `LUNAS-${String(paymentDate).slice(-6)}`,
+      createdAt: paymentDate,
+      paymentMethod: 'PELUNASAN BON',
+      customerName: customerName || 'Pelanggan',
+      totalAmount: amount,
+      cashGiven: amount,
+      changeAmount: 0,
+      itemsText: `Pembayaran utang (Sisa bon: Rp ${Math.max(0, remainingDebt).toLocaleString('id-ID')})`
+    }, storeName)
   }
 
   // ==============================================================
@@ -396,6 +503,8 @@ export function useGoogleSync() {
       // KASUS 1: File belum ada di Google Drive (Upload pertama kali)
       if (!fileId) {
         const newFileId = await uploadToDrive(localData, null, interactive)
+        await flushPendingSheetQueue(localData.storeProfile?.name)
+        markDrivePending(false)
         const nowIso = new Date().toISOString()
         lastSyncTime.value = nowIso
         localStorage.setItem('kasiry_gdrive_last_sync', nowIso)
@@ -403,7 +512,7 @@ export function useGoogleSync() {
         return { success: true, updated: false, fileId: newFileId }
       }
 
-      // KASUS 2: File sudah ada di Google Drive -> Jalankan Two-Way Merge
+      // KASUS 2: File sudah ada di Google Drive -> Jalankan Merge Aman
       const remoteData = await downloadFromDrive(fileId, interactive)
       if (!remoteData || !remoteData.data) {
         throw new Error('Format file cloud tidak valid.')
@@ -414,38 +523,38 @@ export function useGoogleSync() {
 
       // 1. Merge Produk (Bandingkan updatedAt, dukung soft-delete)
       const productMap = new Map()
-      // Masukkan local
       ;(lData.products || []).forEach(p => productMap.set(p.id, p))
-      // Bandingkan dengan remote
       ;(rData.products || []).forEach(rp => {
         const lp = productMap.get(rp.id)
-        if (!lp) {
+        if (!lp || (rp.updatedAt || 0) > (lp.updatedAt || 0)) {
           productMap.set(rp.id, rp)
-        } else {
-          // Pilih yang paling baru
-          if ((rp.updatedAt || 0) > (lp.updatedAt || 0)) {
-            productMap.set(rp.id, rp)
-          }
         }
       })
       const mergedProducts = Array.from(productMap.values())
 
-      // 2. Merge Pelanggan Buku Utang (Bandingkan updatedAt)
+      // 2. Merge Pelanggan (cocokkan ID atau nama "Umum" agar tidak duplikat)
       const customerMap = new Map()
-      ;(lData.customers || []).forEach(c => customerMap.set(c.id, c))
+      const customerNameToId = new Map()
+      ;(lData.customers || []).forEach(c => {
+        customerMap.set(c.id, c)
+        if (c.name) customerNameToId.set(c.name.trim().toLowerCase(), c.id)
+      })
       ;(rData.customers || []).forEach(rc => {
-        const lc = customerMap.get(rc.id)
-        if (!lc) {
+        const nameKey = rc.name?.trim().toLowerCase()
+        const matchedId = customerMap.has(rc.id) ? rc.id : (nameKey ? customerNameToId.get(nameKey) : null)
+        if (matchedId == null) {
           customerMap.set(rc.id, rc)
+          if (nameKey) customerNameToId.set(nameKey, rc.id)
         } else {
+          const lc = customerMap.get(matchedId)
           if ((rc.updatedAt || 0) > (lc.updatedAt || 0)) {
-            customerMap.set(rc.id, rc)
+            customerMap.set(matchedId, { ...rc, id: matchedId })
           }
         }
       })
       const mergedCustomers = Array.from(customerMap.values())
 
-      // 3. Merge Transaksi (Event logs berdasarkan invoiceNumber / createdAt)
+      // 3. Merge Transaksi (berdasarkan invoiceNumber agar tidak tertimpa bentrok ID)
       const txMap = new Map()
       ;(lData.transactions || []).forEach(t => txMap.set(t.invoiceNumber || t.id, t))
       ;(rData.transactions || []).forEach(rt => {
@@ -457,25 +566,33 @@ export function useGoogleSync() {
       const mergedTransactions = Array.from(txMap.values())
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 
-      // 4. Merge Pembayaran Utang
+      // 4. Merge Pembayaran Utang (berdasarkan kunci unik komposit)
       const payMap = new Map()
-      ;(lData.debtPayments || []).forEach(dp => payMap.set(dp.id || `${dp.customerId}_${dp.paymentDate}`, dp))
+      ;(lData.debtPayments || []).forEach(dp => payMap.set(`${dp.customerId}_${dp.paymentDate}_${dp.amount}`, dp))
       ;(rData.debtPayments || []).forEach(rdp => {
-        const key = rdp.id || `${rdp.customerId}_${rdp.paymentDate}`
+        const key = `${rdp.customerId}_${rdp.paymentDate}_${rdp.amount}`
         if (!payMap.has(key)) {
           payMap.set(key, rdp)
         }
       })
       const mergedDebtPayments = Array.from(payMap.values())
 
-      // 5. Merge Pengaturan Toko
-      const mergedSettings = rData.settings || lData.settings || []
+      // 5. Merge Pengaturan Toko per key berdasarkan updatedAt
+      const settingsMap = new Map()
+      ;(lData.settings || []).forEach(s => settingsMap.set(s.key, s))
+      ;(rData.settings || []).forEach(rs => {
+        const ls = settingsMap.get(rs.key)
+        if (!ls || (rs.updatedAt || 0) > (ls.updatedAt || 0)) {
+          settingsMap.set(rs.key, rs)
+        }
+      })
+      const mergedSettings = Array.from(settingsMap.values())
 
       const mergedPayload = {
         app: 'Kasiry POS',
-        version: '2.2',
+        version: '2.4',
         exportedAt: new Date().toISOString(),
-        storeProfile: localData.storeProfile || remoteData.storeProfile,
+        storeProfile: settingsMap.get('storeProfile')?.value || localData.storeProfile || remoteData.storeProfile,
         data: {
           products: mergedProducts,
           customers: mergedCustomers,
@@ -490,13 +607,15 @@ export function useGoogleSync() {
         await applyMergedDataCallback(mergedPayload)
       }
 
-      // Upload kembali data gabungan paling mutakhir ke Google Drive
+      // Upload kembali data gabungan paling mutakhir ke Google Drive & flush antrean Sheets
       await uploadToDrive(mergedPayload, fileId, interactive)
+      await flushPendingSheetQueue(mergedPayload.storeProfile?.name)
+      markDrivePending(false)
 
       const nowIso = new Date().toISOString()
       lastSyncTime.value = nowIso
       localStorage.setItem('kasiry_gdrive_last_sync', nowIso)
-      statusMessage.value = 'Sinkronisasi multi-device berhasil!'
+      statusMessage.value = 'Sinkronisasi cadangan cloud berhasil!'
 
       return { success: true, updated: true, mergedCount: mergedTransactions.length }
     } catch (err) {
@@ -509,12 +628,42 @@ export function useGoogleSync() {
     }
   }
 
+  // Jadwalkan auto-backup Google Drive secara senyap setelah perubahan data lokal
+  const scheduleDriveAutoBackup = (getLocalPayloadFn, applyMergedFn, getStoreNameFn) => {
+    if (!isConnected.value) return
+    markDrivePending(true)
+
+    if (driveAutoBackupTimer) {
+      clearTimeout(driveAutoBackupTimer)
+    }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return
+    }
+
+    driveAutoBackupTimer = setTimeout(async () => {
+      if (!isConnected.value || isSyncing.value || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        return
+      }
+      try {
+        const storeName = typeof getStoreNameFn === 'function' ? getStoreNameFn() : 'Toko'
+        await flushPendingSheetQueue(storeName)
+        const payload = await getLocalPayloadFn()
+        await syncWithCloud(payload, applyMergedFn, false)
+      } catch (err) {
+        console.warn('[AutoBackup Drive] Ditunda hingga koneksi/token siap:', err)
+      }
+    }, 2500)
+  }
+
   return {
     accessToken,
     userProfile,
     lastSyncTime,
     linkedSheetId,
     customClientId,
+    pendingQueueCount,
+    hasPendingDriveBackup,
     isConnecting,
     isSyncing,
     statusMessage,
@@ -522,8 +671,12 @@ export function useGoogleSync() {
     activeClientId,
     connect,
     disconnect,
+    setCustomClientId,
     syncWithCloud,
+    scheduleDriveAutoBackup,
+    flushPendingSheetQueue,
     appendTransactionToSheet,
+    appendDebtPaymentToSheet,
     ensureSpreadsheet
   }
 }

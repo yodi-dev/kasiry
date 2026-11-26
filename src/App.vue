@@ -32,6 +32,7 @@ const {
   storeProfile,
   licenseStatus,
   categories,
+  lastLocalBackupTime,
   addCategory,
   deleteCategory,
   loadDatabase,
@@ -54,20 +55,43 @@ const {
   lastSyncTime,
   linkedSheetId,
   customClientId,
+  pendingQueueCount,
+  hasPendingDriveBackup,
   isConnecting: isGoogleConnecting,
   isSyncing: isGoogleSyncing,
   statusMessage: googleSyncStatus,
   connect: connectGoogle,
   disconnect: disconnectGoogle,
+  setCustomClientId,
   syncWithCloud,
+  scheduleDriveAutoBackup,
+  flushPendingSheetQueue,
   appendTransactionToSheet,
+  appendDebtPaymentToSheet,
   ensureSpreadsheet
 } = useGoogleSync()
 
-// State Keranjang Belanja Awal (Mulai Kosong agar Bar Pembayaran Muncul Hanya Saat Ada Barang)
+// Helper terpusat untuk menjadwalkan auto-backup Google Drive saat data lokal berubah
+const triggerCloudAutoBackup = () => {
+  scheduleDriveAutoBackup(
+    getFullDatabasePayload,
+    (mergedPayload) => importBackupJSON(mergedPayload, 'merge'),
+    () => storeProfile.value?.name
+  )
+}
+
+// State Jaringan & Keranjang Belanja Awal (Mulai Kosong agar Bar Pembayaran Muncul Hanya Saat Ada Barang)
 const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => { isOnline.value = true })
+  window.addEventListener('online', async () => {
+    isOnline.value = true
+    if (isGoogleConnected.value) {
+      await flushPendingSheetQueue(storeProfile.value?.name)
+      if (hasPendingDriveBackup.value) {
+        triggerCloudAutoBackup()
+      }
+    }
+  })
   window.addEventListener('offline', () => { isOnline.value = false })
 }
 const cart = ref([])
@@ -224,11 +248,23 @@ const clearCart = () => {
 // Product Management (CRUD dengan Dexie.js)
 const handleSaveProduct = async (prodData) => {
   await saveProduct(prodData)
+  triggerCloudAutoBackup()
 }
 
 const handleDeleteProduct = async (prodId) => {
   await deleteProduct(prodId)
   cart.value = cart.value.filter(c => c.id !== prodId)
+  triggerCloudAutoBackup()
+}
+
+const handleAddCategory = async (catName) => {
+  const ok = await addCategory(catName)
+  if (ok) triggerCloudAutoBackup()
+}
+
+const handleDeleteCategory = async (catName) => {
+  const res = await deleteCategory(catName)
+  if (res?.success) triggerCloudAutoBackup()
 }
 
 // Lazy Inventory Handler (Produk baru langsung tersimpan permanen ke Dexie.js)
@@ -241,6 +277,7 @@ const saveAndAddToCart = async (newProduct) => {
   const saved = await saveProduct(newProduct)
   addToCart(saved)
   isLazyInventoryOpen.value = false
+  triggerCloudAutoBackup()
 }
 
 // Payment Handlers (Menyimpan riwayat transaksi ke Dexie.js)
@@ -278,8 +315,9 @@ const handleProcessCashPayment = async (data) => {
   await recordTransaction(txPayload)
   playBeepSound('success')
 
-  // Catat ke Google Sheets secara asinkron di latar belakang jika terhubung
-  appendTransactionToSheet(txPayload)
+  // Catat ke Google Sheets (atau antrean offline) & jadwalkan auto-backup Google Drive
+  appendTransactionToSheet(txPayload, storeProfile.value?.name)
+  triggerCloudAutoBackup()
 
   receiptData.value = {
     invoiceNumber: invoice,
@@ -325,8 +363,9 @@ const handleProcessDebtPayment = async (data) => {
   await recordTransaction(txPayload)
   playBeepSound('success')
 
-  // Catat ke Google Sheets secara asinkron di latar belakang jika terhubung
-  appendTransactionToSheet(txPayload)
+  // Catat ke Google Sheets (atau antrean offline) & jadwalkan auto-backup Google Drive
+  appendTransactionToSheet(txPayload, storeProfile.value?.name)
+  triggerCloudAutoBackup()
 
   receiptData.value = {
     invoiceNumber: invoice,
@@ -342,10 +381,19 @@ const handleProcessDebtPayment = async (data) => {
   isReceiptOpen.value = true
 }
 
-// Record Pelunasan Utang (Tersimpan ke Dexie.js)
+// Record Pelunasan Utang (Tersimpan ke Dexie.js + Google Sheets & Auto-Backup)
 const handleRecordDebtPayment = async ({ customerId, amount }) => {
-  await recordDebtPayment({ customerId, amount })
+  const res = await recordDebtPayment({ customerId, amount })
   playBeepSound('success')
+  if (res && res.appliedAmount > 0) {
+    appendDebtPaymentToSheet({
+      customerName: res.customerName,
+      amount: res.appliedAmount,
+      remainingDebt: res.remainingDebt,
+      paymentDate: res.paymentDate
+    }, storeProfile.value?.name)
+    triggerCloudAutoBackup()
+  }
 }
 
 // Handler Scan Barcode (Hardware Scanner maupun Kamera)
@@ -380,11 +428,23 @@ const handleExportBackup = async () => {
   }
 }
 
-const handleImportBackup = async (content) => {
+const handleImportBackup = async (payloadOrContent) => {
   try {
-    const res = await importBackupJSON(content)
+    const content = typeof payloadOrContent === 'object' && payloadOrContent !== null && 'content' in payloadOrContent
+      ? payloadOrContent.content
+      : payloadOrContent
+    const mode = typeof payloadOrContent === 'object' && payloadOrContent !== null && payloadOrContent.mode
+      ? payloadOrContent.mode
+      : 'merge'
+
+    const res = await importBackupJSON(content, mode)
     playBeepSound('success')
-    alert(`Berhasil memulihkan ${res.count} data produk & transaksi!`)
+    triggerCloudAutoBackup()
+    alert(
+      mode === 'replace'
+        ? `Data berhasil diganti penuh dari cadangan (${res.productCount} barang, ${res.customerCount} pelanggan, ${res.transactionCount} transaksi)!`
+        : `Berhasil menggabungkan cadangan (${res.productCount} barang & ${res.transactionCount} transaksi)!`
+    )
   } catch (err) {
     playBeepSound('warning')
     alert('Gagal memulihkan cadangan: ' + err.message)
@@ -395,6 +455,7 @@ const handleImportBackup = async (content) => {
 const handleUpdateProfile = async (newProfile) => {
   await saveStoreProfile(newProfile)
   playBeepSound('success')
+  triggerCloudAutoBackup()
 }
 
 const handleConnectGoogle = async () => {
@@ -414,12 +475,12 @@ const handleDisconnectGoogle = () => {
 const handleSyncCloud = async () => {
   const localPayload = await getFullDatabasePayload()
   const res = await syncWithCloud(localPayload, async (mergedPayload) => {
-    await importBackupJSON(mergedPayload)
+    await importBackupJSON(mergedPayload, 'merge')
   }, false)
 
   if (res.success) {
     playBeepSound('success')
-    alert('Sinkronisasi cloud berhasil! Data antar-perangkat telah cocok.')
+    alert('Sinkronisasi cloud berhasil! Data & cadangan Google Drive sudah diperbarui.')
   } else if (res.error) {
     alert('Gagal sinkronisasi: ' + res.error)
   }
@@ -428,7 +489,7 @@ const handleSyncCloud = async () => {
 const handleOpenGoogleSheet = async () => {
   let sheetId = linkedSheetId.value
   if (!sheetId) {
-    sheetId = await ensureSpreadsheet()
+    sheetId = await ensureSpreadsheet(storeProfile.value?.name)
   }
   if (sheetId) {
     window.open(`https://docs.google.com/spreadsheets/d/${sheetId}`, '_blank')
@@ -438,17 +499,18 @@ const handleOpenGoogleSheet = async () => {
 }
 
 const handleUpdateCustomClientId = (clientId) => {
-  customClientId.value = clientId
-  localStorage.setItem('kasiry_custom_client_id', clientId)
+  setCustomClientId(clientId)
 }
 
 const handleSaveCustomer = async (custData) => {
   await saveCustomer(custData)
   playBeepSound('success')
+  triggerCloudAutoBackup()
 }
 
 const handleDeleteCustomer = async (custId) => {
   await deleteCustomer(custId)
+  triggerCloudAutoBackup()
 }
 
 const handleDownloadExcel = () => {
@@ -523,11 +585,12 @@ onMounted(async () => {
   ensureKasaFocus()
   setTimeout(ensureKasaFocus, 200)
   setTimeout(ensureKasaFocus, 500)
-  // Jika akun Google aktif, lakukan sinkronisasi otomatis diam-diam di latar belakang saat buka aplikasi
-  if (isGoogleConnected.value) {
+  // Jika akun Google aktif, kirim antrean tertunda lalu lakukan sinkronisasi otomatis diam-diam
+  if (isGoogleConnected.value && isOnline.value) {
+    await flushPendingSheetQueue(storeProfile.value?.name)
     const localPayload = await getFullDatabasePayload()
     syncWithCloud(localPayload, async (mergedPayload) => {
-      await importBackupJSON(mergedPayload)
+      await importBackupJSON(mergedPayload, 'merge')
     }, false)
   }
 })
@@ -607,8 +670,8 @@ onMounted(async () => {
       @close="isProductManageOpen = false"
       @saveProduct="handleSaveProduct"
       @deleteProduct="handleDeleteProduct"
-      @addCategory="addCategory"
-      @deleteCategory="deleteCategory"
+      @addCategory="handleAddCategory"
+      @deleteCategory="handleDeleteCategory"
     />
 
     <!-- Modal Pembayaran (Tunai vs Utang) -->
@@ -673,6 +736,11 @@ onMounted(async () => {
       :googleUser="googleUser"
       :lastSyncTime="lastSyncTime"
       :isSyncing="isGoogleSyncing"
+      :lastLocalBackupTime="lastLocalBackupTime"
+      :pendingQueueCount="pendingQueueCount"
+      :hasPendingDriveBackup="hasPendingDriveBackup"
+      :syncStatusMessage="googleSyncStatus"
+      :customClientId="customClientId"
       @close="isSettingsOpen = false"
       @updateProfile="handleUpdateProfile"
       @connectGoogle="handleConnectGoogle"
@@ -681,6 +749,7 @@ onMounted(async () => {
       @openGoogleSheet="handleOpenGoogleSheet"
       @exportBackup="handleExportBackup"
       @importBackup="handleImportBackup"
+      @updateClientId="handleUpdateCustomClientId"
     />
 
     <!-- Modal Struk / Nota Pembayaran Berhasil -->

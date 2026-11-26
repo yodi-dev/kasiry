@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { 
   X, 
   Store, 
@@ -15,7 +15,10 @@ import {
   Check, 
   Smartphone, 
   HardDrive,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle,
+  Clock,
+  KeyRound
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -50,6 +53,26 @@ const props = defineProps({
   isSyncing: {
     type: Boolean,
     default: false
+  },
+  lastLocalBackupTime: {
+    type: String,
+    default: null
+  },
+  pendingQueueCount: {
+    type: Number,
+    default: 0
+  },
+  hasPendingDriveBackup: {
+    type: Boolean,
+    default: false
+  },
+  syncStatusMessage: {
+    type: String,
+    default: ''
+  },
+  customClientId: {
+    type: String,
+    default: ''
   }
 })
 
@@ -61,7 +84,8 @@ const emit = defineEmits([
   'syncNow', 
   'openGoogleSheet', 
   'exportBackup', 
-  'importBackup'
+  'importBackup',
+  'updateClientId'
 ])
 
 // 2 Tabs: 'profile' (Nama Pemilik) | 'backup' (Cadangan & Google)
@@ -70,8 +94,24 @@ const activeTab = ref('profile')
 const formName = ref(props.storeProfile?.name || 'Habiba Store')
 const formOwner = ref(props.storeProfile?.owner || 'Habiba')
 const formPhone = ref(props.storeProfile?.phone || '081234567890')
+const formClientId = ref(props.customClientId || '')
+const showClientIdConfig = ref(false)
+const clientIdSaved = ref(false)
 const fileInputRef = ref(null)
 const isSaved = ref(false)
+
+// Preview & Konfirmasi Restore Backup JSON sebelum menulis ke DB
+const pendingImportPreview = ref(null)
+const importError = ref('')
+
+watch(() => props.isOpen, (newVal) => {
+  if (newVal) {
+    pendingImportPreview.value = null
+    importError.value = ''
+    showClientIdConfig.value = false
+    formClientId.value = props.customClientId || ''
+  }
+})
 
 watch(() => props.storeProfile, (newVal) => {
   if (newVal) {
@@ -80,6 +120,37 @@ watch(() => props.storeProfile, (newVal) => {
     formPhone.value = newVal.phone || '081234567890'
   }
 }, { deep: true, immediate: true })
+
+// Status pengingat cadangan file offline
+const localBackupStatus = computed(() => {
+  if (!props.lastLocalBackupTime) {
+    return {
+      isWarning: true,
+      text: 'Belum pernah download file cadangan ke HP ini'
+    }
+  }
+  const ts = new Date(props.lastLocalBackupTime).getTime()
+  if (Number.isNaN(ts)) {
+    return { isWarning: true, text: 'Belum pernah download cadangan' }
+  }
+  const diffDays = Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24))
+  const formatted = new Date(ts).toLocaleString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  if (diffDays >= 7) {
+    return {
+      isWarning: true,
+      text: `Cadangan terakhir ${diffDays} hari lalu (${formatted}) • Sebaiknya unduh ulang`
+    }
+  }
+  return {
+    isWarning: false,
+    text: `Terakhir dicadangkan: ${formatted}`
+  }
+})
 
 const saveProfile = () => {
   emit('updateProfile', {
@@ -93,24 +164,75 @@ const saveProfile = () => {
   }, 2000)
 }
 
+const saveCustomClientId = () => {
+  emit('updateClientId', formClientId.value.trim())
+  clientIdSaved.value = true
+  setTimeout(() => {
+    clientIdSaved.value = false
+  }, 2000)
+}
+
 const triggerImportFile = () => {
+  importError.value = ''
   fileInputRef.value?.click()
 }
 
 const onFileSelected = (event) => {
   const file = event.target.files?.[0]
   if (!file) return
+  importError.value = ''
+
   const reader = new FileReader()
   reader.onload = (e) => {
     try {
       const content = e.target.result
-      emit('importBackup', content)
+      const parsed = JSON.parse(content)
+      if (!parsed || !parsed.data) {
+        throw new Error('Struktur file JSON bukan cadangan Kasiry yang valid.')
+      }
+      const d = parsed.data
+      const activeProds = Array.isArray(d.products) ? d.products.filter(p => !p.deleted) : []
+      const activeCusts = Array.isArray(d.customers) ? d.customers.filter(c => !c.deleted) : []
+      const txList = Array.isArray(d.transactions) ? d.transactions : []
+
+      pendingImportPreview.value = {
+        fileName: file.name,
+        storeName: parsed.storeProfile?.name || d.settings?.find(s => s.key === 'storeProfile')?.value?.name || 'Toko Kasiry',
+        exportedAt: parsed.exportedAt
+          ? new Date(parsed.exportedAt).toLocaleString('id-ID', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          : 'Tidak diketahui',
+        productCount: activeProds.length,
+        customerCount: activeCusts.length,
+        transactionCount: txList.length,
+        content
+      }
     } catch (err) {
-      alert('Gagal membaca file: ' + err.message)
+      pendingImportPreview.value = null
+      importError.value = 'File tidak valid: ' + err.message
     }
   }
   reader.readAsText(file)
   event.target.value = ''
+}
+
+const confirmImport = (mode) => {
+  if (!pendingImportPreview.value) return
+  emit('importBackup', {
+    content: pendingImportPreview.value.content,
+    mode
+  })
+  pendingImportPreview.value = null
+}
+
+const cancelImport = () => {
+  pendingImportPreview.value = null
+  importError.value = ''
 }
 </script>
 
@@ -377,6 +499,26 @@ const onFileSelected = (event) => {
                 </span>
               </div>
 
+              <!-- Status Antrean Offline / Pending Cloud Sync -->
+              <div 
+                v-if="pendingQueueCount > 0 || hasPendingDriveBackup" 
+                class="p-2.5 bg-amber-50 rounded-xl border border-amber-200/80 text-xs text-amber-800 flex items-center gap-2 font-medium"
+              >
+                <Clock class="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  <template v-if="pendingQueueCount > 0">
+                    {{ pendingQueueCount }} catatan transaksi menunggu koneksi untuk dikirim ke Google Sheets.
+                  </template>
+                  <template v-else>
+                    Perubahan terbaru menunggu giliran auto-backup ke Google Drive.
+                  </template>
+                </span>
+              </div>
+
+              <p v-if="syncStatusMessage" class="text-[11px] text-slate-500 px-0.5 truncate">
+                Status: <span class="font-medium text-slate-700">{{ syncStatusMessage }}</span>
+              </p>
+
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button 
                   @click="emit('syncNow')"
@@ -405,19 +547,131 @@ const onFileSelected = (event) => {
                 </button>
               </div>
             </div>
+
+            <!-- Konfigurasi Lanjutan OAuth Client ID (Collapsible agar tidak mengganggu tampilan utama) -->
+            <div class="pt-2 border-t border-slate-200/70">
+              <button 
+                type="button"
+                @click="showClientIdConfig = !showClientIdConfig"
+                class="text-[11px] font-semibold text-slate-500 hover:text-[#0284c7] flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <KeyRound class="w-3.5 h-3.5" />
+                <span>{{ showClientIdConfig ? 'Tutup Pengaturan Client ID Google' : 'Pengaturan Lanjutan (Google Client ID)' }}</span>
+              </button>
+
+              <div v-if="showClientIdConfig" class="mt-2.5 p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+                <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  OAuth Client ID Khusus Kasiry (Opsional)
+                </label>
+                <div class="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    v-model="formClientId"
+                    placeholder="xxxx.apps.googleusercontent.com"
+                    class="flex-1 h-9 px-3 bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#0284c7] rounded-lg text-xs font-mono text-[#0a193d] outline-hidden"
+                  />
+                  <button 
+                    type="button"
+                    @click="saveCustomClientId"
+                    class="h-9 px-3 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-lg cursor-pointer transition-colors shrink-0"
+                  >
+                    {{ clientIdSaved ? 'Tersimpan ✓' : 'Simpan' }}
+                  </button>
+                </div>
+                <p class="text-[10px] text-slate-400 leading-snug">
+                  Kosongkan untuk memakai Client ID bawaan atau isi milik Google Cloud Console Kasiry agar login aktif di domain sendiri.
+                </p>
+              </div>
+            </div>
           </div>
 
           <!-- 2. Bagian Cadangan File Manual (Offline) -->
           <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
-            <div class="flex items-center gap-2 text-[#0a193d]">
-              <Database class="w-5 h-5 text-[#0284c7]" />
-              <h4 class="text-sm font-bold">Cadangan File di HP (Offline)</h4>
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 text-[#0a193d]">
+                <Database class="w-5 h-5 text-[#0284c7]" />
+                <h4 class="text-sm font-bold">Cadangan File di HP (Offline)</h4>
+              </div>
             </div>
+
+            <!-- Status / Pengingat Waktu Cadangan Lokal -->
+            <div 
+              :class="[
+                'px-3 py-2 rounded-xl border text-[11px] font-semibold flex items-center gap-2',
+                localBackupStatus.isWarning 
+                  ? 'bg-amber-50/90 border-amber-200/80 text-amber-800' 
+                  : 'bg-emerald-50/80 border-emerald-200/80 text-emerald-800'
+              ]"
+            >
+              <AlertCircle v-if="localBackupStatus.isWarning" class="w-3.5 h-3.5 shrink-0 text-amber-600" />
+              <CheckCircle v-else class="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+              <span>{{ localBackupStatus.text }}</span>
+            </div>
+
             <p class="text-xs text-slate-600 leading-relaxed">
               Simpan salinan data toko langsung ke memori HP agar aman tanpa perlu internet.
             </p>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            <!-- Pesan Error File Backup -->
+            <div v-if="importError" class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2">
+              <AlertCircle class="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{{ importError }}</span>
+            </div>
+
+            <!-- Preview & Konfirmasi Aman Sebelum Pulihkan Backup -->
+            <div v-if="pendingImportPreview" class="p-3.5 bg-white border-2 border-[#0284c7] rounded-2xl space-y-3 shadow-xs">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="text-xs font-bold text-[#0a193d]">Konfirmasi Pemulihan Data</p>
+                  <p class="text-[11px] text-slate-500 font-mono truncate">{{ pendingImportPreview.fileName }}</p>
+                </div>
+                <button 
+                  type="button" 
+                  @click="cancelImport"
+                  class="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
+                >
+                  <X class="w-4 h-4" />
+                </button>
+              </div>
+
+              <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
+                <div class="flex justify-between">
+                  <span class="text-slate-500">Toko Asal:</span>
+                  <span class="font-bold text-[#0a193d]">{{ pendingImportPreview.storeName }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500">Tanggal Cadangan:</span>
+                  <span class="font-mono font-medium text-slate-700">{{ pendingImportPreview.exportedAt }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500">Isi Data:</span>
+                  <span class="font-bold text-[#0284c7]">
+                    {{ pendingImportPreview.productCount }} barang • {{ pendingImportPreview.customerCount }} pelanggan • {{ pendingImportPreview.transactionCount }} struk
+                  </span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button 
+                  type="button"
+                  @click="confirmImport('merge')"
+                  class="h-10 px-3 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors shadow-2xs"
+                  title="Tambahkan data yang belum ada tanpa menghapus transaksi baru"
+                >
+                  Gabung Data (Aman)
+                </button>
+                <button 
+                  type="button"
+                  @click="confirmImport('replace')"
+                  class="h-10 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+                  title="Hapus seluruh data saat ini lalu ganti persis seperti isi file cadangan"
+                >
+                  Timpa Total (Reset)
+                </button>
+              </div>
+            </div>
+
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
               <button 
                 @click="emit('exportBackup')"
                 class="p-3 bg-white hover:bg-sky-50/50 border border-slate-200 hover:border-sky-300 text-left rounded-2xl cursor-pointer transition-all active:scale-95 group shadow-2xs"
