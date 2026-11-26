@@ -35,8 +35,17 @@ const isVisibleInstance = () => {
   return Boolean(inputRef.value && inputRef.value.offsetParent !== null)
 }
 
-const focusInput = () => {
+// Hindari autofocus otomatis di perangkat sentuh / ponsel agar virtual keyboard tidak langsung muncul
+const shouldAutoFocus = () => {
+  if (typeof window === 'undefined') return false
+  const isCoarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches
+  const isMobileWidth = window.innerWidth < 768
+  return !isCoarsePointer && !isMobileWidth
+}
+
+const focusInput = (force = false) => {
   if (props.modalOpen || !isVisibleInstance()) return
+  if (!force && !shouldAutoFocus()) return
   nextTick(() => {
     if (props.modalOpen || !isVisibleInstance()) return
     if (inputRef.value) {
@@ -50,14 +59,20 @@ const focusInput = () => {
   })
 }
 
-// Global keydown: hanya instance yang terlihat yang menangkap input barcode / hotkey '/'
+const blurInput = () => {
+  inputRef.value?.blur()
+  isFocused.value = false
+}
+
+// Global keydown: hanya fokus otomatis input di Desktop/keyboard fisik (tidak memicu soft keyboard di HP)
 const handleGlobalKeyDown = (e) => {
   if (props.modalOpen || !isVisibleInstance()) return
+  if (!shouldAutoFocus()) return
   const activeEl = document.activeElement
   if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) return
   if (e.key === '/') {
     e.preventDefault()
-    focusInput()
+    focusInput(true)
     return
   }
   if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey && e.key !== 'F2') {
@@ -65,23 +80,28 @@ const handleGlobalKeyDown = (e) => {
   }
 }
 
-// Autofocus tangguh saat komponen dimuat & saat tab aktif
-onMounted(() => {
+const handleWindowFocus = () => {
   focusInput()
-  setTimeout(focusInput, 50)
-  setTimeout(focusInput, 200)
-  setTimeout(focusInput, 500)
-  window.addEventListener('focus', focusInput)
+}
+
+// Autofocus hanya pada desktop/keyboard non-sentuh
+onMounted(() => {
+  if (shouldAutoFocus()) {
+    focusInput()
+    setTimeout(focusInput, 150)
+  }
+  window.addEventListener('focus', handleWindowFocus)
   window.addEventListener('keydown', handleGlobalKeyDown)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('focus', focusInput)
+  window.removeEventListener('focus', handleWindowFocus)
   window.removeEventListener('keydown', handleGlobalKeyDown)
 })
 
 defineExpose({
-  focusInput
+  focusInput,
+  blurInput
 })
 
 const handleInput = (e) => {
@@ -90,21 +110,35 @@ const handleInput = (e) => {
 
 const clearInput = () => {
   emit('update:searchQuery', '')
-  focusInput()
+  if (shouldAutoFocus()) {
+    focusInput()
+  } else {
+    blurInput()
+  }
 }
 
 const onSelect = (product) => {
   emit('selectProduct', product)
-  clearInput()
+  emit('update:searchQuery', '')
+  if (shouldAutoFocus()) {
+    focusInput()
+  } else {
+    blurInput()
+  }
 }
 
 const onTriggerUnknown = () => {
   const code = props.searchQuery.trim() || '8999999888123'
   emit('triggerLazyInventory', code)
   emit('update:searchQuery', '')
+  if (!shouldAutoFocus()) {
+    blurInput()
+  }
 }
 
-const handleEnter = () => {
+const handleEnter = (e) => {
+  // Jangan submit jika IME keyboard sedang menyusun kata/komposisi
+  if (e?.isComposing || e?.keyCode === 229) return
   if (props.searchResults && props.searchResults.length > 0) {
     onSelect(props.searchResults[0])
   } else if (props.searchQuery.trim().length > 0) {
@@ -128,14 +162,13 @@ const handleEnter = () => {
         <input
           ref="inputRef"
           type="text"
-          autofocus
           :value="searchQuery"
           @input="handleInput"
-          @keydown.enter.prevent="handleEnter"
+          @keydown.enter="handleEnter"
           @keydown.esc="clearInput"
           @focus="isFocused = true"
           @blur="isFocused = false"
-          :placeholder="variant === 'inline' ? 'Cari nama barang atau tembak barcode...' : 'Cari barang / scan barcode...'"
+          :placeholder="variant === 'inline' ? 'Cari nama barang atau scan barcode...' : 'Cari barang / scan barcode...'"
           aria-label="Cari nama barang atau scan barcode"
           class="w-full h-11 sm:h-11 pl-10 pr-10 text-base sm:text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border-2 transition-all outline-none"
           :class="[

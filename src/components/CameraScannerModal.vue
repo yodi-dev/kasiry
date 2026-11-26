@@ -1,6 +1,15 @@
 <script setup>
 import { ref, watch, onUnmounted, nextTick } from 'vue'
 import { X, Camera, SwitchCamera, Zap, AlertCircle, RefreshCw } from '@lucide/vue'
+import {
+  BarcodeFormat,
+  BinaryBitmap,
+  DecodeHintType,
+  GlobalHistogramBinarizer,
+  HTMLCanvasElementLuminanceSource,
+  HybridBinarizer,
+  MultiFormatReader
+} from '@zxing/library'
 
 const props = defineProps({
   isOpen: {
@@ -9,7 +18,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'scan', 'simulateScan'])
+const emit = defineEmits(['close', 'scan'])
 
 const videoRef = ref(null)
 const isLoading = ref(true)
@@ -18,12 +27,56 @@ const errorMessage = ref('')
 const isScanning = ref(false)
 const isTorchOn = ref(false)
 const isTorchSupported = ref(false)
-const isBarcodeDetectorSupported = ref(true)
 const facingMode = ref('environment') // Kamera belakang secara default
+const scannerEngineLabel = ref('Siap memindai')
 
 let stream = null
-let scanAnimationId = null
-let barcodeDetector = null
+let scanTimerId = null
+let nativeDetector = null
+let zxingReader = null
+let scanCanvas = null
+let scanCtx = null
+let frameCounter = 0
+
+// Buat instance ZXing MultiFormatReader sekali saja untuk performa pemindaian kontinyu
+const getZxingReader = () => {
+  if (!zxingReader) {
+    const reader = new MultiFormatReader()
+    const hints = new Map()
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.ITF,
+      BarcodeFormat.QR_CODE,
+      BarcodeFormat.DATA_MATRIX
+    ])
+    hints.set(DecodeHintType.TRY_HARDER, true)
+    reader.setHints(hints)
+    zxingReader = reader
+  }
+  return zxingReader
+}
+
+// Periksa apakah native BarcodeDetector tersedia DAN mendukung format barcode ritel
+const initNativeDetector = async () => {
+  if (typeof window === 'undefined' || !('BarcodeDetector' in window)) return null
+  try {
+    const desired = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'qr_code']
+    if (typeof window.BarcodeDetector.getSupportedFormats === 'function') {
+      const supported = await window.BarcodeDetector.getSupportedFormats()
+      const validFormats = desired.filter(fmt => supported.includes(fmt))
+      if (validFormats.length === 0) return null
+      return new window.BarcodeDetector({ formats: validFormats })
+    }
+    return new window.BarcodeDetector()
+  } catch {
+    return null
+  }
+}
 
 // Audio Beep saat barcode berhasil terdeteksi (seperti kasir supermarket)
 const playBeep = () => {
@@ -41,83 +94,194 @@ const playBeep = () => {
     gain.connect(ctx.destination)
     osc.start()
     osc.stop(ctx.currentTime + 0.12)
-  } catch (e) {
-    // Ignore audio error
+  } catch {
+    // Abaikan jika audio diblokir browser
   }
 }
 
-// Loop pemindaian barcode dengan BarcodeDetector API
-const scanLoop = async () => {
-  if (!isScanning.value || !videoRef.value || !barcodeDetector) return
+const handleDetectedCode = (rawCode) => {
+  const cleanCode = String(rawCode || '').trim()
+  if (!cleanCode || !isScanning.value) return
+  isScanning.value = false
+  playBeep()
+  stopCamera()
+  emit('scan', cleanCode)
+}
 
-  if (videoRef.value.readyState >= 2) {
-    try {
-      const barcodes = await barcodeDetector.detect(videoRef.value)
-      if (barcodes && barcodes.length > 0) {
-        const rawCode = barcodes[0].rawValue
-        if (rawCode) {
-          isScanning.value = false
-          playBeep()
-          stopCamera()
-          emit('scan', rawCode)
-          emit('simulateScan', rawCode)
+// Gambar frame video ke kanvas tersembunyi (fokus area tengah atau penuh secara bergantian)
+const captureFrameToCanvas = (video) => {
+  const vw = video.videoWidth
+  const vh = video.videoHeight
+  if (!vw || !vh) return false
+
+  if (!scanCanvas) {
+    scanCanvas = document.createElement('canvas')
+    scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true })
+  }
+  if (!scanCtx) return false
+
+  frameCounter += 1
+  const useFullFrame = frameCounter % 4 === 0
+  const cropRatioW = useFullFrame ? 1 : 0.82
+  const cropRatioH = useFullFrame ? 1 : 0.62
+
+  const sw = Math.max(1, Math.round(vw * cropRatioW))
+  const sh = Math.max(1, Math.round(vh * cropRatioH))
+  const sx = Math.round((vw - sw) / 2)
+  const sy = Math.round((vh - sh) / 2)
+
+  // Skala sisi terpanjang maksimal 760px agar decode ZXing tetap cepat di orientasi portrait & landscape
+  const maxDim = Math.max(sw, sh)
+  const scale = maxDim > 760 ? 760 / maxDim : 1
+  const dw = Math.max(1, Math.round(sw * scale))
+  const dh = Math.max(1, Math.round(sh * scale))
+
+  if (scanCanvas.width !== dw || scanCanvas.height !== dh) {
+    scanCanvas.width = dw
+    scanCanvas.height = dh
+  }
+
+  scanCtx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh)
+  return true
+}
+
+// Loop pemindaian hybrid: coba native BarcodeDetector (jika ada), lalu fallback ke ZXing JS
+const scanFrame = async () => {
+  if (!isScanning.value || !props.isOpen) return
+
+  const video = videoRef.value
+  if (video && video.readyState >= 2 && captureFrameToCanvas(video)) {
+    // 1. Coba native BarcodeDetector terlebih dahulu jika didukung browser
+    if (nativeDetector) {
+      try {
+        const barcodes = await nativeDetector.detect(scanCanvas)
+        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+          handleDetectedCode(barcodes[0].rawValue)
           return
         }
+      } catch {
+        // Jika gagal saat runtime, nonaktifkan native agar langsung memakai ZXing
+        nativeDetector = null
       }
-    } catch (err) {
-      // Lanjutkan loop frame berikutnya
+    }
+
+    // 2. Fallback universal via @zxing/library (jalan di iOS Safari, Android Chrome/WebView, Firefox, Desktop)
+    try {
+      const reader = getZxingReader()
+      const luminance = new HTMLCanvasElementLuminanceSource(scanCanvas)
+      const useHistogram = frameCounter % 2 === 0
+      const binarizer = useHistogram
+        ? new GlobalHistogramBinarizer(luminance)
+        : new HybridBinarizer(luminance)
+      const bitmap = new BinaryBitmap(binarizer)
+      const result = reader.decodeWithState(bitmap)
+      const text = result?.getText?.()
+      if (text) {
+        handleDetectedCode(text)
+        return
+      }
+    } catch {
+      // NotFoundException normal saat frame belum memuat barcode
     }
   }
 
-  if (isScanning.value) {
-    scanAnimationId = requestAnimationFrame(scanLoop)
+  if (isScanning.value && props.isOpen) {
+    scanTimerId = window.setTimeout(scanFrame, 110)
   }
 }
 
+const waitForVideoReady = (video) => {
+  return new Promise((resolve) => {
+    if (video.videoWidth > 0 && video.readyState >= 2) {
+      resolve()
+      return
+    }
+    const onReady = () => {
+      video.removeEventListener('loadedmetadata', onReady)
+      video.removeEventListener('canplay', onReady)
+      resolve()
+    }
+    video.addEventListener('loadedmetadata', onReady, { once: true })
+    video.addEventListener('canplay', onReady, { once: true })
+    window.setTimeout(onReady, 1500)
+  })
+}
+
+const releaseStream = (targetStream) => {
+  if (!targetStream) return
+  targetStream.getTracks().forEach(track => track.stop())
+}
+
 const startCamera = async () => {
+  stopCamera()
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true
   isTorchOn.value = false
+  isTorchSupported.value = false
+  frameCounter = 0
+
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    isLoading.value = false
+    hasError.value = true
+    errorMessage.value = 'Kamera tidak tersedia. Pastikan aplikasi dibuka lewat koneksi HTTPS yang aman dan izin kamera aktif.'
+    return
+  }
 
   try {
-    const constraints = {
-      video: {
-        facingMode: { ideal: facingMode.value },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+    let acquiredStream = null
+    try {
+      acquiredStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: facingMode.value },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      })
+    } catch (constraintErr) {
+      if (constraintErr?.name === 'OverconstrainedError' || constraintErr?.name === 'ConstraintNotSatisfiedError') {
+        acquiredStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: facingMode.value }
+        })
+      } else {
+        throw constraintErr
       }
     }
 
-    stream = await navigator.mediaDevices.getUserMedia(constraints)
-    if (videoRef.value) {
-      videoRef.value.srcObject = stream
-      await videoRef.value.play()
+    // Jika modal keburu ditutup saat izin kamera baru selesai diberikan, langsung matikan stream
+    if (!props.isOpen) {
+      releaseStream(acquiredStream)
+      return
     }
 
-    // Periksa dukungan senter (torch)
+    stream = acquiredStream
+    const video = videoRef.value
+    if (video) {
+      video.setAttribute('playsinline', 'true')
+      video.srcObject = stream
+      await video.play()
+      await waitForVideoReady(video)
+    }
+
+    // Periksa dukungan senter (torch) & autofokus kontinu pada lensa HP
     const track = stream.getVideoTracks()[0]
     if (track && 'getCapabilities' in track) {
       const capabilities = track.getCapabilities()
       isTorchSupported.value = !!capabilities.torch
+      if (Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes('continuous')) {
+        track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
+      }
     }
+
+    nativeDetector = await initNativeDetector()
+    getZxingReader()
+    scannerEngineLabel.value = nativeDetector ? 'Pindai otomatis aktif (Hybrid)' : 'Pindai otomatis aktif'
 
     isLoading.value = false
     isScanning.value = true
-
-    // Inisialisasi BarcodeDetector API bawaan peramban
-    if ('BarcodeDetector' in window) {
-      try {
-        barcodeDetector = new window.BarcodeDetector({
-          formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e']
-        })
-      } catch (e) {
-        barcodeDetector = new window.BarcodeDetector()
-      }
-      scanAnimationId = requestAnimationFrame(scanLoop)
-    } else {
-      isBarcodeDetectorSupported.value = false
-    }
+    scanTimerId = window.setTimeout(scanFrame, 120)
   } catch (err) {
     isLoading.value = false
     hasError.value = true
@@ -125,6 +289,8 @@ const startCamera = async () => {
       errorMessage.value = 'Izin kamera ditolak. Silakan berikan izin akses kamera pada peramban Anda.'
     } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
       errorMessage.value = 'Perangkat kamera tidak ditemukan di perangkat ini.'
+    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      errorMessage.value = 'Kamera sedang dipakai aplikasi lain. Tutup aplikasi kamera lain lalu coba lagi.'
     } else {
       errorMessage.value = 'Tidak dapat membuka kamera: ' + (err.message || 'Terjadi kesalahan')
     }
@@ -133,12 +299,12 @@ const startCamera = async () => {
 
 const stopCamera = () => {
   isScanning.value = false
-  if (scanAnimationId) {
-    cancelAnimationFrame(scanAnimationId)
-    scanAnimationId = null
+  if (scanTimerId) {
+    clearTimeout(scanTimerId)
+    scanTimerId = null
   }
   if (stream) {
-    stream.getTracks().forEach(track => track.stop())
+    releaseStream(stream)
     stream = null
   }
   if (videoRef.value) {
@@ -151,19 +317,19 @@ const toggleTorch = async () => {
   const track = stream.getVideoTracks()[0]
   if (track && 'applyConstraints' in track) {
     try {
-      isTorchOn.value = !isTorchOn.value
+      const nextState = !isTorchOn.value
       await track.applyConstraints({
-        advanced: [{ torch: isTorchOn.value }]
+        advanced: [{ torch: nextState }]
       })
-    } catch (e) {
-      // Torch gagal
+      isTorchOn.value = nextState
+    } catch {
+      // Torch tidak didukung pada kondisi ini
     }
   }
 }
 
 const toggleCamera = () => {
   facingMode.value = facingMode.value === 'environment' ? 'user' : 'environment'
-  stopCamera()
   startCamera()
 }
 
@@ -179,6 +345,8 @@ watch(() => props.isOpen, (newVal) => {
 
 onUnmounted(() => {
   stopCamera()
+  zxingReader = null
+  nativeDetector = null
 })
 </script>
 
@@ -195,11 +363,13 @@ onUnmounted(() => {
           <h3 class="font-bold text-sm text-white">Scanner Barcode Kamera</h3>
         </div>
         <button 
+          type="button"
           @click="emit('close')"
-          class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+          aria-label="Tutup scanner kamera"
+          class="w-9 h-9 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
           title="Tutup"
         >
-          <X class="w-4 h-4" />
+          <X aria-hidden="true" class="w-4 h-4" />
         </button>
       </div>
 
@@ -271,7 +441,7 @@ onUnmounted(() => {
           <!-- Petunjuk Pindai -->
           <div class="absolute bottom-3 inset-x-4 text-center z-20 pointer-events-none">
             <p class="text-[11px] text-white/95 font-medium bg-black/60 backdrop-blur-xs py-1 px-3.5 rounded-full inline-block border border-white/10 shadow-sm">
-              Posisikan barcode di dalam kotak
+              Posisikan barcode di dalam kotak • {{ scannerEngineLabel }}
             </p>
           </div>
         </template>
@@ -283,29 +453,32 @@ onUnmounted(() => {
           <!-- Tombol Senter (Torch) -->
           <button 
             v-if="isTorchSupported"
+            type="button"
             @click="toggleTorch"
-            class="h-9 px-3 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+            class="h-10 px-3 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
             :class="isTorchOn ? 'bg-amber-400/20 border-amber-400 text-amber-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'"
             title="Senter"
           >
-            <Zap class="w-3.5 h-3.5" :class="isTorchOn ? 'fill-amber-400' : ''" />
+            <Zap aria-hidden="true" class="w-3.5 h-3.5" :class="isTorchOn ? 'fill-amber-400' : ''" />
             <span>{{ isTorchOn ? 'Senter Aktif' : 'Senter' }}</span>
           </button>
 
           <!-- Tombol Balik Kamera (Depan / Belakang) -->
           <button 
+            type="button"
             @click="toggleCamera"
-            class="h-9 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+            class="h-10 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
             title="Ganti Kamera"
           >
-            <SwitchCamera class="w-3.5 h-3.5 text-sky-400" />
+            <SwitchCamera aria-hidden="true" class="w-3.5 h-3.5 text-sky-400" />
             <span>Balik</span>
           </button>
         </div>
 
         <button 
+          type="button"
           @click="emit('close')"
-          class="h-9 px-4 bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs rounded-xl cursor-pointer transition-colors"
+          class="h-10 px-4 bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs rounded-xl cursor-pointer transition-colors"
         >
           Tutup
         </button>

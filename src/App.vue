@@ -819,7 +819,6 @@ onUnmounted(() => {
       :isOpen="isCameraOpen"
       @close="isCameraOpen = false"
       @scan="handleBarcodeScan"
-      @simulateScan="handleBarcodeScan"
     />
   </div>
 </template>

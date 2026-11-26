@@ -64,7 +64,7 @@ const totalItemCount = computed(() => {
         </div>
         <p class="font-bold text-[#0a193d] text-sm">Keranjang Masih Kosong</p>
         <p class="text-xs text-slate-400 mt-1 max-w-[230px]">
-          <span class="md:hidden">Ketuk barang cepat di bawah atau tembak barcode.</span>
+          <span class="md:hidden">Ketuk barang cepat di bawah atau scan barcode.</span>
           <span class="hidden md:inline">Ketuk produk di sebelah kanan atau scan barcode untuk mulai transaksi.</span>
         </p>
       </div>
