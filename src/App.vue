@@ -736,6 +736,7 @@ onMounted(async () => {
       :googleUser="googleUser"
       :lastSyncTime="lastSyncTime"
       :isSyncing="isGoogleSyncing"
+      :isConnecting="isGoogleConnecting"
       :lastLocalBackupTime="lastLocalBackupTime"
       :pendingQueueCount="pendingQueueCount"
       :hasPendingDriveBackup="hasPendingDriveBackup"

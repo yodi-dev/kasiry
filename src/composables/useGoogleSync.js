@@ -86,11 +86,30 @@ export function useGoogleSync() {
         return
       }
 
+      if (!activeClientId.value) {
+        reject(new Error('Google OAuth Client ID belum dikonfigurasi.'))
+        return
+      }
+
       try {
+        let settled = false
         const tokenClient = window.google.accounts.oauth2.initTokenClient({
           client_id: activeClientId.value,
           scope: SCOPES,
+          error_callback: (err) => {
+            if (settled) return
+            settled = true
+            let msg = 'Login Google dibatalkan atau gagal membuka jendela.'
+            if (err?.type === 'popup_failed_to_open') {
+              msg = 'Pop-up login Google diblokir oleh peramban. Silakan izinkan pop-up lalu coba lagi.'
+            } else if (err?.type === 'popup_closed') {
+              msg = 'Jendela login Google ditutup sebelum selesai.'
+            }
+            reject(new Error(msg))
+          },
           callback: async (resp) => {
+            if (settled) return
+            settled = true
             if (resp.error) {
               let errorDetail = resp.error
               if (resp.error === 'access_denied') {
