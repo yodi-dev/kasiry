@@ -447,9 +447,9 @@ const submitPayment = () => {
 
       <!-- KPI Strip Atas (Selalu Terlihat Tanpa Scroll di Laptop & HP: Total Tagihan | Kembalian / Status) -->
       <div class="mx-5 my-2.5 grid grid-cols-2 gap-2.5 shrink-0">
-        <div class="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 to-[#0a193d] text-white shadow-xs flex flex-col justify-center">
+        <div class="min-w-0 p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 to-[#0a193d] text-white shadow-xs flex flex-col justify-center">
           <span class="text-[10px] sm:text-xs font-bold text-sky-300 uppercase tracking-wider">Total Tagihan</span>
-          <span class="text-lg sm:text-2xl font-extrabold tracking-tight text-white font-mono mt-0.5 truncate">
+          <span class="text-base sm:text-xl lg:text-2xl font-extrabold tracking-tight text-white font-mono mt-0.5 leading-tight break-words">
             Rp {{ totalAmount.toLocaleString('id-ID') }}
           </span>
         </div>
@@ -457,7 +457,7 @@ const submitPayment = () => {
         <div
           v-if="activeTab === 'cash'"
           :class="[
-            'p-3 sm:p-3.5 rounded-2xl border shadow-xs flex flex-col justify-center transition-colors',
+            'min-w-0 p-3 sm:p-3.5 rounded-2xl border shadow-xs flex flex-col justify-center transition-colors',
             isCashSufficient
               ? 'bg-emerald-50 border-emerald-200'
               : 'bg-rose-50 border-rose-200'
@@ -465,7 +465,7 @@ const submitPayment = () => {
         >
           <span
             :class="[
-              'text-[10px] sm:text-xs font-bold uppercase tracking-wider',
+              'text-[10px] sm:text-xs font-bold uppercase tracking-wider leading-tight',
               isCashSufficient ? 'text-emerald-800' : 'text-rose-700'
             ]"
           >
@@ -473,7 +473,7 @@ const submitPayment = () => {
           </span>
           <span
             :class="[
-              'text-lg sm:text-2xl font-extrabold font-mono mt-0.5 truncate',
+              'text-base sm:text-xl lg:text-2xl font-extrabold font-mono mt-0.5 leading-tight break-words',
               isCashSufficient ? 'text-emerald-700' : 'text-rose-600'
             ]"
           >
@@ -483,20 +483,23 @@ const submitPayment = () => {
 
         <div
           v-else-if="activeTab === 'qris'"
-          class="p-3 sm:p-3.5 rounded-2xl border border-sky-200 bg-sky-50/90 shadow-xs flex flex-col justify-center"
+          class="min-w-0 p-3 sm:p-3.5 rounded-2xl border border-sky-200 bg-sky-50/90 shadow-xs flex flex-col justify-center"
         >
-          <span class="text-[10px] sm:text-xs font-bold text-[#0284c7] uppercase tracking-wider">Metode QRIS</span>
-          <span class="text-base sm:text-xl font-extrabold text-[#0a193d] mt-0.5 truncate">
-            Uang Pas (Non-Tunai)
+          <span class="text-[10px] sm:text-xs font-bold text-[#0284c7] uppercase tracking-wider leading-tight">Metode QRIS</span>
+          <span class="text-base sm:text-xl font-extrabold text-[#0a193d] mt-0.5 leading-tight">
+            Uang Pas ✓
+          </span>
+          <span class="text-[11px] font-semibold text-sky-700 leading-tight mt-0.5">
+            Non-Tunai (Otomatis Pas)
           </span>
         </div>
 
         <div
           v-else
-          class="p-3 sm:p-3.5 rounded-2xl border border-amber-200 bg-amber-50/90 shadow-xs flex flex-col justify-center"
+          class="min-w-0 p-3 sm:p-3.5 rounded-2xl border border-amber-200 bg-amber-50/90 shadow-xs flex flex-col justify-center"
         >
-          <span class="text-[10px] sm:text-xs font-bold text-amber-800 uppercase tracking-wider">Masuk Buku Bon</span>
-          <span class="text-sm sm:text-base font-extrabold text-[#0a193d] mt-0.5 truncate">
+          <span class="text-[10px] sm:text-xs font-bold text-amber-800 uppercase tracking-wider leading-tight">Masuk Buku Bon</span>
+          <span class="text-sm sm:text-base font-extrabold text-[#0a193d] mt-0.5 leading-tight line-clamp-2 break-words">
             {{ selectedCustomer?.name || (customerQuery.trim() && !isDebtQueryUmum ? customerQuery.trim() : 'Pilih Pelanggan') }}
           </span>
         </div>

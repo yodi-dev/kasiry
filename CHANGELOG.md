@@ -6,6 +6,13 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.8.3] - 2026-11-26 (Hotfix Tampilan Kartu QRIS & KPI Strip PaymentModal)
+
+### Fixed
+- Menambahkan `min-w-0` dan menghapus pemotongan satu baris (`truncate`) pada kotak KPI atas di `src/components/PaymentModal.vue` (`Total Tagihan`, `Uang Kembalian`, `Metode QRIS`, dan `Masuk Buku Bon`), serta memecah teks status QRIS menjadi **`Uang Pas ✓`** dengan sublabel **`Non-Tunai (Otomatis Pas)`** agar tidak terpotong di HP maupun laptop.
+
+---
+
 ## [2.8.2] - 2026-11-26 (Optimasi Tampilan Laptop Modal Bayar & Isolasi Cetak Termal)
 
 ### Fixed

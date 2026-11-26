@@ -88,6 +88,7 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await qrisTabBtn.trigger('click')
     await nextTick()
 
+    expect(wrapper.text()).toContain('Non-Tunai (Otomatis Pas)')
     expect(wrapper.text()).toContain('Pembayaran QRIS (Uang Pas)')
     expect(wrapper.text()).toContain('Konfirmasi Bayar QRIS')
     const confirmQrisBtn = wrapper.findAll('button').find(b => b.text().includes('Konfirmasi Bayar QRIS'))
