@@ -597,7 +597,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col antialiased pb-44 sm:pb-48" @click="handleKasaClick">
+  <div
+    class="min-h-dvh flex flex-col antialiased transition-[padding] duration-200"
+    :class="cart.length > 0 ? 'pb-40 sm:pb-44 lg:pb-36' : 'pb-24 sm:pb-28'"
+    @click="handleKasaClick"
+  >
     <!-- 1. Top Bar Header -->
     <TopBar 
       :storeName="storeProfile.name"
@@ -614,12 +618,12 @@ onMounted(async () => {
       @drawerClosed="ensureKasaFocus"
     />
 
-    <!-- 2. Ergonomic Workspace (Keranjang Tetap di Paling Atas) -->
-    <main class="w-full max-w-5xl mx-auto px-4 py-2">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
+    <!-- 2. Ergonomic Workspace (Mobile: Keranjang di Atas; Tablet & Desktop: Kiri-Kanan Seimbang) -->
+    <main class="w-full max-w-6xl mx-auto px-3 sm:px-5 lg:px-6 pt-1 pb-2 flex-1 flex flex-col">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 md:gap-4 lg:gap-6 items-start">
         
-        <!-- BAGIAN 1: KERANJANG BELANJAAN / STRUK (Paling Atas di Layar) -->
-        <div class="lg:col-span-6 xl:col-span-6 flex flex-col gap-3">
+        <!-- BAGIAN 1: KERANJANG BELANJAAN / STRUK -->
+        <div class="md:col-span-5 md:sticky md:top-3 flex flex-col gap-3 min-w-0">
           <CartSection 
             :cartItems="cart"
             @increaseQty="increaseQty"
@@ -629,8 +633,8 @@ onMounted(async () => {
           />
         </div>
 
-        <!-- BAGIAN 2: BARANG SERING TERJUAL (Tombol Cepat di Bawah Keranjang) -->
-        <div class="lg:col-span-6 xl:col-span-6 flex flex-col gap-3">
+        <!-- BAGIAN 2: BARANG SERING TERJUAL -->
+        <div class="md:col-span-7 flex flex-col gap-3 min-w-0">
           <FrequentProductsSection 
             :frequentProducts="frequentProducts"
             @selectProduct="addToCart"
@@ -639,10 +643,10 @@ onMounted(async () => {
 
       </div>
 
-      <!-- Subtle App Identity & Compliance Links -->
-      <footer class="mt-6 pt-3 border-t border-[#0a193d]/10 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+      <!-- Kepatuhan & Identitas Aplikasi (Khusus Desktop agar Layar Transaksi Mobile & Tablet Bebas Gangguan) -->
+      <footer class="hidden lg:flex mt-auto pt-6 border-t border-[#0a193d]/8 items-center justify-between gap-2 text-[11px] text-slate-400">
         <span>
-          <strong class="font-semibold text-[#0a193d]/80">Kasiry</strong> — Aplikasi Kasir Warung &amp; Pencadangan Buku Kas
+          <strong class="font-semibold text-[#0a193d]/70">Kasiry</strong> — Aplikasi Kasir Warung &amp; Pencadangan Buku Kas
         </span>
         <nav class="flex items-center gap-3" aria-label="Tautan Kepatuhan">
           <a href="/privacy.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Kebijakan Privasi</a>
@@ -653,7 +657,7 @@ onMounted(async () => {
     </main>
 
     <!-- 3. Floating Sticky Bottom Console (Input Barcode Sticky Tepat di Atas Total Tagihan) -->
-    <div class="fixed bottom-3 sm:bottom-4 inset-x-3 sm:inset-x-4 max-w-4xl mx-auto z-30 flex flex-col gap-2">
+    <div class="safe-bottom-dock fixed inset-x-3 sm:inset-x-5 max-w-3xl lg:max-w-4xl mx-auto z-30 flex flex-col gap-2">
       <!-- Form Input Barcode & Search (Sticky di Atas Total Tagihan, Autofocus, Dropdown Membuka ke Atas) -->
       <BarcodeInputBar 
         ref="barcodeInputBarRef"

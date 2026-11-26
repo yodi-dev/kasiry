@@ -73,30 +73,38 @@ const triggerAction = (actionEvent) => {
 </script>
 
 <template>
-  <header class="w-full max-w-5xl mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
-    <!-- Left: Sleek 2-Line Hamburger Menu Icon (matches reference) -->
+  <header class="w-full max-w-6xl mx-auto px-3 sm:px-5 lg:px-6 pt-3 sm:pt-4 pb-2 flex items-center justify-between gap-2">
+    <!-- Left: Sleek 2-Line Hamburger Menu Icon -->
     <button 
+      type="button"
       @click="isDrawerOpen = true"
-      class="w-10 h-10 rounded-2xl bg-white/70 hover:bg-white text-[#0a193d] flex flex-col items-start justify-center gap-1.5 px-2.5 shadow-xs border border-white/80 cursor-pointer transition-all"
+      class="w-11 h-11 sm:w-10 sm:h-10 rounded-2xl bg-white/75 hover:bg-white text-[#0a193d] flex flex-col items-start justify-center gap-1.5 px-3 sm:px-2.5 shadow-xs border border-white/80 cursor-pointer transition-all shrink-0"
       aria-label="Buka Menu"
     >
-      <span class="w-5 h-0.5 bg-[#0a193d] rounded-full"></span>
-      <span class="w-3.5 h-0.5 bg-[#0a193d] rounded-full"></span>
+      <span aria-hidden="true" class="w-5 h-0.5 bg-[#0a193d] rounded-full"></span>
+      <span aria-hidden="true" class="w-3.5 h-0.5 bg-[#0a193d] rounded-full"></span>
     </button>
 
     <!-- Center: Brand Title -->
-    <div class="text-center leading-tight">
+    <div class="min-w-0 flex-1 px-1 text-center leading-tight">
       <span class="block text-[10px] font-bold tracking-[0.14em] uppercase text-[#0284c7]">Kasiry</span>
-      <h1 class="text-sm font-bold text-[#0a193d] tracking-tight">{{ storeName }}</h1>
+      <h1 class="text-sm sm:text-base font-bold text-[#0a193d] tracking-tight truncate">{{ storeName }}</h1>
       <p class="text-[11px] text-slate-500 font-medium">{{ todayFormatted }}</p>
     </div>
 
-    <!-- Right: User/Store Profile Avatar (matches reference) -->
-    <div class="relative cursor-pointer" @click="emit('openSettings')" role="button" title="Profil & Pengaturan Toko">
-      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#0284c7] to-[#38bdf8] p-0.5 shadow-sm border border-white/80 flex items-center justify-center overflow-hidden">
+    <!-- Right: User/Store Profile Avatar -->
+    <button 
+      type="button"
+      class="relative cursor-pointer shrink-0 rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0284c7]" 
+      @click="emit('openSettings')" 
+      aria-label="Profil dan Pengaturan Toko"
+      title="Profil & Pengaturan Toko"
+    >
+      <div class="w-11 h-11 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-[#0284c7] to-[#38bdf8] p-0.5 shadow-sm border border-white/80 flex items-center justify-center overflow-hidden">
         <img 
           v-if="isGoogleConnected && googleUser?.picture" 
           :src="googleUser.picture" 
+          :alt="googleUser?.name || storeName"
           referrerpolicy="no-referrer"
           class="w-full h-full rounded-[14px] object-cover"
         />
@@ -106,11 +114,12 @@ const triggerAction = (actionEvent) => {
       </div>
       <!-- Online / Cloud Sync Status Dot -->
       <span 
+        aria-hidden="true"
         class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center text-[7px] text-white"
         :class="isGoogleConnected ? 'bg-emerald-500' : isOnline ? 'bg-sky-500' : 'bg-slate-400'"
         :title="isGoogleConnected ? 'Cloud Sync Aktif' : isOnline ? 'Online' : 'Offline'"
       ></span>
-    </div>
+    </button>
 
     <!-- Navigation Drawer -->
     <div 
@@ -209,19 +218,26 @@ const triggerAction = (actionEvent) => {
           </nav>
         </div>
 
-        <div class="p-4 border-t border-slate-100 text-xs text-slate-500">
-          <p class="font-bold text-slate-700">Kasiry</p>
-          <p class="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
-            <span>Crafted with ❤️ by</span>
-            <a 
-              href="https://awanbeo.my.id" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              class="font-bold text-[#0284c7] hover:underline"
-            >
-              awanbeo
-            </a>
-          </p>
+        <div class="p-4 border-t border-slate-100 text-xs text-slate-500 space-y-2">
+          <div>
+            <p class="font-bold text-slate-700">Kasiry</p>
+            <p class="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+              <span>Crafted with ❤️ by</span>
+              <a 
+                href="https://awanbeo.my.id" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                class="font-bold text-[#0284c7] hover:underline"
+              >
+                awanbeo
+              </a>
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2.5 pt-1 text-[11px] text-slate-400">
+            <a href="/privacy.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2">Kebijakan Privasi</a>
+            <span aria-hidden="true">•</span>
+            <a href="/terms.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2">Ketentuan Layanan</a>
+          </div>
         </div>
       </div>
     </div>

@@ -27,25 +27,26 @@ const emit = defineEmits(['openPayment'])
     <!-- Hanya muncul jika ada data di keranjang (itemCount > 0) -->
     <div 
       v-if="itemCount > 0"
-      class="w-full bg-[#0a193d]/95 backdrop-blur-xl border border-white/10 text-white rounded-[24px] sm:rounded-[28px] p-3 sm:p-3.5 shadow-2xl shadow-sky-950/30 flex items-center justify-between gap-3"
+      class="w-full bg-[#0a193d]/95 backdrop-blur-xl border border-white/10 text-white rounded-[22px] sm:rounded-[26px] p-2.5 sm:p-3.5 shadow-2xl shadow-sky-950/30 flex items-center justify-between gap-2.5 sm:gap-3"
     >
       <!-- Total Tagihan -->
-      <div class="pl-2 sm:pl-3 min-w-0">
-        <p class="text-[11px] font-semibold text-sky-200/70 uppercase tracking-wide">
+      <div class="pl-2 sm:pl-3 min-w-0 flex-1">
+        <p class="text-[10px] sm:text-[11px] font-semibold text-sky-200/75 uppercase tracking-wide truncate">
           Total Tagihan ({{ itemCount }} Pcs)
         </p>
-        <p class="font-black text-white text-xl sm:text-2xl tracking-tight leading-none mt-0.5">
+        <p class="font-black text-white text-lg sm:text-2xl tracking-tight leading-none mt-0.5 tabular-nums truncate">
           Rp {{ totalAmount.toLocaleString('id-ID') }}
         </p>
       </div>
 
-      <!-- Tombol Pembayaran (Teks baru: Pembayaran) -->
+      <!-- Tombol Pembayaran -->
       <button 
+        type="button"
         @click="emit('openPayment')"
-        class="h-11 sm:h-12 px-5 sm:px-8 bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-400 hover:to-sky-500 active:scale-95 text-white rounded-2xl font-bold text-sm sm:text-base shadow-lg shadow-sky-500/30 flex items-center gap-2 cursor-pointer transition-all"
+        class="h-11 sm:h-12 px-4 sm:px-7 bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-400 hover:to-sky-500 active:scale-95 text-white rounded-2xl font-bold text-sm sm:text-base shadow-lg shadow-sky-500/30 flex items-center gap-1.5 sm:gap-2 cursor-pointer transition-all shrink-0 whitespace-nowrap"
       >
         <span>Pembayaran</span>
-        <ArrowRight class="w-4 h-4 stroke-[2.5]" />
+        <ArrowRight aria-hidden="true" class="w-4 h-4 stroke-[2.5]" />
       </button>
     </div>
   </Transition>

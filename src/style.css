@@ -7,6 +7,11 @@
   --color-canvas-bg: #ebf4fc;
 }
 
+/* Viewport & scroll offset agar elemen fokus tidak tertutup sticky console bawah */
+html {
+  scroll-padding-bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+}
+
 /* Background Ethereal Soft Light Blue */
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "Segoe UI", Roboto, sans-serif;
@@ -15,7 +20,128 @@ body {
   color: #0a193d;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-wrap: break-word;
   min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Typographic balance & legibility */
+h1, h2, h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+
+/* Sticky bottom dock menghormati notch / gesture bar HP (safe-area) */
+.safe-bottom-dock {
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 640px) {
+  .safe-bottom-dock {
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Scroll container dengan scrollbar stabil & tanpa scroll chaining ke halaman */
+.kasiry-scroll-pane {
+  scrollbar-gutter: stable;
+  overscroll-behavior-y: contain;
+}
+
+/* Container query: Grid Barang Sering Terjual beradaptasi ke lebar panelnya */
+.products-pane-container {
+  container: products-pane / inline-size;
+}
+.frequent-products-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@container products-pane (inline-size >= 400px) {
+  .frequent-products-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container products-pane (inline-size >= 560px) {
+  .frequent-products-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Container query: Baris Struk Keranjang rapi di layar sempit maupun lebar */
+.cart-pane-container {
+  container: cart-pane / inline-size;
+}
+.cart-item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "info subtotal"
+    "unit controls";
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+}
+.cart-item-info {
+  grid-area: info;
+  min-width: 0;
+}
+.cart-item-unit {
+  grid-area: unit;
+}
+.cart-item-controls {
+  grid-area: controls;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.cart-item-subtotal {
+  grid-area: subtotal;
+  text-align: right;
+}
+.cart-wide-unit,
+.cart-wide-remove {
+  display: none;
+}
+@container cart-pane (inline-size >= 385px) {
+  .cart-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+  }
+  .cart-item-info {
+    flex: 1 1 0%;
+  }
+  .cart-item-unit,
+  .cart-narrow-remove {
+    display: none;
+  }
+  .cart-wide-unit {
+    display: block;
+  }
+  .cart-wide-remove {
+    display: inline-flex;
+  }
+  .cart-item-controls {
+    order: 2;
+  }
+  .cart-item-subtotal {
+    order: 3;
+    min-width: 78px;
+  }
+}
+
+/* Perluas hit area kontrol kecil khusus perangkat sentuh tanpa mengubah visual */
+@media (pointer: coarse) {
+  .touch-hit-target {
+    position: relative;
+  }
+  .touch-hit-target::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+  }
 }
 
 /* Custom Sleek Scrollbar */
@@ -46,4 +172,9 @@ body {
 /* Smooth micro-interactions */
 button:active:not(:disabled) {
   transform: scale(0.96);
+}
+@media (prefers-reduced-motion: reduce) {
+  button:active:not(:disabled) {
+    transform: none;
+  }
 }

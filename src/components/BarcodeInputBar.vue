@@ -103,14 +103,14 @@ const handleEnter = () => {
 
 <template>
   <div class="relative w-full">
-    <!-- Form Input Barcode & Search (Floating Glassmorphism Pill tepat di atas Keranjang) -->
+    <!-- Form Input Barcode & Search -->
     <div class="flex items-center gap-2">
-      <div class="relative flex-1">
+      <div class="relative flex-1 min-w-0">
         <div 
           class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors"
           :class="isFocused ? 'text-sky-600' : 'text-slate-400'"
         >
-          <Search class="w-4 h-4" />
+          <Search aria-hidden="true" class="w-4 h-4" />
         </div>
 
         <input
@@ -122,27 +122,32 @@ const handleEnter = () => {
           @keydown.enter.prevent="handleEnter"
           @focus="isFocused = true"
           @blur="isFocused = false"
-          placeholder="Cari nama barang atau scan barcode..."
-          class="w-full h-11 sm:h-12 pl-10 pr-9 text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border-2 transition-all shadow-md outline-none"
+          placeholder="Cari barang / scan barcode..."
+          aria-label="Cari nama barang atau scan barcode"
+          class="w-full h-11 sm:h-12 pl-10 pr-10 text-base sm:text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border-2 transition-all shadow-md outline-none"
           :class="isFocused ? 'border-sky-500 ring-4 ring-sky-500/20 bg-white' : 'border-slate-200/80 hover:border-slate-300'"
         />
 
         <button 
           v-if="searchQuery"
+          type="button"
           @click="clearInput"
-          class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+          aria-label="Bersihkan pencarian"
+          class="touch-hit-target absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
         >
-          <X class="w-4 h-4" />
+          <X aria-hidden="true" class="w-4 h-4" />
         </button>
       </div>
 
       <!-- Tombol Scan Barcode Kamera -->
       <button 
+        type="button"
         @click="emit('openCamera')"
-        class="h-11 sm:h-12 px-3 sm:px-3.5 bg-[#0a193d] hover:bg-[#102b66] text-white rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors active:scale-95 shrink-0 shadow-sm"
+        aria-label="Buka kamera scanner barcode"
+        class="h-11 sm:h-12 min-w-11 px-3 sm:px-3.5 bg-[#0a193d] hover:bg-[#102b66] text-white rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors active:scale-95 shrink-0 shadow-sm"
         title="Buka Kamera Barcode"
       >
-        <Camera class="w-4 h-4 text-sky-400" />
+        <Camera aria-hidden="true" class="w-4 h-4 text-sky-400" />
         <span class="hidden sm:inline text-xs font-semibold">Scan</span>
       </button>
     </div>
@@ -150,7 +155,7 @@ const handleEnter = () => {
     <!-- Dropdown Hasil Pencarian Dinamis (Membuka ke Atas karena Posisi Input Sticky di Bawah) -->
     <div 
       v-if="searchQuery.trim().length > 0"
-      class="absolute left-0 right-0 bottom-full mb-2.5 bg-white/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden divide-y divide-slate-100 max-h-60 overflow-y-auto"
+      class="kasiry-scroll-pane absolute left-0 right-0 bottom-full mb-2.5 bg-white/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden divide-y divide-slate-100 max-h-[42dvh] sm:max-h-64 overflow-y-auto"
     >
       <div 
         v-for="product in searchResults" 
