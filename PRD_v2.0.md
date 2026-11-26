@@ -146,3 +146,18 @@ Status terbaru sebelum rilis penuh ke pemilik warung:
   - Test cetak struk asli ke printer thermal 58mm via `window.print()` (`ReceiptModal`) & alur kirim nota/tagihan WhatsApp.
   - Test mode restore **Timpa Total (Reset)**, **Arsip Tahunan + Drive**, dan reload offline PWA (`npm run preview` / `https://kasiry.pages.dev`).
   - Pastikan status **Google OAuth Consent Screen** di Google Cloud Console berstatus *Published / Verified* agar akun Google toko baru tidak terkena batasan *Testing mode*.
+
+---
+
+## 8. Roadmap Pengembangan Selanjutnya (Backlog v2.8+)
+
+Daftar fitur berikut dicatat untuk dibahas detail (*design & spec alignment*) dan dikerjakan satu per satu pada iterasi berikutnya:
+
+| No | Item Fitur | Status | Ringkasan Cakupan Awal untuk Dibahas |
+| :-: | :--- | :---: | :--- |
+| 1 | **Sistem Buka & Tutup Shift** | `[ ] Backlog` | Modal/saldo kas awal laci, pencatatan nama kasir/shift aktif, ringkasan uang fisik laci vs sistem saat tutup shift, selisih kas, & rekap laporan per shift. |
+| 2 | **Transaksi Keluar / Pengeluaran Harian** | `[ ] Backlog` | Pencatatan kas keluar warung per hari (listrik, plastik, bensin, iuran, dll.), memengaruhi saldo laci shift/kas harian, & muncul di Laporan Harian + ekspor Excel/Sheets. |
+| 3 | **Multi Harga (Ecer / Grosir / Agen)** | `[ ] Backlog` | Definisi tier harga atau aturan grosir bertingkat (berdasarkan qty atau level pelanggan/manual switch saat transaksi) serta skema IndexedDB & backup kompatibel. |
+| 4 | **Metode Bayar QRIS** | `[ ] Backlog` | Opsi tab/metode pembayaran `QRIS` di `PaymentModal.vue` (QRIS statis toko / gambar QR unggahan pemilik warung), pencatatan di struk & laporan kas non-tunai (agar terpisah dari kas fisik laci). |
+| 5 | **Fitur Kulakan / Belanja Stok** | `[ ] Backlog` | Pencatatan stok masuk barang, harga kulak/modal terbaru, pembaruan stok produk (opsional pelacakan stok aktif), serta keterhubungannya dengan pengeluaran kas warung atau shift. |
+| 6 | **Pembersihan & Seed Data Awal Baru** | `[ ] Backlog` | Audit dan peremajaan `src/db/seedData.js` (produk awal warung & contoh pelanggan buku utang) atau opsi awal warung bersih vs data contoh. |
