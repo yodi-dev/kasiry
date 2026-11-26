@@ -11,6 +11,7 @@
       content="Aplikasi kasir (POS) PWA gratis dan offline-first khusus warung kelontong &amp; UMKM Indonesia. Catat penjualan kilat, scan barcode HP atau alat, kelola buku utang pelanggan, dan cadangkan ke Google Sheets &amp; Drive."
     />
     <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://kasiry.pages.dev/" />
     <meta name="application-name" content="Kasiry" />
     <meta name="author" content="Kasiry" />
 
@@ -28,12 +29,14 @@
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="id_ID" />
     <meta property="og:site_name" content="Kasiry" />
+    <meta property="og:url" content="https://kasiry.pages.dev/" />
     <meta property="og:title" content="Kasiry — Aplikasi Kasir Warung Paling Gampang" />
     <meta
       property="og:description"
       content="Aplikasi kasir warung &amp; UMKM 100% offline-first. Scan barcode, catat buku utang otomatis, laporan harian WA 1-klik, dan cadangan aman ke Google Cloud."
     />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image" content="https://kasiry.pages.dev/og-image.png" />
+    <meta property="og:image:secure_url" content="https://kasiry.pages.dev/og-image.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -41,12 +44,33 @@
 
     <!-- Twitter / X Card -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://kasiry.pages.dev/" />
     <meta name="twitter:title" content="Kasiry — Aplikasi Kasir Warung Paling Gampang" />
     <meta
       name="twitter:description"
       content="Kasir warung &amp; UMKM 100% offline-first dengan barcode scanner, buku utang digital, dan cadangan Google Drive &amp; Sheets."
     />
-    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image" content="https://kasiry.pages.dev/og-image.png" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Kasiry",
+        "url": "https://kasiry.pages.dev/",
+        "description": "Aplikasi kasir (POS) PWA offline-first untuk warung kelontong dan UMKM Indonesia dengan barcode scanner, buku utang digital, laporan kasir, dan cadangan Google Cloud.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web, Android, iOS, Windows, macOS",
+        "inLanguage": "id",
+        "image": "https://kasiry.pages.dev/og-image.png",
+        "author": {
+          "@type": "Person",
+          "name": "awanbeo",
+          "url": "https://awanbeo.my.id"
+        }
+      }
+    </script>
 
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>

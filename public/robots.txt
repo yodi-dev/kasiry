@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://kasiry.pages.dev/sitemap.xml
