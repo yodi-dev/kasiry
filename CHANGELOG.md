@@ -6,6 +6,28 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.7.0] - 2026-11-26 (Tahap 2: Automated Tests & Bersih-Bersih Kode Warisan)
+
+### Added
+- Konfigurasi automated unit/integration testing memakai **Vitest** (`vitest.config.js`, `tests/setup.js`) + **fake-indexeddb** dengan script `npm test` dan `npm run test:watch`.
+- 5 suite pengujian (12 skenario test) di folder `tests/`:
+  - `tests/customerStats.test.js` — agregasi $O(N)$ `buildCustomerStatsMap`, edge case nama/ID, dan benchmark 50.000 transaksi.
+  - `tests/useKasiryDB.test.js` — inisialisasi katalog/pelanggan awal, transaksi tunai & bon, pembulatan pelunasan cicilan utang, jendela memori 90 hari + query pelanggan lintas tahun, proteksi kategori aktif, serta arsip tahunan & isolasi `honorArchiveCutoff`.
+  - `tests/useGoogleSync.test.js` — antrean offline Google Sheets & flush batch saat online, throttling upload Drive (10 transaksi / 3 menit saat transaksi >= 200), dan merge LWW + filter cutoff arsip.
+  - `tests/dbMigration.test.js` — verifikasi migrasi skema Dexie `v1 -> v2` beserta penghapusan tabel legacy `transactionItems` tanpa kehilangan data produk.
+  - `tests/excelExport.test.js` — verifikasi dynamic import `xlsx` serta struktur 4 sheet workbook laporan Excel.
+
+### Fixed
+- Memperbaiki bug `ReferenceError: DAY_MS is not defined` (menggantinya ke `MS_PER_DAY`) pada `getArchivableSummary` dan `archiveOldTransactions` di `src/composables/useKasiryDB.js` yang terdeteksi langsung oleh test suite.
+- Menambahkan guard angka non-finit/negatif pada `recordDebtPayment`, reset `archiveCutoffAt` ketika `archiveState` tidak ada pada `refreshSettings`, serta perlindungan level database agar akun sistem `"Umum"` tidak tercatat dalam `UTANG / BON`.
+
+### Removed / Changed
+- Upgrade skema Dexie (`src/db/index.js`) ke `version(2)` untuk menghapus tabel usang `transactionItems` secara aman.
+- Menghapus sisa state & handler lisensi mati (`licenseStatus`, `handleActivateLicense`) dari `src/composables/useKasiryDB.js`, `src/db/seedData.js`, dan `src/App.vue` (sekaligus menghilangkan 1 penulisan IndexedDB tambahan tiap checkout).
+- Menghapus 6 file prototipe awal yang sudah tidak terpakai: `DarkNavyCartSheet.vue`, `HeroCardsCarousel.vue`, `MacroProductMatrix.vue`, `ProductCatalogSection.vue`, `QuickActionActivities.vue`, dan `src/data/mockData.js`.
+
+---
+
 ## [2.6.0] - 2026-11-26 (Tahap 1: Pemecahan Bundle / Code Splitting)
 
 ### Added

@@ -39,11 +39,6 @@ const storeProfile = ref({
   owner: 'Habiba',
   phone: '081234567890'
 })
-const licenseStatus = ref({
-  isLifetime: true,
-  txCount: 0,
-  txLimit: 999999
-})
 
 // Kategori Barang
 const initialDefaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok', 'Curah', 'Lainnya']
@@ -122,9 +117,8 @@ export function useKasiryDB() {
   }
 
   const refreshSettings = async () => {
-    const [profileSetting, licenseSetting, catSetting, archiveSetting] = await Promise.all([
+    const [profileSetting, catSetting, archiveSetting] = await Promise.all([
       db.settings.get('storeProfile'),
-      db.settings.get('licenseStatus'),
       db.settings.get('categories'),
       db.settings.get('archiveState')
     ])
@@ -133,13 +127,7 @@ export function useKasiryDB() {
       storeProfile.value = { ...profileSetting.value }
     }
 
-    if (licenseSetting && licenseSetting.value) {
-      licenseStatus.value = { ...licenseSetting.value }
-    }
-
-    if (archiveSetting && archiveSetting.value && typeof archiveSetting.value.cutoffAt === 'number') {
-      archiveCutoffAt.value = archiveSetting.value.cutoffAt
-    }
+    archiveCutoffAt.value = Number(archiveSetting?.value?.cutoffAt || 0)
 
     if (catSetting && Array.isArray(catSetting.value) && catSetting.value.length > 0) {
       categoryList.value = catSetting.value
@@ -252,8 +240,11 @@ export function useKasiryDB() {
 
     const now = Date.now()
     const currentDebt = cust.totalDebt || 0
+    const numericAmount = Number(amount)
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) return
+
     // Catat kas masuk hanya sebatas nominal utang yang benar-benar terlunasi (tanpa uang kembalian)
-    const appliedAmount = Math.min(amount, currentDebt)
+    const appliedAmount = Math.min(numericAmount, currentDebt)
     if (appliedAmount <= 0) return
 
     const nextDebt = Math.max(0, currentDebt - appliedAmount)
@@ -310,9 +301,9 @@ export function useKasiryDB() {
     // 1. Simpan Transaksi Induk ke IndexedDB
     const txId = await db.transactions.add(txRecord)
 
-    // 2. Jika Metode Utang, akumulasikan saldo utang pelanggan
+    // 2. Jika Metode Utang, akumulasikan saldo utang pelanggan (kecuali akun sistem "Umum")
     let customerMutated = false
-    if (paymentMethod === 'UTANG / BON' && customer) {
+    if (paymentMethod === 'UTANG / BON' && customer && customer.name?.trim().toLowerCase() !== 'umum') {
       let cust = customer.id ? await db.customers.get(customer.id) : null
       if (!cust && customer.name) {
         const cleanName = customer.name.trim().toLowerCase()
@@ -338,15 +329,7 @@ export function useKasiryDB() {
       customerMutated = true
     }
 
-    // 3. Update counter lisensi
-    licenseStatus.value.txCount += 1
-    await db.settings.put({
-      key: 'licenseStatus',
-      value: toPlain(licenseStatus.value),
-      updatedAt: now
-    })
-
-    // 4. Perbarui shallowRef & counter lokal langsung tanpa full reload 5 tabel
+    // 3. Perbarui shallowRef & counter lokal langsung tanpa full reload 5 tabel
     transactions.value = [txRecord, ...transactions.value]
     totalTransactionCount.value += 1
     if (customerMutated) {
@@ -454,7 +437,7 @@ export function useKasiryDB() {
 
   // Hitung jumlah riwayat yang memenuhi syarat arsip (lebih tua dari retentionDays) tanpa memuat payload penuh
   const getArchivableSummary = async (retentionDays = 180) => {
-    const cutoffTimestamp = Date.now() - retentionDays * DAY_MS
+    const cutoffTimestamp = Date.now() - retentionDays * MS_PER_DAY
     const [txCount, payCount] = await Promise.all([
       db.transactions.where('createdAt').below(cutoffTimestamp).count(),
       db.debtPayments.where('paymentDate').below(cutoffTimestamp).count()
@@ -469,7 +452,7 @@ export function useKasiryDB() {
 
   // Arsipkan & pangkas transaksi lama ke file JSON (+ siapkan payload untuk arsip Drive) tanpa menyentuh utang/barang/pelanggan
   const archiveOldTransactions = async (retentionDays = 180) => {
-    const cutoffTimestamp = Date.now() - retentionDays * DAY_MS
+    const cutoffTimestamp = Date.now() - retentionDays * MS_PER_DAY
     const [oldTx, oldPays] = await Promise.all([
       db.transactions.where('createdAt').below(cutoffTimestamp).toArray(),
       db.debtPayments.where('paymentDate').below(cutoffTimestamp).toArray()
@@ -762,7 +745,6 @@ export function useKasiryDB() {
     olderTransactionCount,
     archiveCutoffAt,
     storeProfile,
-    licenseStatus,
     categories,
     categoryList,
     lastLocalBackupTime,

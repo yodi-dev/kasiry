@@ -447,11 +447,6 @@ export const seedSettings = {
     owner: 'Habiba',
     phone: '081234567890'
   },
-  licenseStatus: {
-    isLifetime: true,
-    txCount: 0,
-    txLimit: 999999
-  },
   googleIntegration: {
     isConnected: false,
     user: null,

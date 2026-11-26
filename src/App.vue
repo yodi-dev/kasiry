@@ -103,7 +103,6 @@ const {
   totalTransactionCount,
   olderTransactionCount,
   storeProfile,
-  licenseStatus,
   categories,
   lastLocalBackupTime,
   addCategory,
@@ -652,15 +651,6 @@ const handleArchiveOldData = async (payload) => {
     if (typeof onComplete === 'function') {
       await onComplete()
     }
-  }
-}
-
-const handleActivateLicense = (code) => {
-  if (code.toUpperCase().includes('KASIRY') || code.length >= 6) {
-    licenseStatus.value.isLifetime = true
-    alert('Selamat! Aplikasi Kasiry aktif penuh seumur hidup!')
-  } else {
-    alert('Kode aktivasi tidak valid.')
   }
 }
 

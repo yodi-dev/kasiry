@@ -17,9 +17,13 @@ export class KasiryDatabase extends Dexie {
       settings: 'key, updatedAt'
     })
 
+    // Schema Version 2: Bersihkan tabel legacy transactionItems (item transaksi sudah disimpan inline di transactions.items)
+    this.version(2).stores({
+      transactionItems: null
+    })
+
     this.products = this.table('products')
     this.transactions = this.table('transactions')
-    this.transactionItems = this.table('transactionItems')
     this.customers = this.table('customers')
     this.debtPayments = this.table('debtPayments')
     this.settings = this.table('settings')
