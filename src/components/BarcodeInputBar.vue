@@ -51,10 +51,8 @@ const syncInputKeyboardLock = (allowSoftKeyboard) => {
   const el = inputRef.value
   if (!el) return
   if (allowSoftKeyboard || isDesktopAutoFocus()) {
-    el.removeAttribute('readonly')
     el.inputMode = 'search'
   } else {
-    el.setAttribute('readonly', 'readonly')
     el.inputMode = 'none'
   }
 }
@@ -201,7 +199,7 @@ const handleEnter = (e) => {
 </script>
 
 <template>
-  <search class="relative block w-full">
+  <div role="search" class="relative w-full">
     <!-- Form Input Barcode & Search -->
     <div class="flex items-center gap-2">
       <div class="relative flex-1 min-w-0">
@@ -216,9 +214,7 @@ const handleEnter = (e) => {
           ref="inputRef"
           type="text"
           :value="searchQuery"
-          :readonly="!touchUnlocked"
           :inputmode="touchUnlocked ? 'search' : 'none'"
-          :virtualkeyboardpolicy="touchUnlocked ? 'auto' : 'manual'"
           autocomplete="off"
           autocorrect="off"
           autocapitalize="none"
@@ -307,5 +303,5 @@ const handleEnter = (e) => {
         </button>
       </div>
     </div>
-  </search>
+  </div>
 </template>
