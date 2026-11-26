@@ -480,16 +480,16 @@ const toggleCamera = () => {
   startCamera(150)
 }
 
-watch(() => props.isOpen, (newVal) => {
+watch(() => props.isOpen, (newVal, oldVal) => {
   if (newVal) {
     nextTick(() => {
       startCamera()
     })
-  } else {
+  } else if (oldVal) {
     cameraSessionId += 1
     stopCamera()
   }
-})
+}, { immediate: true })
 
 onUnmounted(() => {
   cameraSessionId += 1

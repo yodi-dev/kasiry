@@ -38,6 +38,10 @@ const props = defineProps({
   storeName: {
     type: String,
     default: 'Habiba Store'
+  },
+  isExporting: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -279,10 +283,12 @@ const shareToWhatsApp = () => {
             <!-- Unduh File Excel (.xlsx) -->
             <button 
               @click="emit('downloadExcel')"
-              class="h-11 px-4 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs"
+              :disabled="isExporting"
+              class="h-11 px-4 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
             >
-              <Download class="w-4 h-4 text-slate-500" />
-              <span>Unduh Laporan Excel (.xlsx)</span>
+              <span v-if="isExporting" class="w-4 h-4 rounded-full border-2 border-[#0284c7] border-t-transparent animate-spin"></span>
+              <Download v-else class="w-4 h-4 text-slate-500" />
+              <span>{{ isExporting ? 'Menyiapkan Excel...' : 'Unduh Laporan Excel (.xlsx)' }}</span>
             </button>
           </div>
         </div>

@@ -51,7 +51,7 @@ watch(() => props.isOpen, (newVal) => {
       nameInputRef.value?.focus()
     })
   }
-})
+}, { immediate: true })
 
 const openInlineCategory = () => {
   isAddingCategoryInline.value = true

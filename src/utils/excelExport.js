@@ -1,8 +1,7 @@
-import * as XLSX from 'xlsx'
-
 /**
  * Ekspor data warung ke file Microsoft Excel (.xlsx) rapi dengan multi-sheet
- * Berjalan 100% offline langsung di browser HP maupun PC.
+ * Memuat modul SheetJS secara dinamis agar tidak membebani waktu muat awal kasa,
+ * namun tetap berjalan 100% offline berkat precache Service Worker.
  * 
  * @param {Object} options
  * @param {Object} options.storeProfile Profil warung (nama, pemilik, no wa)
@@ -11,13 +10,14 @@ import * as XLSX from 'xlsx'
  * @param {Array} options.customers Daftar pelanggan buku utang
  * @param {Array} options.debtPayments Riwayat pelunasan utang
  */
-export function exportKasiryExcel({
+export async function exportKasiryExcel({
   storeProfile = { name: 'Habiba Store', owner: 'Habiba', phone: '081234567890' },
   stats = {},
   transactions = [],
   customers = [],
   debtPayments = []
 }) {
+  const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
   const todayStr = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',

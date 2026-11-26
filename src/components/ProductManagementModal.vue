@@ -43,15 +43,6 @@ const defaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok
 // currentView: 'list' | 'form' | 'categories'
 const currentView = ref('list')
 
-// Selalu reset ke tampilan list saat modal dibuka kembali
-watch(() => props.isOpen, (newVal) => {
-  if (newVal) {
-    currentView.value = 'list'
-    searchQuery.value = ''
-    isAddingCategoryInline.value = false
-  }
-})
-
 const handleClose = () => {
   currentView.value = 'list'
   isAddingCategoryInline.value = false
@@ -62,6 +53,15 @@ const searchQuery = ref('')
 const selectedCategory = ref('Semua')
 const newCategoryInput = ref('')
 const isAddingCategoryInline = ref(false)
+
+// Selalu reset ke tampilan list saat modal dibuka kembali
+watch(() => props.isOpen, (newVal) => {
+  if (newVal) {
+    currentView.value = 'list'
+    searchQuery.value = ''
+    isAddingCategoryInline.value = false
+  }
+}, { immediate: true })
 
 const currentProduct = ref({
   id: null,

@@ -68,7 +68,7 @@ watch(() => props.isOpen, (newVal) => {
     fullCustomerHistory.value = []
     searchQuery.value = ''
   }
-})
+}, { immediate: true })
 
 const handleClose = () => {
   currentView.value = 'list'

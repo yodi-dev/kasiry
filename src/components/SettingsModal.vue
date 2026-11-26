@@ -115,6 +115,7 @@ const emit = defineEmits([
 
 // 2 Tabs: 'profile' (Nama Pemilik) | 'backup' (Cadangan & Google)
 const activeTab = ref('profile')
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.6.0'
 
 const formName = ref(props.storeProfile?.name || 'Habiba Store')
 const formOwner = ref(props.storeProfile?.owner || 'Habiba')
@@ -196,7 +197,7 @@ watch(() => props.isOpen, (newVal) => {
       refreshArchivePreview()
     }
   }
-})
+}, { immediate: true })
 
 watch([activeTab, archiveRetentionDays, () => props.totalTransactionCount], ([tab]) => {
   if (props.isOpen && tab === 'backup') {
@@ -341,8 +342,13 @@ const cancelImport = () => {
             <Store class="w-5 h-5 text-sky-400" />
           </div>
           <div>
-            <h3 class="text-base font-bold text-[#0a193d] leading-tight">Profil & Pengaturan</h3>
-            <p class="text-xs text-slate-500 font-medium">Pengaturan pemilik toko & cadangan data</p>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-bold text-[#0a193d] leading-tight">Profil &amp; Pengaturan</h3>
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/70">
+                v{{ appVersion }}
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium">Pengaturan pemilik toko &amp; cadangan data</p>
           </div>
         </div>
         <button 

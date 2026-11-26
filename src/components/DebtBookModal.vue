@@ -66,7 +66,7 @@ watch(() => props.isOpen, (newVal) => {
     paymentAmount.value = ''
     searchQuery.value = ''
   }
-})
+}, { immediate: true })
 
 const handleClose = () => {
   currentView.value = 'list'

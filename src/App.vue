@@ -1,19 +1,90 @@
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, defineAsyncComponent, h } from 'vue'
 import TopBar from './components/TopBar.vue'
 import BarcodeInputBar from './components/BarcodeInputBar.vue'
 import CartSection from './components/CartSection.vue'
 import FrequentProductsSection from './components/FrequentProductsSection.vue'
 import StickyBottomBar from './components/StickyBottomBar.vue'
-import PaymentModal from './components/PaymentModal.vue'
-import LazyInventoryModal from './components/LazyInventoryModal.vue'
-import DebtBookModal from './components/DebtBookModal.vue'
-import DailyReportModal from './components/DailyReportModal.vue'
-import SettingsModal from './components/SettingsModal.vue'
-import ReceiptModal from './components/ReceiptModal.vue'
-import CameraScannerModal from './components/CameraScannerModal.vue'
-import ProductManagementModal from './components/ProductManagementModal.vue'
-import CustomerManagementModal from './components/CustomerManagementModal.vue'
+
+const AsyncModalLoading = {
+  render() {
+    return h(
+      'div',
+      { class: 'fixed inset-0 z-50 bg-[#0a193d]/35 backdrop-blur-xs flex items-center justify-center p-4' },
+      [
+        h(
+          'div',
+          { class: 'bg-white rounded-2xl px-4 py-3 shadow-xl border border-slate-100 flex items-center gap-2.5 text-xs font-bold text-[#0a193d]' },
+          [
+            h('span', { class: 'w-4 h-4 rounded-full border-2 border-[#0284c7] border-t-transparent animate-spin' }),
+            h('span', 'Memuat...')
+          ]
+        )
+      ]
+    )
+  }
+}
+
+const AsyncModalError = {
+  render() {
+    return h(
+      'div',
+      { class: 'fixed inset-0 z-50 bg-[#0a193d]/45 backdrop-blur-xs flex items-center justify-center p-4' },
+      [
+        h(
+          'div',
+          { class: 'bg-white rounded-3xl p-5 max-w-xs w-full shadow-2xl border border-slate-100 text-center space-y-3' },
+          [
+            h('p', { class: 'text-sm font-bold text-[#0a193d]' }, 'Gagal memuat fitur'),
+            h('p', { class: 'text-xs text-slate-500' }, 'Periksa koneksi internet Anda lalu coba muat ulang.'),
+            h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => window.location.reload(),
+                class: 'w-full h-10 rounded-xl bg-[#0a193d] text-white text-xs font-bold cursor-pointer'
+              },
+              'Muat Ulang'
+            )
+          ]
+        )
+      ]
+    )
+  }
+}
+
+const lazyModal = (loader) => defineAsyncComponent({
+  loader,
+  loadingComponent: AsyncModalLoading,
+  errorComponent: AsyncModalError,
+  delay: 150,
+  timeout: 15000,
+  suspensible: false,
+  onError(error, retry, fail, attempts) {
+    if (attempts <= 2) {
+      setTimeout(retry, 350)
+    } else {
+      fail(error)
+    }
+  }
+})
+
+// Jalur checkout inti di-code-split dari main chunk agar booting awal ngebut, lalu dipanaskan saat browser luang
+const loadPaymentModal = () => import('./components/PaymentModal.vue')
+const loadLazyInventoryModal = () => import('./components/LazyInventoryModal.vue')
+const loadReceiptModal = () => import('./components/ReceiptModal.vue')
+
+const PaymentModal = lazyModal(loadPaymentModal)
+const LazyInventoryModal = lazyModal(loadLazyInventoryModal)
+const ReceiptModal = lazyModal(loadReceiptModal)
+
+// Fitur sekunder & berat (@zxing camera scanner, admin CRUD, backup, laporan) hanya diunduh saat dibuka
+const DebtBookModal = lazyModal(() => import('./components/DebtBookModal.vue'))
+const DailyReportModal = lazyModal(() => import('./components/DailyReportModal.vue'))
+const SettingsModal = lazyModal(() => import('./components/SettingsModal.vue'))
+const CameraScannerModal = lazyModal(() => import('./components/CameraScannerModal.vue'))
+const ProductManagementModal = lazyModal(() => import('./components/ProductManagementModal.vue'))
+const CustomerManagementModal = lazyModal(() => import('./components/CustomerManagementModal.vue'))
 
 import { useKasiryDB } from './composables/useKasiryDB'
 import { useHardwareScanner } from './composables/useHardwareScanner'
@@ -525,10 +596,13 @@ const handleDeleteCustomer = async (custId) => {
   triggerCloudAutoBackup()
 }
 
+const isExportingExcel = ref(false)
 const handleDownloadExcel = async () => {
+  if (isExportingExcel.value) return
+  isExportingExcel.value = true
   try {
     const { transactions: allTransactions, debtPayments: allDebtPayments } = await getAllTransactionsForExport()
-    exportKasiryExcel({
+    await exportKasiryExcel({
       storeProfile: storeProfile.value,
       stats: stats.value,
       transactions: allTransactions,
@@ -538,6 +612,8 @@ const handleDownloadExcel = async () => {
     playBeepSound('success')
   } catch (err) {
     alert('Gagal mengekspor file Excel: ' + err.message)
+  } finally {
+    isExportingExcel.value = false
   }
 }
 
@@ -633,6 +709,29 @@ watch(isAnyModalOpen, (isOpenNow) => {
   }
 })
 
+const modalFlagKeys = [
+  'productManage',
+  'customerManage',
+  'debtBook',
+  'dailyReport',
+  'settings',
+  'camera',
+  'lazyInventory',
+  'payment',
+  'receipt'
+]
+const activatedModals = reactive({
+  productManage: false,
+  customerManage: false,
+  debtBook: false,
+  dailyReport: false,
+  settings: false,
+  camera: false,
+  lazyInventory: false,
+  payment: false,
+  receipt: false
+})
+
 watch(
   [
     isProductManageOpen,
@@ -646,6 +745,11 @@ watch(
     isReceiptOpen
   ],
   (newVals, oldVals) => {
+    newVals.forEach((isOpenNow, idx) => {
+      if (isOpenNow) {
+        activatedModals[modalFlagKeys[idx]] = true
+      }
+    })
     const wasOpen = oldVals && oldVals.some(v => Boolean(v))
     const isNowAllClosed = newVals.every(v => !v)
     if (wasOpen && isNowAllClosed) {
@@ -682,6 +786,19 @@ onMounted(async () => {
     setTimeout(ensureKasaFocus, 200)
     setTimeout(ensureKasaFocus, 500)
   }
+
+  // Hangatkan chunk checkout inti saat browser luang agar transaksi tetap instan 0ms
+  const prewarmCheckoutChunks = () => {
+    loadPaymentModal().catch(() => {})
+    loadLazyInventoryModal().catch(() => {})
+    loadReceiptModal().catch(() => {})
+  }
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    window.requestIdleCallback(prewarmCheckoutChunks, { timeout: 2500 })
+  } else {
+    setTimeout(prewarmCheckoutChunks, 1500)
+  }
+
   // Jika akun Google aktif, kirim antrean tertunda lalu lakukan sinkronisasi otomatis diam-diam
   if (isGoogleConnected.value && isOnline.value) {
     await flushPendingSheetQueue(storeProfile.value?.name)
@@ -800,9 +917,10 @@ onUnmounted(() => {
       />
     </div>
 
-    <!-- 4. Modals & Overlays -->
+    <!-- 4. Modals & Overlays (Dimuat malas / code-split agar booting kasir cepat) -->
     <!-- Modal Kelola Barang (Tambah, Edit, Hapus) -->
     <ProductManagementModal 
+      v-if="activatedModals.productManage || isProductManageOpen"
       :isOpen="isProductManageOpen"
       :products="products"
       :categories="categories"
@@ -815,6 +933,7 @@ onUnmounted(() => {
 
     <!-- Modal Pembayaran (Tunai vs Utang) -->
     <PaymentModal 
+      v-if="activatedModals.payment || isPaymentOpen"
       :isOpen="isPaymentOpen"
       :totalAmount="totalCartAmount"
       :savedCustomers="customers"
@@ -827,6 +946,7 @@ onUnmounted(() => {
 
     <!-- Modal Input Cepat Barcode Baru (Lazy Inventory) -->
     <LazyInventoryModal 
+      v-if="activatedModals.lazyInventory || isLazyInventoryOpen"
       :isOpen="isLazyInventoryOpen"
       :scannedBarcode="scannedBarcode"
       :categories="categories"
@@ -837,6 +957,7 @@ onUnmounted(() => {
 
     <!-- Modal Buku Utang Warung -->
     <DebtBookModal 
+      v-if="activatedModals.debtBook || isDebtBookOpen"
       :isOpen="isDebtBookOpen"
       :customers="customers"
       :transactions="transactions"
@@ -850,6 +971,7 @@ onUnmounted(() => {
 
     <!-- Modal Manajemen Data Pelanggan -->
     <CustomerManagementModal 
+      v-if="activatedModals.customerManage || isCustomerManageOpen"
       :isOpen="isCustomerManageOpen"
       :customers="customers"
       :transactions="transactions"
@@ -862,16 +984,19 @@ onUnmounted(() => {
 
     <!-- Modal Laporan Harian Warung -->
     <DailyReportModal 
+      v-if="activatedModals.dailyReport || isDailyReportOpen"
       :isOpen="isDailyReportOpen"
       :stats="stats"
       :transactions="transactions"
       :storeName="storeProfile.name"
+      :isExporting="isExportingExcel"
       @close="isDailyReportOpen = false"
       @downloadExcel="handleDownloadExcel"
     />
 
     <!-- Modal Pengaturan & Integrasi Google -->
     <SettingsModal 
+      v-if="activatedModals.settings || isSettingsOpen"
       :isOpen="isSettingsOpen"
       :storeProfile="storeProfile"
       :isOnline="isOnline"
@@ -904,6 +1029,7 @@ onUnmounted(() => {
 
     <!-- Modal Struk / Nota Pembayaran Berhasil -->
     <ReceiptModal 
+      v-if="activatedModals.receipt || isReceiptOpen"
       :isOpen="isReceiptOpen"
       :receiptData="receiptData"
       :storeProfile="storeProfile"
@@ -913,6 +1039,7 @@ onUnmounted(() => {
 
     <!-- Modal Scanner Kamera Barcode -->
     <CameraScannerModal 
+      v-if="activatedModals.camera || isCameraOpen"
       :isOpen="isCameraOpen"
       @close="isCameraOpen = false"
       @scan="handleBarcodeScan"

@@ -1,9 +1,45 @@
+import { readFileSync } from 'node:fs'
 import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version)
+  },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-xlsx',
+              test: /node_modules[\\/]xlsx[\\/]/,
+              priority: 30
+            },
+            {
+              name: 'vendor-zxing',
+              test: /node_modules[\\/]@zxing[\\/]/,
+              priority: 30
+            },
+            {
+              name: 'vendor-vue',
+              test: /node_modules[\\/](vue|@vue)[\\/]/,
+              priority: 20
+            },
+            {
+              name: 'vendor-dexie',
+              test: /node_modules[\\/]dexie[\\/]/,
+              priority: 20
+            }
+          ]
+        }
+      }
+    }
+  },
   plugins: [
     vue(),
     tailwindcss(),

@@ -107,7 +107,7 @@ watch(() => props.isOpen, (newVal) => {
     newCustName.value = ''
     newCustPhone.value = ''
   }
-})
+}, { immediate: true })
 
 // Sinkronkan jika data savedCustomers tiba atau pelanggan baru mendapat ID dari IndexedDB
 watch(() => props.savedCustomers, (newCustomers) => {
