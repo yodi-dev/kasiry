@@ -2,16 +2,56 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+    <!-- Identitas & SEO Dasar -->
+    <title>Kasiry — Aplikasi Kasir Warung &amp; Buku Utang Offline-First</title>
+    <meta
+      name="description"
+      content="Aplikasi kasir (POS) PWA gratis dan offline-first khusus warung kelontong &amp; UMKM Indonesia. Catat penjualan kilat, scan barcode HP atau alat, kelola buku utang pelanggan, dan cadangkan ke Google Sheets &amp; Drive."
+    />
+    <meta name="robots" content="index, follow" />
+    <meta name="application-name" content="Kasiry" />
+    <meta name="author" content="Kasiry" />
+
+    <!-- Favicon & Ikon PWA (Midnight Deep Navy & Azure Sky) -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0a193d" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>Kasiry - Aplikasi Kasir Warung Paling Gampang</title>
+    <meta name="apple-mobile-web-app-title" content="Kasiry" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- Open Graph / Social Media Sharing (WhatsApp, Facebook, LinkedIn, Telegram) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="id_ID" />
+    <meta property="og:site_name" content="Kasiry" />
+    <meta property="og:title" content="Kasiry — Aplikasi Kasir Warung Paling Gampang" />
+    <meta
+      property="og:description"
+      content="Aplikasi kasir warung &amp; UMKM 100% offline-first. Scan barcode, catat buku utang otomatis, laporan harian WA 1-klik, dan cadangan aman ke Google Cloud."
+    />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Kasiry — Aplikasi Kasir Warung Offline-First bertema Midnight Deep Navy dan Azure Blue" />
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Kasiry — Aplikasi Kasir Warung Paling Gampang" />
+    <meta
+      name="twitter:description"
+      content="Kasir warung &amp; UMKM 100% offline-first dengan barcode scanner, buku utang digital, dan cadangan Google Drive &amp; Sheets."
+    />
+    <meta name="twitter:image" content="/og-image.png" />
+
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
-  <body class="bg-[#f8faf8] text-slate-900 antialiased font-sans select-none overflow-x-hidden min-h-screen">
+  <body class="bg-[#edf5fd] text-[#0a193d] antialiased font-sans select-none overflow-x-hidden min-h-screen">
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>

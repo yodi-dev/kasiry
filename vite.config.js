@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         name: 'Kasiry - Aplikasi Kasir Warung Paling Gampang',
         short_name: 'Kasiry',
-        description: 'Aplikasi Kasir Warung Kelontong & UMKM Pedesaan Offline-First',
+        description: 'Aplikasi Kasir Warung Kelontong & UMKM Indonesia Offline-First',
         lang: 'id',
         theme_color: '#0a193d',
         background_color: '#edf5fd',
@@ -40,7 +40,8 @@ export default defineConfig({
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 3500000,
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}']
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        globIgnores: ['**/og-image.png', '**/kasiry-oauth-120x120.png', '**/privacy.html', '**/terms.html']
       }
     })
   ]

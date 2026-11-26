@@ -25,7 +25,7 @@ function makeChunk(type, data) {
   const len = data ? data.length : 0
   const lenBuf = Buffer.alloc(4)
   lenBuf.writeUInt32BE(len, 0)
-  
+
   const toCrc = data ? Buffer.concat([typeBuf, data]) : typeBuf
   const crcVal = crc32(toCrc)
   const crcBuf = Buffer.alloc(4)
@@ -42,95 +42,133 @@ function distToSeg(px, py, x1, y1, x2, y2) {
   return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)))
 }
 
-function generatePng(size) {
+function lerp(a, b, t) {
+  return a + (b - a) * Math.max(0, Math.min(1, t))
+}
+
+function blendOver(bg, fg, alpha) {
+  const a = Math.max(0, Math.min(1, alpha))
+  return [
+    bg[0] * (1 - a) + fg[0] * a,
+    bg[1] * (1 - a) + fg[1] * a,
+    bg[2] * (1 - a) + fg[2] * a
+  ]
+}
+
+// Render ikon PNG dengan 4x4 SSAA anti-aliasing sesuai sistem desain Kasiry (Midnight Navy & Azure Sky)
+function generateIconPng(size, { fullBleed = false } = {}) {
   const width = size
   const height = size
   const rowBytes = 1 + width * 4
   const rawData = Buffer.alloc(rowBytes * height)
-
   const scale = size / 512
-  const cornerRadius = 110 * scale
+  const cornerRadius = fullBleed ? 0 : 124
+  const subSamples = 4
+  const invSub = 1 / (subSamples * subSamples)
 
   for (let y = 0; y < height; y++) {
     const rowOffset = y * rowBytes
-    rawData[rowOffset] = 0 // Filter type 0 (None)
+    rawData[rowOffset] = 0 // Filter 0
 
     for (let x = 0; x < width; x++) {
+      let accR = 0
+      let accG = 0
+      let accB = 0
+      let accA = 0
+
+      for (let sy = 0; sy < subSamples; sy++) {
+        for (let sx = 0; sx < subSamples; sx++) {
+          const px = (x + (sx + 0.5) / subSamples) / scale
+          const py = (y + (sy + 0.5) / subSamples) / scale
+
+          let insideBg = true
+          if (!fullBleed) {
+            const dx = Math.max(0, Math.max(cornerRadius - px, px - (512 - cornerRadius)))
+            const dy = Math.max(0, Math.max(cornerRadius - py, py - (512 - cornerRadius)))
+            if (Math.hypot(dx, dy) > cornerRadius) {
+              insideBg = false
+            }
+          }
+
+          if (!insideBg) continue
+
+          // Background gradient: bottom-left (#061029) -> top-right (#133173)
+          const diagT = Math.max(0, Math.min(1, (px + (512 - py)) / 1024))
+          let col = [
+            lerp(0x06, 0x13, diagT),
+            lerp(0x10, 0x31, diagT),
+            lerp(0x29, 0x73, diagT)
+          ]
+
+          // Subtle Azure/Sky radial aura at top-right (400, 102)
+          const glowDist = Math.hypot(px - 400, py - 102) / 340
+          if (glowDist < 1) {
+            const glowAlpha = (1 - glowDist) * (1 - glowDist) * 0.28
+            col = blendOver(col, [0x38, 0xbd, 0xf8], glowAlpha)
+          }
+
+          // Subtle inner luminous edge ring for squircle icons
+          if (!fullBleed && px >= 7 && px <= 505 && py >= 7 && py <= 505) {
+            const innerR = 116
+            const idx = Math.max(0, Math.max(innerR - (px - 8), (px - 8) - (496 - innerR)))
+            const idy = Math.max(0, Math.max(innerR - (py - 8), (py - 8) - (496 - innerR)))
+            const borderDist = Math.abs(Math.hypot(idx, idy) - innerR)
+            if (borderDist <= 1.5) {
+              col = blendOver(col, [0x38, 0xbd, 0xf8], 0.22)
+            }
+          }
+
+          // Lettermark K (seamless shared pivot at 196, 260):
+          // 1. Spine (White #FFFFFF): (158, 132) -> (158, 380), r=32
+          const dSpine = distToSeg(px, py, 158, 132, 158, 380)
+          // 2. Lower leg (White #FFFFFF): (196, 260) -> (358, 380), r=32
+          const dLower = distToSeg(px, py, 196, 260, 358, 380)
+          if (dSpine <= 32 || dLower <= 32) {
+            col = [255, 255, 255]
+          }
+
+          // 3. Upper Check Arm (Azure -> Luminous Sky Blue): (196, 260) -> (362, 132), r=32
+          const dUpper = distToSeg(px, py, 196, 260, 362, 132)
+          if (dUpper <= 32) {
+            const armT = Math.max(0, Math.min(1, (px - 196) / (362 - 196)))
+            col = [
+              lerp(0x02, 0x7d, armT),
+              lerp(0x84, 0xd3, armT),
+              lerp(0xc7, 0xfc, armT)
+            ]
+          }
+
+          accR += col[0]
+          accG += col[1]
+          accB += col[2]
+          accA += 255
+        }
+      }
+
       const pixelOffset = rowOffset + 1 + x * 4
-
-      // Rounded rectangle test for main canvas
-      const dx = Math.max(0, Math.max(cornerRadius - x, x - (width - cornerRadius)))
-      const dy = Math.max(0, Math.max(cornerRadius - y, y - (height - cornerRadius)))
-      const outsideCorner = Math.hypot(dx, dy) > cornerRadius
-
-      if (outsideCorner) {
+      if (accA > 0) {
+        rawData[pixelOffset] = Math.round(accR / (accA / 255))
+        rawData[pixelOffset + 1] = Math.round(accG / (accA / 255))
+        rawData[pixelOffset + 2] = Math.round(accB / (accA / 255))
+        rawData[pixelOffset + 3] = Math.round(accA * invSub)
+      } else {
         rawData[pixelOffset] = 0
         rawData[pixelOffset + 1] = 0
         rawData[pixelOffset + 2] = 0
         rawData[pixelOffset + 3] = 0
-        continue
       }
-
-      // Default Background: Kasiry Emerald Green (#2E7D32)
-      let r = 0x2e
-      let g = 0x7d
-      let b = 0x32
-      let a = 255
-
-      // Subtly lighter green gradient at top
-      const gradT = y / height
-      r = Math.min(255, Math.floor(0x28 + (0x35 - 0x28) * (1 - gradT)))
-      g = Math.min(255, Math.floor(0x75 + (0x8e - 0x75) * (1 - gradT)))
-      b = Math.min(255, Math.floor(0x2d + (0x3c - 0x2d) * (1 - gradT)))
-
-      const px = x / scale
-      const py = y / scale
-
-      // 1. Warung Traditional Roof (Golden Yellow #FBC02D)
-      // Roof Triangle / Ridge: Peak at (256, 90), Left (76, 210), Right (436, 210)
-      const distRoofLeft = distToSeg(px, py, 256, 95, 85, 210)
-      const distRoofRight = distToSeg(px, py, 256, 95, 427, 210)
-      const distRoofEaves = distToSeg(px, py, 85, 210, 427, 210)
-
-      if (distRoofLeft <= 16 || distRoofRight <= 16 || (distRoofEaves <= 12 && px >= 85 && px <= 427)) {
-        r = 0xfb; g = 0xc0; b = 0x2d // Gold Roof
-      }
-
-      // 2. Y Shape & Checkmark (Clean Crisp White #FFFFFF)
-      // Left arm of Y: (140, 200) to (256, 320)
-      const distLeftArm = distToSeg(px, py, 145, 210, 256, 320)
-      // Right arm (thick check stroke): (375, 175) to (256, 320)
-      const distRightArm = distToSeg(px, py, 375, 175, 256, 320)
-      // Stem of Y: (256, 320) to (256, 420)
-      const distStem = distToSeg(px, py, 256, 320, 256, 420)
-
-      if (distLeftArm <= 20 || distRightArm <= 24 || distStem <= 20) {
-        r = 255; g = 255; b = 255
-      }
-
-      // 3. Central Golden Coin Accent Circle at (256, 265)
-      const distCoin = Math.hypot(px - 256, py - 265)
-      if (distCoin <= 26) {
-        r = 0xf5; g = 0x9e; b = 0x0b // Golden Amber
-      }
-
-      rawData[pixelOffset] = r
-      rawData[pixelOffset + 1] = g
-      rawData[pixelOffset + 2] = b
-      rawData[pixelOffset + 3] = a
     }
   }
 
-  // PNG Construction
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
   const ihdrData = Buffer.alloc(13)
   ihdrData.writeUInt32BE(width, 0)
   ihdrData.writeUInt32BE(height, 4)
-  ihdrData[8] = 8  // bit depth
-  ihdrData[9] = 6  // color type RGBA
-  ihdrData[10] = 0 // compression
-  ihdrData[11] = 0 // filter
-  ihdrData[12] = 0 // interlace
+  ihdrData[8] = 8
+  ihdrData[9] = 6
+  ihdrData[10] = 0
+  ihdrData[11] = 0
+  ihdrData[12] = 0
   const ihdrChunk = makeChunk('IHDR', ihdrData)
 
   const compressedData = zlib.deflateSync(rawData, { level: 9 })
@@ -145,8 +183,9 @@ if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true })
 }
 
-console.log('Menghasilkan ikon PWA Kasiry...')
-fs.writeFileSync(path.join(publicDir, 'pwa-192x192.png'), generatePng(192))
-fs.writeFileSync(path.join(publicDir, 'pwa-512x512.png'), generatePng(512))
-fs.writeFileSync(path.join(publicDir, 'apple-touch-icon.png'), generatePng(180))
-console.log('Ikon PWA berhasil dibuat di folder public!')
+console.log('Menghasilkan aset ikon brand baru Kasiry (Midnight Navy & Azure Sky)...')
+fs.writeFileSync(path.join(publicDir, 'pwa-192x192.png'), generateIconPng(192))
+fs.writeFileSync(path.join(publicDir, 'pwa-512x512.png'), generateIconPng(512))
+fs.writeFileSync(path.join(publicDir, 'apple-touch-icon.png'), generateIconPng(180, { fullBleed: true }))
+fs.writeFileSync(path.join(publicDir, 'kasiry-oauth-120x120.png'), generateIconPng(120, { fullBleed: true }))
+console.log('Selesai! pwa-192x192.png, pwa-512x512.png, apple-touch-icon.png, dan kasiry-oauth-120x120.png siap di public/.')

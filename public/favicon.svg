@@ -1,18 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <!-- Background Rounded Rect -->
-  <rect width="512" height="512" rx="128" fill="#2E7D32"/>
-  
-  <!-- Warung Traditional Roof Silhouette -->
-  <path d="M76 210 L256 90 L436 210 L400 240 L256 140 L112 240 Z" fill="#FBC02D"/>
-  
-  <!-- Stylized "Y" merged with Checkmark -->
-  <!-- Left arm -->
-  <path d="M140 200 L230 310 L282 310 L192 200 Z" fill="#FFFFFF"/>
-  <!-- Right arm (thick check stroke) -->
-  <path d="M372 170 L256 340 L220 340 L336 170 Z" fill="#FFFFFF"/>
-  <!-- Stem of Y -->
-  <path d="M236 330 H276 V420 H236 Z" rx="8" fill="#FFFFFF"/>
-  
-  <!-- Accent Dot / Golden Coin Symbol -->
-  <circle cx="256" cy="270" r="28" fill="#FBC02D"/>
+  <defs>
+    <linearGradient id="kasiry-bg" x1="0" y1="512" x2="512" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#061029"/>
+      <stop offset="55%" stop-color="#0a193d"/>
+      <stop offset="100%" stop-color="#133173"/>
+    </linearGradient>
+    <radialGradient id="kasiry-glow" cx="0.78" cy="0.2" r="0.65">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a193d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="kasiry-sky" x1="196" y1="260" x2="366" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="55%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#7dd3fc"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Midnight Deep Navy Squircle Backdrop -->
+  <rect width="512" height="512" rx="124" fill="url(#kasiry-bg)"/>
+  <rect width="512" height="512" rx="124" fill="url(#kasiry-glow)"/>
+  <rect x="8" y="8" width="496" height="496" rx="116" stroke="#38bdf8" stroke-opacity="0.22" stroke-width="3"/>
+
+  <!-- Lettermark K: Spine & Lower Leg (Crisp White, seamless pivot at 196,260) -->
+  <line x1="158" y1="132" x2="158" y2="380" stroke="#ffffff" stroke-width="64" stroke-linecap="round"/>
+  <line x1="196" y1="260" x2="358" y2="380" stroke="#ffffff" stroke-width="64" stroke-linecap="round"/>
+
+  <!-- Luminous Sky-Azure Upward Arm (shared pivot at 196,260) -->
+  <line x1="196" y1="260" x2="362" y2="132" stroke="url(#kasiry-sky)" stroke-width="64" stroke-linecap="round"/>
 </svg>
