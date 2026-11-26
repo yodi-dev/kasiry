@@ -72,11 +72,26 @@
       }
     </script>
 
+    <!-- Google Search Console Verification (isi content lalu hapus tanda komentar setelah daftar di Search Console) -->
+    <!-- <meta name="google-site-verification" content="ISI_KODE_SEARCH_CONSOLE" /> -->
+
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body class="bg-[#edf5fd] text-[#0a193d] antialiased font-sans select-none overflow-x-hidden min-h-screen">
-    <div id="app"></div>
+    <div id="app">
+      <!-- Konten Semantik Awal untuk Crawler Verifikasi Google & Pratinjau Tanpa JS -->
+      <main class="max-w-xl mx-auto px-6 py-12 text-[#0a193d]">
+        <h1 class="text-2xl font-bold tracking-tight">Kasiry</h1>
+        <p class="mt-2 text-sm text-slate-600 leading-relaxed">
+          Kasiry adalah aplikasi kasir (POS) offline-first untuk warung kelontong &amp; UMKM Indonesia, lengkap dengan scan barcode, buku utang pelanggan, serta pencadangan opsional ke Google Drive dan Google Sheets milik pengguna.
+        </p>
+        <nav class="mt-6 flex flex-wrap gap-4 text-xs text-[#0284c7]" aria-label="Tautan Kepatuhan">
+          <a href="/privacy.html" class="underline">Kebijakan Privasi</a>
+          <a href="/terms.html" class="underline">Ketentuan Layanan</a>
+        </nav>
+      </main>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

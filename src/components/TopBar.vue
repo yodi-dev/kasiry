@@ -85,7 +85,8 @@ const triggerAction = (actionEvent) => {
     </button>
 
     <!-- Center: Brand Title -->
-    <div class="text-center">
+    <div class="text-center leading-tight">
+      <span class="block text-[10px] font-bold tracking-[0.14em] uppercase text-[#0284c7]">Kasiry</span>
       <h1 class="text-sm font-bold text-[#0a193d] tracking-tight">{{ storeName }}</h1>
       <p class="text-[11px] text-slate-500 font-medium">{{ todayFormatted }}</p>
     </div>

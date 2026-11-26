@@ -638,6 +638,18 @@ onMounted(async () => {
         </div>
 
       </div>
+
+      <!-- Subtle App Identity & Compliance Links -->
+      <footer class="mt-6 pt-3 border-t border-[#0a193d]/10 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+        <span>
+          <strong class="font-semibold text-[#0a193d]/80">Kasiry</strong> — Aplikasi Kasir Warung &amp; Pencadangan Buku Kas
+        </span>
+        <nav class="flex items-center gap-3" aria-label="Tautan Kepatuhan">
+          <a href="/privacy.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Kebijakan Privasi</a>
+          <span aria-hidden="true" class="text-slate-300">•</span>
+          <a href="/terms.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Ketentuan Layanan</a>
+        </nav>
+      </footer>
     </main>
 
     <!-- 3. Floating Sticky Bottom Console (Input Barcode Sticky Tepat di Atas Total Tagihan) -->

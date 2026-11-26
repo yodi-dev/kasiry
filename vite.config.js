@@ -41,8 +41,8 @@ export default defineConfig({
       workbox: {
         maximumFileSizeToCacheInBytes: 3500000,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
-        globIgnores: ['**/og-image.png', '**/kasiry-oauth-120x120.png', '**/privacy.html', '**/terms.html', '**/robots.txt', '**/sitemap.xml'],
-        navigateFallbackDenylist: [/^\/privacy\.html$/, /^\/terms\.html$/, /^\/robots\.txt$/, /^\/sitemap\.xml$/]
+        globIgnores: ['**/google*.html', '**/og-image.png', '**/kasiry-oauth-120x120.png', '**/privacy.html', '**/terms.html', '**/robots.txt', '**/sitemap.xml'],
+        navigateFallbackDenylist: [/^\/google[a-z0-9]+\.html$/i, /^\/privacy\.html$/, /^\/terms\.html$/, /^\/robots\.txt$/, /^\/sitemap\.xml$/]
       }
     })
   ]
