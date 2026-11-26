@@ -93,15 +93,30 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(masAndi).toBeTruthy()
     expect(masAndi.totalDebt).toBe(25000)
 
-    // Cicilan Rp 10.000 -> sisa Rp 15.000
-    const pay1 = await kasiry.recordDebtPayment({ customerId: masAndi.id, amount: 10000 })
+    // Cicilan Rp 10.000 tunai -> sisa Rp 15.000
+    const pay1 = await kasiry.recordDebtPayment({ customerId: masAndi.id, amount: 10000, paymentMethod: 'TUNAI' })
     expect(pay1.appliedAmount).toBe(10000)
+    expect(pay1.paymentMethod).toBe('TUNAI')
     expect(pay1.remainingDebt).toBe(15000)
 
-    // Bayar dengan pecahan besar Rp 50.000 -> appliedAmount hanya Rp 15.000 (sisa bon 0)
-    const pay2 = await kasiry.recordDebtPayment({ customerId: masAndi.id, amount: 50000 })
+    // Bayar dengan pecahan besar Rp 50.000 tunai -> appliedAmount hanya Rp 15.000 (sisa bon 0)
+    const pay2 = await kasiry.recordDebtPayment({ customerId: masAndi.id, amount: 50000, paymentMethod: 'TUNAI' })
     expect(pay2.appliedAmount).toBe(15000)
     expect(pay2.remainingDebt).toBe(0)
+
+    // Catat BON ke pelanggan lain & lunasi lewat QRIS -> paymentMethod tersimpan 'QRIS'
+    await kasiry.recordTransaction({
+      invoiceNumber: 'BON-QRIS-1',
+      totalAmount: 40000,
+      paymentMethod: 'UTANG / BON',
+      customer: masAndi,
+      items: [{ ...prod, qty: 1 }]
+    })
+    const payQris = await kasiry.recordDebtPayment({ customerId: masAndi.id, amount: 40000, paymentMethod: 'QRIS' })
+    expect(payQris.appliedAmount).toBe(40000)
+    expect(payQris.paymentMethod).toBe('QRIS')
+    expect(payQris.remainingDebt).toBe(0)
+    expect(kasiry.debtPayments.value[0].paymentMethod).toBe('QRIS')
 
     // Input tidak valid / <= 0 ditolak bersih
     expect(await kasiry.recordDebtPayment({ customerId: masAndi.id, amount: -500 })).toBeUndefined()

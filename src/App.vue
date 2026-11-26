@@ -90,6 +90,7 @@ import { useKasiryDB } from './composables/useKasiryDB'
 import { useHardwareScanner } from './composables/useHardwareScanner'
 import { playBeepSound } from './utils/sound'
 import { exportKasiryExcel } from './utils/excelExport'
+import { computeDailyStats } from './utils/dailyStats'
 import { useGoogleSync } from './composables/useGoogleSync'
 
 // Dexie Database Composable (IndexedDB Engine)
@@ -215,57 +216,8 @@ const unpaidDebtCount = computed(() => {
   ).length
 })
 
-// Computed Laporan Kasir Real-time dari Transaksi Hari Ini
-const stats = computed(() => {
-  const startOfDay = new Date()
-  startOfDay.setHours(0, 0, 0, 0)
-  const todayTimestamp = startOfDay.getTime()
-
-  const todayTx = transactions.value.filter(t => t.createdAt >= todayTimestamp)
-  
-  let sales = 0
-  let profit = 0
-  let debt = 0
-  const productCountMap = {}
-
-  todayTx.forEach(t => {
-    if (t.paymentMethod === 'TUNAI') {
-      sales += t.totalAmount
-    } else {
-      debt += t.totalAmount
-    }
-
-    if (t.items) {
-      t.items.forEach(item => {
-        const itemProfit = (item.sellPrice - (item.buyPrice ?? item.sellPrice * 0.8)) * item.qty
-        profit += itemProfit
-
-        if (!productCountMap[item.name]) {
-          productCountMap[item.name] = { name: item.name, qty: 0, subtotal: 0 }
-        }
-        productCountMap[item.name].qty += item.qty
-        productCountMap[item.name].subtotal += item.sellPrice * item.qty
-      })
-    }
-  })
-
-  const todayDebtPaid = debtPayments.value
-    .filter(p => p.paymentDate >= todayTimestamp)
-    .reduce((sum, p) => sum + (p.amount || 0), 0)
-
-  const topProducts = Object.values(productCountMap)
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 5)
-
-  return {
-    todaySales: sales,
-    todayDebtPaid,
-    todayProfit: Math.round(profit),
-    transactionCount: todayTx.length,
-    todayNewDebt: debt,
-    topProducts
-  }
-})
+// Computed Laporan Kasir Real-time dari Transaksi Hari Ini (Tunai Laci vs QRIS Non-Tunai vs Bon)
+const stats = computed(() => computeDailyStats(transactions.value, debtPayments.value))
 
 // Computed Filtered Products for Search
 const searchResults = computed(() => {
@@ -362,13 +314,13 @@ const saveAndAddToCart = async (newProduct) => {
   triggerCloudAutoBackup()
 }
 
-// Payment Handlers (Menyimpan riwayat transaksi ke Dexie.js)
-const handleProcessCashPayment = async (data) => {
+// Helper bersama untuk menyelesaikan pembayaran langsung (Tunai maupun QRIS)
+const finalizeDirectSale = async ({ paymentMethod, invoicePrefix, totalAmount, cashGiven, changeAmount, customer }) => {
   const now = new Date()
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-  const invoice = `KSR-${Date.now().toString().slice(-6)}`
+  const invoice = `${invoicePrefix}-${Date.now().toString().slice(-6)}`
 
-  let custObj = data.customer || customers.value.find(c => c.name.toLowerCase() === 'umum') || { name: 'Umum', phone: '', totalDebt: 0 }
+  let custObj = customer || customers.value.find(c => c.name.toLowerCase() === 'umum') || { name: 'Umum', phone: '', totalDebt: 0 }
   if (custObj && !custObj.id && custObj.name) {
     const existing = customers.value.find(c => c.name.toLowerCase() === custObj.name.trim().toLowerCase())
     if (existing) {
@@ -384,10 +336,10 @@ const handleProcessCashPayment = async (data) => {
 
   const txPayload = {
     invoiceNumber: invoice,
-    totalAmount: data.totalAmount,
-    paymentMethod: 'TUNAI',
-    cashGiven: data.cashGiven,
-    changeAmount: data.changeAmount,
+    totalAmount,
+    paymentMethod,
+    cashGiven,
+    changeAmount,
     customer: custObj,
     customerId: custObj?.id || null,
     customerName: custObj?.name || '',
@@ -404,10 +356,10 @@ const handleProcessCashPayment = async (data) => {
   receiptData.value = {
     invoiceNumber: invoice,
     time: timeStr,
-    totalAmount: data.totalAmount,
-    paymentMethod: 'TUNAI',
-    cashGiven: data.cashGiven,
-    changeAmount: data.changeAmount,
+    totalAmount,
+    paymentMethod,
+    cashGiven,
+    changeAmount,
     customer: custObj,
     items: [...cart.value]
   }
@@ -415,6 +367,29 @@ const handleProcessCashPayment = async (data) => {
   clearCart()
   isPaymentOpen.value = false
   isReceiptOpen.value = true
+}
+
+// Payment Handlers (Menyimpan riwayat transaksi ke Dexie.js)
+const handleProcessCashPayment = async (data) => {
+  await finalizeDirectSale({
+    paymentMethod: 'TUNAI',
+    invoicePrefix: 'KSR',
+    totalAmount: data.totalAmount,
+    cashGiven: data.cashGiven,
+    changeAmount: data.changeAmount,
+    customer: data.customer
+  })
+}
+
+const handleProcessQrisPayment = async (data) => {
+  await finalizeDirectSale({
+    paymentMethod: 'QRIS',
+    invoicePrefix: 'QRS',
+    totalAmount: data.totalAmount,
+    cashGiven: data.totalAmount,
+    changeAmount: 0,
+    customer: data.customer
+  })
 }
 
 const handleProcessDebtPayment = async (data) => {
@@ -464,14 +439,15 @@ const handleProcessDebtPayment = async (data) => {
 }
 
 // Record Pelunasan Utang (Tersimpan ke Dexie.js + Google Sheets & Auto-Backup)
-const handleRecordDebtPayment = async ({ customerId, amount }) => {
-  const res = await recordDebtPayment({ customerId, amount })
+const handleRecordDebtPayment = async ({ customerId, amount, paymentMethod = 'TUNAI' }) => {
+  const res = await recordDebtPayment({ customerId, amount, paymentMethod })
   playBeepSound('success')
   if (res && res.appliedAmount > 0) {
     appendDebtPaymentToSheet({
       customerName: res.customerName,
       amount: res.appliedAmount,
       remainingDebt: res.remainingDebt,
+      paymentMethod: res.paymentMethod,
       paymentDate: res.paymentDate
     }, storeProfile.value?.name)
     triggerCloudAutoBackup(true)
@@ -921,7 +897,7 @@ onUnmounted(() => {
       @deleteCategory="handleDeleteCategory"
     />
 
-    <!-- Modal Pembayaran (Tunai vs Utang) -->
+    <!-- Modal Pembayaran (Tunai, QRIS, vs Utang) -->
     <PaymentModal 
       v-if="activatedModals.payment || isPaymentOpen"
       :isOpen="isPaymentOpen"
@@ -930,6 +906,7 @@ onUnmounted(() => {
       :transactions="transactions"
       @close="isPaymentOpen = false"
       @processCashPayment="handleProcessCashPayment"
+      @processQrisPayment="handleProcessQrisPayment"
       @processDebtPayment="handleProcessDebtPayment"
       @saveCustomer="handleSaveCustomer"
     />

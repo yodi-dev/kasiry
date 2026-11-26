@@ -78,14 +78,24 @@ const formatTime = (ts) => {
 
 // Format pesan WhatsApp laporan harian
 const generateWhatsAppText = () => {
-  const totalCash = (props.stats.todaySales || 0) + (props.stats.todayDebtPaid || 0)
+  const cashSales = props.stats.todayCashSales ?? props.stats.todaySales ?? 0
+  const qrisSales = props.stats.todayQrisSales ?? 0
+  const debtPaidCash = props.stats.todayDebtPaidCash ?? props.stats.todayDebtPaid ?? 0
+  const debtPaidQris = props.stats.todayDebtPaidQris ?? 0
+  const cashDrawerTotal = props.stats.todayCashDrawer ?? (cashSales + debtPaidCash)
+  const qrisTotal = props.stats.todayQrisTotal ?? (qrisSales + debtPaidQris)
+  const totalCash = cashDrawerTotal + qrisTotal
+
   let text = `*📊 LAPORAN KASIR ${props.storeName.toUpperCase()}*\n`
   text += `📅 Tanggal: ${todayFormatted.value}\n`
   text += `--------------------------------\n`
   text += `💵 *Total Kas Masuk:* Rp ${totalCash.toLocaleString('id-ID')}\n`
-  text += `   • Penjualan Tunai: Rp ${(props.stats.todaySales || 0).toLocaleString('id-ID')}\n`
-  if (props.stats.todayDebtPaid > 0) {
-    text += `   • Pelunasan Bon: Rp ${props.stats.todayDebtPaid.toLocaleString('id-ID')}\n`
+  text += `   • Uang Tunai Laci: Rp ${cashDrawerTotal.toLocaleString('id-ID')}\n`
+  if (qrisTotal > 0) {
+    text += `   • QRIS (Non-Tunai): Rp ${qrisTotal.toLocaleString('id-ID')}\n`
+  }
+  if ((props.stats.todayDebtPaid || 0) > 0) {
+    text += `   • Termasuk Pelunasan Bon: Rp ${props.stats.todayDebtPaid.toLocaleString('id-ID')}\n`
   }
   text += `📈 *Perkiraan Untung Bersih:* Rp ${(props.stats.todayProfit || 0).toLocaleString('id-ID')}\n`
   text += `🧾 *Jumlah Transaksi:* ${props.stats.transactionCount || 0} struk\n`
@@ -191,8 +201,9 @@ const shareToWhatsApp = () => {
                 Rp {{ ((stats.todaySales || 0) + (stats.todayDebtPaid || 0)).toLocaleString('id-ID') }}
               </p>
               <p class="text-[11px] text-slate-500 font-medium mt-1 truncate">
-                Tunai: Rp {{ (stats.todaySales || 0).toLocaleString('id-ID') }}
-                <span v-if="stats.todayDebtPaid > 0"> • Bon: Rp {{ stats.todayDebtPaid.toLocaleString('id-ID') }}</span>
+                Laci Tunai: Rp {{ (stats.todayCashDrawer ?? ((stats.todayCashSales ?? stats.todaySales ?? 0) + (stats.todayDebtPaidCash ?? stats.todayDebtPaid ?? 0))).toLocaleString('id-ID') }}
+                <span v-if="(stats.todayQrisTotal || 0) > 0"> • QRIS: Rp {{ stats.todayQrisTotal.toLocaleString('id-ID') }}</span>
+                <span v-else-if="stats.todayDebtPaid > 0"> • Bon: Rp {{ stats.todayDebtPaid.toLocaleString('id-ID') }}</span>
               </p>
             </div>
 
@@ -319,6 +330,8 @@ const shareToWhatsApp = () => {
                     'text-[10px] font-bold px-2 py-0.5 rounded-full border',
                     tx.paymentMethod === 'TUNAI' 
                       ? 'bg-emerald-50 text-emerald-800 border-emerald-200/60' 
+                      : tx.paymentMethod === 'QRIS'
+                      ? 'bg-sky-50 text-[#0284c7] border-sky-200/70'
                       : 'bg-rose-50 text-rose-800 border-rose-200/60'
                   ]"
                 >

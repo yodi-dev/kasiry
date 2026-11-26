@@ -6,6 +6,21 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.8.0] - 2026-11-26 (Roadmap #1: Metode Bayar QRIS & Pemisahan Arus Kas Laci)
+
+### Added
+- Tab metode pembayaran **`QRIS`** pada `src/components/PaymentModal.vue` (`Tunai` sebagai default | `QRIS` | `Utang / Bon`) yang otomatis menggunakan uang pas tanpa kembalian tunai serta tetap mendukung pemilihan pelanggan loyalitas (default `"Umum"`).
+- Opsi metode pembayaran **`Tunai` vs `QRIS`** pada pelunasan cicilan/utang di `src/components/DebtBookModal.vue` beserta penyimpanan `paymentMethod` di tabel `debtPayments` (`src/composables/useKasiryDB.js`).
+- Nomor nota khusus transaksi QRIS dengan prefix **`QRS-...`** di `src/App.vue` (via helper terpusat `finalizeDirectSale`).
+- Helper murni `computeDailyStats` di `src/utils/dailyStats.js` + suite test `tests/dailyStats.test.js` dan penambahan skenario QRIS pada `tests/useKasiryDB.test.js`, `tests/excelExport.test.js`, serta `tests/useGoogleSync.test.js`.
+
+### Changed
+- `ReceiptModal.vue` (tampilan thermal 58mm dan kirim WhatsApp) kini membedakan 3 status metode bayar: `TUNAI`, `QRIS` (`LUNAS (NON-TUNAI)`), dan `UTANG / BON`.
+- `DailyReportModal.vue` (kartu **Total Kas Masuk**, teks laporan WA 1-klik, dan badge biru `QRIS` pada Riwayat Transaksi) serta `src/utils/excelExport.js` kini memisahkan **Uang Tunai Masuk Laci** dan **Penerimaan QRIS (Non-Tunai)** secara presisi sebagai fondasi fitur Pengeluaran & Shift.
+- `src/composables/useGoogleSync.js` kini melabeli pelunasan bon via QRIS sebagai `PELUNASAN BON (QRIS)` di Google Sheets serta memperbaiki default pelanggan `'Umum'` pada transaksi QRIS.
+
+---
+
 ## [2.7.1] - 2026-11-26 (Tahap 3: Sinkronisasi Dokumentasi & Checklist Rilis)
 
 ### Changed

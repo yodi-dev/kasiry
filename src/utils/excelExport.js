@@ -29,6 +29,13 @@ export async function exportKasiryExcel({
   // ==========================================
   // SHEET 1: RINGKASAN KAS
   // ==========================================
+  const cashSales = stats.todayCashSales ?? stats.todaySales ?? 0
+  const qrisSales = stats.todayQrisSales ?? 0
+  const debtPaidCash = stats.todayDebtPaidCash ?? stats.todayDebtPaid ?? 0
+  const debtPaidQris = stats.todayDebtPaidQris ?? 0
+  const cashDrawerTotal = stats.todayCashDrawer ?? (cashSales + debtPaidCash)
+  const qrisTotal = stats.todayQrisTotal ?? (qrisSales + debtPaidQris)
+
   const summaryData = [
     ['LAPORAN KASIR & PENJUALAN'],
     ['Nama Warung', storeProfile.name || 'Habiba Store'],
@@ -38,9 +45,13 @@ export async function exportKasiryExcel({
     ['Waktu Ekspor', new Date().toLocaleTimeString('id-ID')],
     [],
     ['INDIKATOR KEUANGAN HARI INI', 'NOMINAL / JUMLAH'],
-    ['Penjualan Tunai', stats.todaySales || 0],
-    ['Pelunasan Utang Diterima', stats.todayDebtPaid || 0],
-    ['Total Uang Masuk Kas', (stats.todaySales || 0) + (stats.todayDebtPaid || 0)],
+    ['Penjualan Tunai (Masuk Laci)', cashSales],
+    ['Penjualan QRIS (Non-Tunai)', qrisSales],
+    ['Pelunasan Utang - Tunai', debtPaidCash],
+    ['Pelunasan Utang - QRIS', debtPaidQris],
+    ['Total Uang Tunai di Laci', cashDrawerTotal],
+    ['Total Penerimaan QRIS (Non-Tunai)', qrisTotal],
+    ['Total Uang Masuk Kas (Keseluruhan)', cashDrawerTotal + qrisTotal],
     ['Estimasi Untung Bersih', stats.todayProfit || 0],
     ['Bon / Utang Baru Tercatat', stats.todayNewDebt || 0],
     ['Total Transaksi / Struk', `${stats.transactionCount || 0} Kali`],
@@ -85,7 +96,7 @@ export async function exportKasiryExcel({
       txDate,
       t.invoiceNumber || '-',
       t.paymentMethod || 'TUNAI',
-      t.customerName || (t.paymentMethod === 'TUNAI' ? 'Pelanggan Umum' : '-'),
+      t.customerName || (t.paymentMethod === 'UTANG / BON' ? '-' : 'Pelanggan Umum'),
       t.totalAmount || 0,
       t.cashGiven || t.totalAmount || 0,
       t.changeAmount || 0,

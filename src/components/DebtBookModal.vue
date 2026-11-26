@@ -11,7 +11,9 @@ import {
   Phone, 
   User, 
   Calendar, 
-  Receipt 
+  Receipt,
+  Banknote,
+  QrCode
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -48,6 +50,7 @@ const activeFilter = ref('unpaid') // 'unpaid' | 'all' | 'paid'
 // State untuk Pembayaran Cicilan / Pelunasan
 const selectedCustomer = ref(null)
 const paymentAmount = ref('')
+const payMethod = ref('TUNAI')
 const fullCustomerHistory = ref([])
 
 // State untuk Tambah Pelanggan Baru
@@ -64,6 +67,7 @@ watch(() => props.isOpen, (newVal) => {
     selectedCustomer.value = null
     fullCustomerHistory.value = []
     paymentAmount.value = ''
+    payMethod.value = 'TUNAI'
     searchQuery.value = ''
   }
 }, { immediate: true })
@@ -73,6 +77,7 @@ const handleClose = () => {
   selectedCustomer.value = null
   fullCustomerHistory.value = []
   paymentAmount.value = ''
+  payMethod.value = 'TUNAI'
   emit('close')
 }
 
@@ -205,10 +210,36 @@ const handleSaveCustomer = () => {
   currentView.value = 'list'
 }
 
+const isQrisDebtOverpaid = computed(() => {
+  if (!selectedCustomer.value || payMethod.value !== 'QRIS') return false
+  const current = selectedCustomer.value.totalDebt || 0
+  const pay = parseInt(String(paymentAmount.value).replace(/\D/g, '') || '0', 10)
+  return pay > current
+})
+
+const canConfirmDebtPayment = computed(() => {
+  const amt = parseInt(String(paymentAmount.value).replace(/\D/g, '') || '0', 10)
+  if (amt <= 0 || !selectedCustomer.value) return false
+  if (payMethod.value === 'QRIS' && isQrisDebtOverpaid.value) return false
+  return true
+})
+
+const selectPayMethod = (method) => {
+  payMethod.value = method
+  if (method === 'QRIS' && selectedCustomer.value) {
+    const current = selectedCustomer.value.totalDebt || 0
+    const amt = parseInt(String(paymentAmount.value).replace(/\D/g, '') || '0', 10)
+    if (amt <= 0 || amt > current) {
+      paymentAmount.value = String(current)
+    }
+  }
+}
+
 // Buka Tampilan Bayar & muat histori bon lengkap dari IndexedDB bila tersedia
 const openPayView = async (c) => {
   selectedCustomer.value = c
   fullCustomerHistory.value = []
+  payMethod.value = 'TUNAI'
   paymentAmount.value = String(c.totalDebt || 0)
   currentView.value = 'pay'
   if (typeof props.fetchCustomerTransactions === 'function') {
@@ -268,12 +299,13 @@ const onManualPaymentInput = (e) => {
 }
 
 const handleConfirmPayment = () => {
+  if (!canConfirmDebtPayment.value) return
   const amt = parseInt(String(paymentAmount.value).replace(/\D/g, '') || '0', 10)
-  if (amt <= 0 || !selectedCustomer.value) return
 
   emit('recordPayment', {
     customerId: selectedCustomer.value.id,
-    amount: amt
+    amount: amt,
+    paymentMethod: payMethod.value
   })
 
   currentView.value = 'list'
@@ -696,6 +728,41 @@ const shareWhatsAppReminder = (c) => {
           </div>
         </div>
 
+        <!-- Metode Pelunasan (Tunai Laci vs QRIS Non-Tunai) -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
+            Metode Pembayaran Bon:
+          </label>
+          <div class="p-1 bg-slate-100 rounded-2xl flex gap-1">
+            <button
+              type="button"
+              @click="selectPayMethod('TUNAI')"
+              :class="[
+                'flex-1 h-9 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all',
+                payMethod === 'TUNAI'
+                  ? 'bg-[#0a193d] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              ]"
+            >
+              <Banknote class="w-3.5 h-3.5" />
+              <span>Tunai</span>
+            </button>
+            <button
+              type="button"
+              @click="selectPayMethod('QRIS')"
+              :class="[
+                'flex-1 h-9 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all',
+                payMethod === 'QRIS'
+                  ? 'bg-[#0284c7] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              ]"
+            >
+              <QrCode class="w-3.5 h-3.5" />
+              <span>QRIS (Non-Tunai)</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Input Nominal Bayar (Formatted dengan pemisah ribuan persis di Kasa) -->
         <div>
           <div class="flex items-center justify-between mb-1.5">
@@ -707,7 +774,7 @@ const shareWhatsAppReminder = (c) => {
               <span :class="['font-mono font-bold', isFullyPaidPreview ? 'text-emerald-700' : 'text-[#0a193d]']">
                 {{ isFullyPaidPreview ? 'Lunas ✓' : `Rp ${remainingDebtPreview.toLocaleString('id-ID')}` }}
               </span>
-              <span v-if="changeDebtPreview > 0" class="ml-2 text-emerald-700 font-bold font-mono">
+              <span v-if="payMethod === 'TUNAI' && changeDebtPreview > 0" class="ml-2 text-emerald-700 font-bold font-mono">
                 • Kembalian: Rp {{ changeDebtPreview.toLocaleString('id-ID') }}
               </span>
             </span>
@@ -726,44 +793,77 @@ const shareWhatsAppReminder = (c) => {
           </div>
         </div>
 
-        <!-- Tombol Lunas Semua (Uang Pas) & Pembulatan Terdekat (Persis di Kasa) -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <!-- Lunas Semua / Uang Pas -->
-          <button 
+        <!-- Peringatan QRIS bila melebihi sisa bon -->
+        <div
+          v-if="payMethod === 'QRIS' && isQrisDebtOverpaid"
+          class="p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2 text-xs text-amber-800"
+        >
+          <span>QRIS maksimal sebesar sisa bon (tanpa kembalian tunai).</span>
+          <button
             type="button"
             @click="setExactPayment"
-            class="h-11 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200/80 cursor-pointer transition-all active:scale-95 shadow-2xs flex items-center justify-center gap-1.5"
+            class="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 font-bold rounded-lg shrink-0 cursor-pointer"
           >
-            <span>Lunas Semua</span>
-          </button>
-
-          <!-- Saran Pembulatan -->
-          <button 
-            type="button"
-            v-for="sug in roundedSuggestions" 
-            :key="sug"
-            @click="setPaymentAmount(sug)"
-            class="h-11 px-3 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition-all active:scale-95 shadow-2xs font-mono"
-          >
-            Rp {{ (sug / 1000) }}rb
+            Pas-kan
           </button>
         </div>
 
-        <!-- Pecahan Nominal Uang Standar Rupiah (+2rb, +5rb, +10rb, dst Persis di Kasa) -->
-        <div>
-          <p class="text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Tambah Pecahan Uang Kertas:</p>
-          <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+        <!-- Mode QRIS: Cukup info + tombol Lunas Semua (Uang Pas) -->
+        <div v-if="payMethod === 'QRIS'" class="flex items-center justify-between gap-2 p-3 bg-sky-50/70 rounded-2xl border border-sky-200/70">
+          <div class="text-xs text-[#0a193d]">
+            <p class="font-bold">Pelunasan Non-Tunai QRIS</p>
+            <p class="text-[11px] text-slate-600">Bisa bayar pas atau cicil. Tidak masuk uang tunai laci.</p>
+          </div>
+          <button
+            type="button"
+            @click="setExactPayment"
+            class="h-10 px-3.5 bg-white hover:bg-sky-100 text-[#0284c7] font-bold text-xs rounded-xl border border-sky-200 cursor-pointer transition-all active:scale-95 shrink-0"
+          >
+            Lunas Semua (Pas)
+          </button>
+        </div>
+
+        <!-- Tombol Lunas Semua & Pecahan Tunai -->
+        <template v-else>
+          <!-- Tombol Lunas Semua (Uang Pas) & Pembulatan Terdekat (Persis di Kasa) -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <!-- Lunas Semua / Uang Pas -->
             <button 
               type="button"
-              v-for="bill in standardBills" 
-              :key="bill"
-              @click="addPaymentAmount(bill)"
-              class="h-10 bg-slate-100 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 text-slate-800 font-bold text-xs rounded-xl cursor-pointer border border-transparent transition-all active:scale-95 font-mono"
+              @click="setExactPayment"
+              class="h-11 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200/80 cursor-pointer transition-all active:scale-95 shadow-2xs flex items-center justify-center gap-1.5"
             >
-              +{{ bill >= 1000 ? (bill / 1000) + 'rb' : bill }}
+              <span>Lunas Semua</span>
+            </button>
+
+            <!-- Saran Pembulatan -->
+            <button 
+              type="button"
+              v-for="sug in roundedSuggestions" 
+              :key="sug"
+              @click="setPaymentAmount(sug)"
+              class="h-11 px-3 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition-all active:scale-95 shadow-2xs font-mono"
+            >
+              Rp {{ (sug / 1000) }}rb
             </button>
           </div>
-        </div>
+
+          <!-- Pecahan Nominal Uang Standar Rupiah (+2rb, +5rb, +10rb, dst Persis di Kasa) -->
+          <div>
+            <p class="text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Tambah Pecahan Uang Kertas:</p>
+            <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+              <button 
+                type="button"
+                v-for="bill in standardBills" 
+                :key="bill"
+                @click="addPaymentAmount(bill)"
+                class="h-10 bg-slate-100 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 text-slate-800 font-bold text-xs rounded-xl cursor-pointer border border-transparent transition-all active:scale-95 font-mono"
+              >
+                +{{ bill >= 1000 ? (bill / 1000) + 'rb' : bill }}
+              </button>
+            </div>
+          </div>
+        </template>
 
         <!-- Tombol Aksi Pembayaran -->
         <div class="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
@@ -775,11 +875,11 @@ const shareWhatsAppReminder = (c) => {
           </button>
           <button 
             @click="handleConfirmPayment"
-            :disabled="!paymentAmount || parseInt(paymentAmount) <= 0"
+            :disabled="!canConfirmDebtPayment"
             class="h-11 px-6 bg-[#0a193d] hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-2xl shadow-sm flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed transition-all active:scale-95"
           >
             <Check class="w-4 h-4 text-sky-400" />
-            <span>Simpan Pembayaran</span>
+            <span>{{ payMethod === 'QRIS' ? 'Simpan Bayar QRIS' : 'Simpan Pembayaran' }}</span>
           </button>
         </div>
       </div>

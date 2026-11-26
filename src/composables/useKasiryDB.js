@@ -234,7 +234,7 @@ export function useKasiryDB() {
   }
 
   // Pelunasan / Cicilan Utang (update inkremental tanpa membaca ulang seluruh riwayat transaksi)
-  const recordDebtPayment = async ({ customerId, amount }) => {
+  const recordDebtPayment = async ({ customerId, amount, paymentMethod = 'TUNAI' }) => {
     const cust = await db.customers.get(customerId)
     if (!cust) return
 
@@ -242,6 +242,8 @@ export function useKasiryDB() {
     const currentDebt = cust.totalDebt || 0
     const numericAmount = Number(amount)
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return
+
+    const method = paymentMethod === 'QRIS' ? 'QRIS' : 'TUNAI'
 
     // Catat kas masuk hanya sebatas nominal utang yang benar-benar terlunasi (tanpa uang kembalian)
     const appliedAmount = Math.min(numericAmount, currentDebt)
@@ -258,6 +260,7 @@ export function useKasiryDB() {
       id: generateUniqueId(),
       customerId,
       amount: appliedAmount,
+      paymentMethod: method,
       paymentDate: now,
       updatedAt: now
     })
@@ -270,6 +273,7 @@ export function useKasiryDB() {
       appliedAmount,
       remainingDebt: nextDebt,
       customerName: cust.name,
+      paymentMethod: method,
       paymentDate: now
     }
   }

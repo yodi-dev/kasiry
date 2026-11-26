@@ -421,7 +421,7 @@ export function useGoogleSync() {
       new Date(txData.createdAt || Date.now()).toLocaleString('id-ID'),
       txData.invoiceNumber || '-',
       txData.paymentMethod || 'TUNAI',
-      txData.customerName || (txData.paymentMethod === 'TUNAI' ? 'Umum' : '-'),
+      txData.customerName || (txData.paymentMethod === 'UTANG / BON' ? '-' : 'Umum'),
       txData.totalAmount || 0,
       txData.cashGiven ?? txData.totalAmount ?? 0,
       txData.changeAmount || 0,
@@ -505,16 +505,17 @@ export function useGoogleSync() {
   }
 
   // Catat Pelunasan / Cicilan Bon ke Google Sheets melalui pipeline antrean yang sama
-  const appendDebtPaymentToSheet = async ({ customerName, amount, remainingDebt = 0, paymentDate = Date.now() }, storeName = 'Toko') => {
+  const appendDebtPaymentToSheet = async ({ customerName, amount, remainingDebt = 0, paymentMethod = 'TUNAI', paymentDate = Date.now() }, storeName = 'Toko') => {
+    const isQris = paymentMethod === 'QRIS'
     return appendTransactionToSheet({
       invoiceNumber: `LUNAS-${String(paymentDate).slice(-6)}`,
       createdAt: paymentDate,
-      paymentMethod: 'PELUNASAN BON',
+      paymentMethod: isQris ? 'PELUNASAN BON (QRIS)' : 'PELUNASAN BON',
       customerName: customerName || 'Pelanggan',
       totalAmount: amount,
       cashGiven: amount,
       changeAmount: 0,
-      itemsText: `Pembayaran utang (Sisa bon: Rp ${Math.max(0, remainingDebt).toLocaleString('id-ID')})`
+      itemsText: `Pembayaran utang ${isQris ? 'via QRIS ' : ''}(Sisa bon: Rp ${Math.max(0, remainingDebt).toLocaleString('id-ID')})`
     }, storeName)
   }
 

@@ -38,6 +38,8 @@ const shareToWhatsApp = () => {
   let bayarText = ''
   if (r.paymentMethod === 'TUNAI') {
     bayarText = `Bayar: Rp ${r.cashGiven.toLocaleString('id-ID')}\nKembalian: Rp ${r.changeAmount.toLocaleString('id-ID')}`
+  } else if (r.paymentMethod === 'QRIS') {
+    bayarText = `Bayar Pas (QRIS): Rp ${r.totalAmount.toLocaleString('id-ID')}\nStatus: LUNAS (Non-Tunai)`
   } else {
     bayarText = `Status: Dicatat di Buku Utang (${r.customer?.name || 'Pelanggan'})`
   }
@@ -146,6 +148,17 @@ const shareToWhatsApp = () => {
             <div class="flex justify-between font-semibold text-emerald-700 text-xs sm:text-sm">
               <span>KEMBALIAN:</span>
               <span>Rp {{ receiptData.changeAmount.toLocaleString('id-ID') }}</span>
+            </div>
+          </template>
+
+          <template v-else-if="receiptData.paymentMethod === 'QRIS'">
+            <div class="flex justify-between text-slate-600">
+              <span>Bayar Pas (QRIS):</span>
+              <span>Rp {{ receiptData.totalAmount.toLocaleString('id-ID') }}</span>
+            </div>
+            <div class="flex justify-between font-semibold text-[#0284c7] text-xs">
+              <span>STATUS:</span>
+              <span>LUNAS (NON-TUNAI)</span>
             </div>
           </template>
 

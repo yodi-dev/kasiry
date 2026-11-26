@@ -56,6 +56,19 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(flushed).toEqual({ flushed: 1, remaining: 0 })
     expect(sync.pendingQueueCount.value).toBe(0)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    // 3. Pelunasan bon via QRIS mengirimkan penanda metode QRIS yang jelas ke Sheets
+    await sync.appendDebtPaymentToSheet({
+      customerName: 'Bu Tejo',
+      amount: 25000,
+      remainingDebt: 0,
+      paymentMethod: 'QRIS',
+      paymentDate: 1700000000000
+    }, 'Habiba Store')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const lastBody = JSON.parse(fetchMock.mock.calls[1][1].body)
+    expect(lastBody.values[0][2]).toBe('PELUNASAN BON (QRIS)')
+    expect(lastBody.values[0][7]).toContain('via QRIS')
   })
 
   it('batches Drive snapshots to 3 minutes / 10 transactions once txCount >= 200', async () => {

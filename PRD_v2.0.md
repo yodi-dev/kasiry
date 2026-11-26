@@ -16,6 +16,7 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
+| **v2.8.0** | 26 November 2026 | **Roadmap #1 (Metode Bayar QRIS & Pemisahan Laci):** Tab `QRIS` otomatis uang pas di `PaymentModal` (prefix `QRS-`), opsi `Tunai | QRIS` di pelunasan Buku Utang, pemisahan Laci Tunai vs QRIS di Laporan Harian, WA, Excel & Google Sheets (`computeDailyStats`). |
 | **v2.7.1** | 26 November 2026 | **Tahap 3 (Sinkronisasi Dokumen & Checklist Rilis):** Pembaruan menyeluruh `README.md`, `PRD_v2.0.md`, `SITEMAP.md`, serta checklist final verifikasi Google OAuth & uji perangkat fisik. |
 | **v2.7.0** | 26 November 2026 | **Tahap 2 (Automated Testing & Bersih-Bersih Kode):** Setup Vitest + `fake-indexeddb` (5 suite, 12 skenario test), perbaikan bug `DAY_MS` pada modul arsip, penghapusan sisa `licenseStatus`, 6 file prototipe mati, serta migrasi skema Dexie `v1 -> v2` (`transactionItems: null`). |
 | **v2.6.0** | 26 November 2026 | **Tahap 1 (Pemecahan Bundle / Code Splitting):** Pemisahan chunk `vendor-vue`, `vendor-dexie`, `vendor-xlsx`, `vendor-zxing`, dynamic `import('xlsx')`, `defineAsyncComponent` untuk seluruh 9 modal sekunder + idle pre-warm jalur checkout, serta `{ immediate: true }` pada watcher open modal. |
@@ -158,6 +159,6 @@ Daftar fitur berikut dicatat untuk dibahas detail (*design & spec alignment*) da
 | 1 | **Sistem Buka & Tutup Shift** | `[ ] Backlog` | Modal/saldo kas awal laci, pencatatan nama kasir/shift aktif, ringkasan uang fisik laci vs sistem saat tutup shift, selisih kas, & rekap laporan per shift. |
 | 2 | **Transaksi Keluar / Pengeluaran Harian** | `[ ] Backlog` | Pencatatan kas keluar warung per hari (listrik, plastik, bensin, iuran, dll.), memengaruhi saldo laci shift/kas harian, & muncul di Laporan Harian + ekspor Excel/Sheets. |
 | 3 | **Multi Harga (Ecer / Grosir / Agen)** | `[ ] Backlog` | Definisi tier harga atau aturan grosir bertingkat (berdasarkan qty atau level pelanggan/manual switch saat transaksi) serta skema IndexedDB & backup kompatibel. |
-| 4 | **Metode Bayar QRIS** | `[ ] Backlog` | Opsi tab/metode pembayaran `QRIS` di `PaymentModal.vue` (QRIS statis toko / gambar QR unggahan pemilik warung), pencatatan di struk & laporan kas non-tunai (agar terpisah dari kas fisik laci). |
+| 4 | **Metode Bayar QRIS** | `[x] Selesai (v2.8.0)` | Tab `QRIS` di `PaymentModal.vue` (otomatis uang pas, prefix `QRS-`), opsi `Tunai \| QRIS` di Buku Utang, pemisahan Laci Tunai vs QRIS di Laporan Harian, Struk 58mm, WA, Excel & Google Sheets (upload foto QRIS statis ditunda ke rilis opsional nanti). |
 | 5 | **Fitur Kulakan / Belanja Stok** | `[ ] Backlog` | Pencatatan stok masuk barang, harga kulak/modal terbaru, pembaruan stok produk (opsional pelacakan stok aktif), serta keterhubungannya dengan pengeluaran kas warung atau shift. |
 | 6 | **Pembersihan & Seed Data Awal Baru** | `[ ] Backlog` | Audit dan peremajaan `src/db/seedData.js` (produk awal warung & contoh pelanggan buku utang) atau opsi awal warung bersih vs data contoh. |

@@ -20,15 +20,21 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
-  it('lazily imports xlsx and creates valid 4-sheet workbook including historical transactions and debts', async () => {
+  it('lazily imports xlsx and creates valid 4-sheet workbook including historical transactions, QRIS summary, and debts', async () => {
     const fileName = await exportKasiryExcel({
       storeProfile: { name: 'Habiba Store', owner: 'Habiba', phone: '081234567890' },
       stats: {
-        todaySales: 22000,
+        todaySales: 52000,
+        todayCashSales: 22000,
+        todayQrisSales: 30000,
         todayDebtPaid: 10000,
-        todayProfit: 5000,
+        todayDebtPaidCash: 10000,
+        todayDebtPaidQris: 0,
+        todayCashDrawer: 32000,
+        todayQrisTotal: 30000,
+        todayProfit: 9000,
         todayNewDebt: 15000,
-        transactionCount: 2
+        transactionCount: 3
       },
       transactions: [
         {
@@ -40,6 +46,16 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
           cashGiven: 50000,
           changeAmount: 28000,
           items: [{ id: 1, name: 'Gas LPG 3 Kg', sellPrice: 22000, buyPrice: 19000, qty: 1 }]
+        },
+        {
+          invoiceNumber: 'QRS-1002',
+          createdAt: Date.now(),
+          paymentMethod: 'QRIS',
+          customerName: '',
+          totalAmount: 30000,
+          cashGiven: 30000,
+          changeAmount: 0,
+          items: [{ id: 3, name: 'Telur 1kg', sellPrice: 30000, buyPrice: 26000, qty: 1 }]
         },
         {
           invoiceNumber: 'BON-1000',
@@ -69,9 +85,17 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
       'Buku Utang Pelanggan'
     ])
 
+    const summaryRows = XLSX.utils.sheet_to_json(workbook.Sheets['Ringkasan Kas'], { header: 1 })
+    const summaryMap = Object.fromEntries(summaryRows.filter(r => r.length >= 2))
+    expect(summaryMap['Total Uang Tunai di Laci']).toBe(32000)
+    expect(summaryMap['Total Penerimaan QRIS (Non-Tunai)']).toBe(30000)
+    expect(summaryMap['Total Uang Masuk Kas (Keseluruhan)']).toBe(62000)
+
     const txRows = XLSX.utils.sheet_to_json(workbook.Sheets['Daftar Transaksi'])
-    expect(txRows).toHaveLength(2)
-    expect(txRows.map(r => r['No. Nota / Invoice'])).toEqual(['KSR-1001', 'BON-1000'])
+    expect(txRows).toHaveLength(3)
+    expect(txRows.map(r => r['No. Nota / Invoice'])).toEqual(['KSR-1001', 'QRS-1002', 'BON-1000'])
+    expect(txRows[1]['Metode Bayar']).toBe('QRIS')
+    expect(txRows[1]['Nama Pelanggan']).toBe('Pelanggan Umum')
 
     const debtRows = XLSX.utils.sheet_to_json(workbook.Sheets['Buku Utang Pelanggan'])
     expect(debtRows).toHaveLength(1)
