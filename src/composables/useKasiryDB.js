@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, shallowRef, computed } from 'vue'
 import { db, initDatabase } from '../db/index'
 
 // Helper agar objek/array reaktif Vue (Proxy) selalu dikonversi menjadi plain JS sebelum disimpan ke IndexedDB
@@ -6,6 +6,10 @@ const toPlain = (val) => {
   if (val === undefined) return undefined
   return JSON.parse(JSON.stringify(val))
 }
+
+// Batas hari riwayat aktif yang dipertahankan di RAM Vue (data lebih lama tetap aman di IndexedDB)
+const ACTIVE_HISTORY_DAYS = 90
+const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 // Generator ID numerik unik lintas perangkat & dijamin monotonik walau dipanggil di 1ms yang sama
 let lastGeneratedId = 0
@@ -15,12 +19,18 @@ const generateUniqueId = () => {
   return lastGeneratedId
 }
 
-// Shared Reactive State
+// Shared Reactive State (shallowRef untuk daftar besar agar bebas beban deep Proxy Vue)
 const isDbReady = ref(false)
-const products = ref([])
+const products = shallowRef([])
 const customers = ref([])
-const transactions = ref([])
-const debtPayments = ref([])
+const transactions = shallowRef([])
+const debtPayments = shallowRef([])
+const totalTransactionCount = ref(0)
+const totalDebtPaymentCount = ref(0)
+const archiveCutoffAt = ref(0)
+const olderTransactionCount = computed(() =>
+  Math.max(0, totalTransactionCount.value - transactions.value.length)
+)
 const lastLocalBackupTime = ref(
   typeof localStorage !== 'undefined' ? localStorage.getItem('kasiry_last_local_backup') || null : null
 )
@@ -62,16 +72,15 @@ export function useKasiryDB() {
     }
   }
 
-  // Refresh data dari IndexedDB ke Vue reactive state
-  const refreshAllData = async () => {
-    // 1. Ambil Produk (hanya yang tidak dihapus)
-    const allProducts = await db.products
+  // Query parsial: hanya muat tabel yang berubah (hindari membaca puluhan ribu transaksi berulang kali)
+  const refreshProducts = async () => {
+    products.value = await db.products
       .filter(p => !p.deleted)
       .reverse()
       .toArray()
-    products.value = allProducts
+  }
 
-    // 2. Ambil Pelanggan (Buku Utang & Pembeli)
+  const refreshCustomers = async () => {
     let allCustomers = await db.customers
       .filter(c => !c.deleted)
       .reverse()
@@ -96,34 +105,42 @@ export function useKasiryDB() {
         .toArray()
     }
     customers.value = allCustomers
+  }
 
-    // 3. Ambil seluruh riwayat transaksi terbaru agar rekap & statistik pelanggan selalu akurat
-    const recentTx = await db.transactions
-      .orderBy('createdAt')
-      .reverse()
-      .toArray()
+  const refreshRecentTransactions = async () => {
+    const windowCutoff = Date.now() - ACTIVE_HISTORY_DAYS * MS_PER_DAY
+    const [recentTx, recentPays, txCount, payCount] = await Promise.all([
+      db.transactions.where('createdAt').aboveOrEqual(windowCutoff).reverse().toArray(),
+      db.debtPayments.where('paymentDate').aboveOrEqual(windowCutoff).reverse().toArray(),
+      db.transactions.count(),
+      db.debtPayments.count()
+    ])
     transactions.value = recentTx
+    debtPayments.value = recentPays
+    totalTransactionCount.value = txCount
+    totalDebtPaymentCount.value = payCount
+  }
 
-    // 3b. Ambil Pelunasan Utang
-    const recentPayments = await db.debtPayments
-      .orderBy('paymentDate')
-      .reverse()
-      .toArray()
-    debtPayments.value = recentPayments
+  const refreshSettings = async () => {
+    const [profileSetting, licenseSetting, catSetting, archiveSetting] = await Promise.all([
+      db.settings.get('storeProfile'),
+      db.settings.get('licenseStatus'),
+      db.settings.get('categories'),
+      db.settings.get('archiveState')
+    ])
 
-    // 4. Ambil Pengaturan Toko
-    const profileSetting = await db.settings.get('storeProfile')
     if (profileSetting && profileSetting.value) {
       storeProfile.value = { ...profileSetting.value }
     }
 
-    const licenseSetting = await db.settings.get('licenseStatus')
     if (licenseSetting && licenseSetting.value) {
       licenseStatus.value = { ...licenseSetting.value }
     }
 
-    // 5. Ambil Daftar Kategori
-    const catSetting = await db.settings.get('categories')
+    if (archiveSetting && archiveSetting.value && typeof archiveSetting.value.cutoffAt === 'number') {
+      archiveCutoffAt.value = archiveSetting.value.cutoffAt
+    }
+
     if (catSetting && Array.isArray(catSetting.value) && catSetting.value.length > 0) {
       categoryList.value = catSetting.value
     } else {
@@ -134,6 +151,16 @@ export function useKasiryDB() {
         updatedAt: Date.now()
       })
     }
+  }
+
+  // Refresh penuh secara paralel (hanya saat startup & pemulihan cadangan)
+  const refreshAllData = async () => {
+    await Promise.all([
+      refreshProducts(),
+      refreshCustomers(),
+      refreshRecentTransactions(),
+      refreshSettings()
+    ])
   }
 
   // Computed: 6–8 Barang Sering Terjual (isMacro)
@@ -159,7 +186,7 @@ export function useKasiryDB() {
       await db.products.add(payload)
     }
 
-    await refreshAllData()
+    await refreshProducts()
     return payload
   }
 
@@ -170,7 +197,7 @@ export function useKasiryDB() {
       prod.deleted = true
       prod.updatedAt = Date.now()
       await db.products.put(prod)
-      await refreshAllData()
+      await refreshProducts()
     }
   }
 
@@ -195,7 +222,7 @@ export function useKasiryDB() {
         existing.address = payload.address || existing.address
         existing.updatedAt = now
         await db.customers.put(toPlain(existing))
-        await refreshAllData()
+        await refreshCustomers()
         return existing
       }
       payload.id = generateUniqueId()
@@ -204,7 +231,7 @@ export function useKasiryDB() {
       await db.customers.add(payload)
     }
 
-    await refreshAllData()
+    await refreshCustomers()
     return payload
   }
 
@@ -214,11 +241,11 @@ export function useKasiryDB() {
       cust.deleted = true
       cust.updatedAt = Date.now()
       await db.customers.put(cust)
-      await refreshAllData()
+      await refreshCustomers()
     }
   }
 
-  // Pelunasan / Cicilan Utang
+  // Pelunasan / Cicilan Utang (update inkremental tanpa membaca ulang seluruh riwayat transaksi)
   const recordDebtPayment = async ({ customerId, amount }) => {
     const cust = await db.customers.get(customerId)
     if (!cust) return
@@ -236,15 +263,18 @@ export function useKasiryDB() {
     await db.customers.put(cust)
 
     // Catat histori pelunasan sebesar nominal utang yang dibayarkan
-    await db.debtPayments.add({
+    const paymentRecord = toPlain({
       id: generateUniqueId(),
       customerId,
       amount: appliedAmount,
       paymentDate: now,
       updatedAt: now
     })
+    await db.debtPayments.add(paymentRecord)
 
-    await refreshAllData()
+    debtPayments.value = [paymentRecord, ...debtPayments.value]
+    totalDebtPaymentCount.value += 1
+    await refreshCustomers()
     return {
       appliedAmount,
       remainingDebt: nextDebt,
@@ -253,12 +283,10 @@ export function useKasiryDB() {
     }
   }
 
-  // Pencatatan Transaksi Baru (Tunai maupun Utang)
+  // Pencatatan Transaksi Baru (update state inkremental agar checkout selalu instan <5ms)
   const recordTransaction = async ({ invoiceNumber, totalAmount, paymentMethod, cashGiven, changeAmount, customer, items }) => {
     const now = Date.now()
-    
-    // 1. Simpan Transaksi Induk dengan ID unik global
-    const txId = await db.transactions.add(toPlain({
+    const txRecord = toPlain({
       id: generateUniqueId(),
       invoiceNumber,
       createdAt: now,
@@ -277,9 +305,13 @@ export function useKasiryDB() {
         subtotal: item.sellPrice * item.qty
       })),
       updatedAt: now
-    }))
+    })
+
+    // 1. Simpan Transaksi Induk ke IndexedDB
+    const txId = await db.transactions.add(txRecord)
 
     // 2. Jika Metode Utang, akumulasikan saldo utang pelanggan
+    let customerMutated = false
     if (paymentMethod === 'UTANG / BON' && customer) {
       let cust = customer.id ? await db.customers.get(customer.id) : null
       if (!cust && customer.name) {
@@ -303,6 +335,7 @@ export function useKasiryDB() {
         })
         await db.customers.add(cust)
       }
+      customerMutated = true
     }
 
     // 3. Update counter lisensi
@@ -313,7 +346,12 @@ export function useKasiryDB() {
       updatedAt: now
     })
 
-    await refreshAllData()
+    // 4. Perbarui shallowRef & counter lokal langsung tanpa full reload 5 tabel
+    transactions.value = [txRecord, ...transactions.value]
+    totalTransactionCount.value += 1
+    if (customerMutated) {
+      await refreshCustomers()
+    }
     return txId
   }
 
@@ -351,11 +389,11 @@ export function useKasiryDB() {
     })
   }
 
-  // Ekspor Cadangan ke File JSON
+  // Ekspor Cadangan ke File JSON (otomatis compact bila transaksi besar agar hemat memori)
   const exportBackupJSON = async () => {
     const backupData = await getFullDatabasePayload()
-
-    const jsonString = JSON.stringify(backupData, null, 2)
+    const txLen = backupData?.data?.transactions?.length || 0
+    const jsonString = txLen >= 500 ? JSON.stringify(backupData) : JSON.stringify(backupData, null, 2)
     const blob = new Blob([jsonString], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -374,6 +412,128 @@ export function useKasiryDB() {
       localStorage.setItem('kasiry_last_local_backup', nowIso)
     }
     return true
+  }
+
+  // Ambil seluruh transaksi & pelunasan dari IndexedDB on-demand (khusus ekspor Excel lengkap)
+  const getAllTransactionsForExport = async () => {
+    const [allTransactions, allDebtPayments] = await Promise.all([
+      db.transactions.orderBy('createdAt').reverse().toArray(),
+      db.debtPayments.orderBy('paymentDate').reverse().toArray()
+    ])
+    return {
+      transactions: allTransactions,
+      debtPayments: allDebtPayments
+    }
+  }
+
+  // Ambil riwayat lengkap 1 pelanggan dari IndexedDB memakai indeks customerId (O(log N + K))
+  const getCustomerTransactions = async (customerId, customerName = '') => {
+    const mapByKey = new Map()
+    const cleanTargetName = (customerName || '').trim().toLowerCase()
+
+    if (customerId !== null && customerId !== undefined && customerId !== '') {
+      const byIndex = await db.transactions.where('customerId').equals(customerId).toArray()
+      byIndex.forEach(t => mapByKey.set(t.invoiceNumber || t.id, t))
+    }
+
+    if (cleanTargetName) {
+      const byNameLegacy = await db.transactions
+        .filter(t => {
+          const tName = (t.customerName || t.customer?.name || '').trim().toLowerCase()
+          return tName === cleanTargetName
+        })
+        .toArray()
+      byNameLegacy.forEach(t => {
+        const key = t.invoiceNumber || t.id
+        if (!mapByKey.has(key)) mapByKey.set(key, t)
+      })
+    }
+
+    return Array.from(mapByKey.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+  }
+
+  // Hitung jumlah riwayat yang memenuhi syarat arsip (lebih tua dari retentionDays) tanpa memuat payload penuh
+  const getArchivableSummary = async (retentionDays = 180) => {
+    const cutoffTimestamp = Date.now() - retentionDays * DAY_MS
+    const [txCount, payCount] = await Promise.all([
+      db.transactions.where('createdAt').below(cutoffTimestamp).count(),
+      db.debtPayments.where('paymentDate').below(cutoffTimestamp).count()
+    ])
+    return {
+      retentionDays,
+      cutoffTimestamp,
+      txCount,
+      payCount
+    }
+  }
+
+  // Arsipkan & pangkas transaksi lama ke file JSON (+ siapkan payload untuk arsip Drive) tanpa menyentuh utang/barang/pelanggan
+  const archiveOldTransactions = async (retentionDays = 180) => {
+    const cutoffTimestamp = Date.now() - retentionDays * DAY_MS
+    const [oldTx, oldPays] = await Promise.all([
+      db.transactions.where('createdAt').below(cutoffTimestamp).toArray(),
+      db.debtPayments.where('paymentDate').below(cutoffTimestamp).toArray()
+    ])
+
+    if (oldTx.length === 0 && oldPays.length === 0) {
+      return {
+        archivedTxCount: 0,
+        archivedPayCount: 0,
+        cutoffTimestamp,
+        archiveFilename: null,
+        archivePayload: null
+      }
+    }
+
+    const cutoffDateStr = new Date(cutoffTimestamp).toISOString().slice(0, 10)
+    const safeStoreName = (storeProfile.value.name || 'Kasiry').replace(/\s+/g, '_')
+    const archiveFilename = `Arsip_${safeStoreName}_sd_${cutoffDateStr}.json`
+    const archivePayload = toPlain({
+      app: 'Kasiry POS Archive',
+      version: '1.0',
+      archivedAt: new Date().toISOString(),
+      cutoffTimestamp,
+      retentionDays,
+      storeProfile: storeProfile.value,
+      data: {
+        transactions: oldTx,
+        debtPayments: oldPays
+      }
+    })
+
+    // Unduh file arsip JSON otomatis ke perangkat sebelum memangkas IndexedDB
+    const jsonString = JSON.stringify(archivePayload)
+    const blob = new Blob([jsonString], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = archiveFilename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    const nextCutoff = Math.max(archiveCutoffAt.value || 0, cutoffTimestamp)
+    await db.transaction('rw', [db.transactions, db.debtPayments, db.settings], async () => {
+      await db.transactions.where('createdAt').below(cutoffTimestamp).delete()
+      await db.debtPayments.where('paymentDate').below(cutoffTimestamp).delete()
+      await db.settings.put({
+        key: 'archiveState',
+        value: { cutoffAt: nextCutoff },
+        updatedAt: Date.now()
+      })
+    })
+
+    archiveCutoffAt.value = nextCutoff
+    await refreshRecentTransactions()
+
+    return {
+      archivedTxCount: oldTx.length,
+      archivedPayCount: oldPays.length,
+      cutoffTimestamp,
+      archiveFilename,
+      archivePayload
+    }
   }
 
   // Periksa & Ringkas Isi File Cadangan JSON Sebelum Dipulihkan
@@ -405,7 +565,8 @@ export function useKasiryDB() {
   }
 
   // Impor / Pulihkan Cadangan dari File JSON (mendukung mode 'merge' aman & 'replace' timpa penuh)
-  const importBackupJSON = async (jsonStringOrObj, mode = 'merge') => {
+  const importBackupJSON = async (jsonStringOrObj, mode = 'merge', options = {}) => {
+    const { honorArchiveCutoff = false } = options
     try {
       const payload = typeof jsonStringOrObj === 'string' 
         ? JSON.parse(jsonStringOrObj) 
@@ -449,6 +610,13 @@ export function useKasiryDB() {
           return
         }
 
+        const incomingArchiveSetting = Array.isArray(inSettings)
+          ? inSettings.find(s => s.key === 'archiveState')
+          : null
+        const effectiveCutoff = honorArchiveCutoff
+          ? Math.max(archiveCutoffAt.value || 0, incomingArchiveSetting?.value?.cutoffAt || 0)
+          : 0
+
         // MODE MERGE AMAN: bandingkan updatedAt & hindari bentrok primary key lokal (++)
         if (Array.isArray(inProducts) && inProducts.length > 0) {
           const existingProds = await db.products.toArray()
@@ -490,6 +658,7 @@ export function useKasiryDB() {
           const existingInvoices = new Set(existingTx.filter(t => t.invoiceNumber).map(t => t.invoiceNumber))
           const toAddTx = []
           for (const rt of inTransactions) {
+            if (effectiveCutoff > 0 && (rt.createdAt || 0) < effectiveCutoff) continue
             if (rt.invoiceNumber && existingInvoices.has(rt.invoiceNumber)) continue
             const cleanTx = toPlain(rt)
             if (!cleanTx.id || usedIds.has(cleanTx.id)) {
@@ -508,6 +677,7 @@ export function useKasiryDB() {
           const existingKeys = new Set(existingPays.map(p => `${p.customerId}_${p.paymentDate}_${p.amount}`))
           const toAddPays = []
           for (const rdp of inDebtPayments) {
+            if (effectiveCutoff > 0 && (rdp.paymentDate || 0) < effectiveCutoff) continue
             const key = `${rdp.customerId}_${rdp.paymentDate}_${rdp.amount}`
             if (existingKeys.has(key)) continue
             const cleanPay = toPlain(rdp)
@@ -587,6 +757,10 @@ export function useKasiryDB() {
     customers,
     transactions,
     debtPayments,
+    totalTransactionCount,
+    totalDebtPaymentCount,
+    olderTransactionCount,
+    archiveCutoffAt,
     storeProfile,
     licenseStatus,
     categories,
@@ -604,6 +778,10 @@ export function useKasiryDB() {
     recordTransaction,
     saveStoreProfile,
     getFullDatabasePayload,
+    getAllTransactionsForExport,
+    getCustomerTransactions,
+    getArchivableSummary,
+    archiveOldTransactions,
     exportBackupJSON,
     inspectBackupJSON,
     importBackupJSON

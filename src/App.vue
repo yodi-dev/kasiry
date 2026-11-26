@@ -29,6 +29,8 @@ const {
   customers,
   transactions,
   debtPayments,
+  totalTransactionCount,
+  olderTransactionCount,
   storeProfile,
   licenseStatus,
   categories,
@@ -44,6 +46,10 @@ const {
   recordTransaction,
   saveStoreProfile,
   getFullDatabasePayload,
+  getAllTransactionsForExport,
+  getCustomerTransactions,
+  getArchivableSummary,
+  archiveOldTransactions,
   exportBackupJSON,
   importBackupJSON
 } = useKasiryDB()
@@ -64,6 +70,8 @@ const {
   disconnect: disconnectGoogle,
   setCustomClientId,
   syncWithCloud,
+  uploadArchiveToDrive,
+  pushCleanCloudSnapshot,
   scheduleDriveAutoBackup,
   flushPendingSheetQueue,
   appendTransactionToSheet,
@@ -72,11 +80,12 @@ const {
 } = useGoogleSync()
 
 // Helper terpusat untuk menjadwalkan auto-backup Google Drive saat data lokal berubah
-const triggerCloudAutoBackup = () => {
+const triggerCloudAutoBackup = (isTransactional = false) => {
   scheduleDriveAutoBackup(
     getFullDatabasePayload,
-    (mergedPayload) => importBackupJSON(mergedPayload, 'merge'),
-    () => storeProfile.value?.name
+    (mergedPayload) => importBackupJSON(mergedPayload, 'merge', { honorArchiveCutoff: true }),
+    () => storeProfile.value?.name,
+    { isTransactional, txCount: totalTransactionCount.value }
   )
 }
 
@@ -320,7 +329,7 @@ const handleProcessCashPayment = async (data) => {
 
   // Catat ke Google Sheets (atau antrean offline) & jadwalkan auto-backup Google Drive
   appendTransactionToSheet(txPayload, storeProfile.value?.name)
-  triggerCloudAutoBackup()
+  triggerCloudAutoBackup(true)
 
   receiptData.value = {
     invoiceNumber: invoice,
@@ -368,7 +377,7 @@ const handleProcessDebtPayment = async (data) => {
 
   // Catat ke Google Sheets (atau antrean offline) & jadwalkan auto-backup Google Drive
   appendTransactionToSheet(txPayload, storeProfile.value?.name)
-  triggerCloudAutoBackup()
+  triggerCloudAutoBackup(true)
 
   receiptData.value = {
     invoiceNumber: invoice,
@@ -395,7 +404,7 @@ const handleRecordDebtPayment = async ({ customerId, amount }) => {
       remainingDebt: res.remainingDebt,
       paymentDate: res.paymentDate
     }, storeProfile.value?.name)
-    triggerCloudAutoBackup()
+    triggerCloudAutoBackup(true)
   }
 }
 
@@ -478,7 +487,7 @@ const handleDisconnectGoogle = () => {
 const handleSyncCloud = async () => {
   const localPayload = await getFullDatabasePayload()
   const res = await syncWithCloud(localPayload, async (mergedPayload) => {
-    await importBackupJSON(mergedPayload, 'merge')
+    await importBackupJSON(mergedPayload, 'merge', { honorArchiveCutoff: true })
   }, true)
 
   if (res.success) {
@@ -516,18 +525,57 @@ const handleDeleteCustomer = async (custId) => {
   triggerCloudAutoBackup()
 }
 
-const handleDownloadExcel = () => {
+const handleDownloadExcel = async () => {
   try {
+    const { transactions: allTransactions, debtPayments: allDebtPayments } = await getAllTransactionsForExport()
     exportKasiryExcel({
       storeProfile: storeProfile.value,
       stats: stats.value,
-      transactions: transactions.value,
+      transactions: allTransactions,
       customers: customers.value,
-      debtPayments: debtPayments.value
+      debtPayments: allDebtPayments
     })
     playBeepSound('success')
   } catch (err) {
     alert('Gagal mengekspor file Excel: ' + err.message)
+  }
+}
+
+const handleArchiveOldData = async (payload) => {
+  const retentionDays = typeof payload === 'object' && payload !== null ? payload.retentionDays : payload
+  const onComplete = typeof payload === 'object' && payload !== null ? payload.onComplete : null
+  try {
+    const res = await archiveOldTransactions(retentionDays)
+    if (!res || (res.archivedTxCount === 0 && res.archivedPayCount === 0)) {
+      alert('Belum ada transaksi lama yang melebihi batas waktu tersebut.')
+      return
+    }
+
+    let driveUploaded = false
+    if (isGoogleConnected.value && res.archivePayload && res.archiveFilename) {
+      if (isOnline.value) {
+        const uploaded = await uploadArchiveToDrive(res.archivePayload, res.archiveFilename, false)
+        driveUploaded = Boolean(uploaded)
+        const freshPayload = await getFullDatabasePayload()
+        await pushCleanCloudSnapshot(freshPayload, false)
+      } else {
+        triggerCloudAutoBackup(false)
+      }
+    }
+
+    playBeepSound('success')
+    alert(
+      `Berhasil mengarsipkan ${res.archivedTxCount.toLocaleString('id-ID')} transaksi lama ke file ${res.archiveFilename}` +
+      (driveUploaded ? ' & menyimpan salinan ke Google Drive.' : '.') +
+      '\nMemori kasir kini lebih ringan; daftar barang & total saldo utang pelanggan tetap 100% aman.'
+    )
+  } catch (err) {
+    playBeepSound('warning')
+    alert('Gagal mengarsipkan data lama: ' + err.message)
+  } finally {
+    if (typeof onComplete === 'function') {
+      await onComplete()
+    }
   }
 }
 
@@ -639,7 +687,7 @@ onMounted(async () => {
     await flushPendingSheetQueue(storeProfile.value?.name)
     const localPayload = await getFullDatabasePayload()
     syncWithCloud(localPayload, async (mergedPayload) => {
-      await importBackupJSON(mergedPayload, 'merge')
+      await importBackupJSON(mergedPayload, 'merge', { honorArchiveCutoff: true })
     }, false)
   }
 })
@@ -793,6 +841,7 @@ onUnmounted(() => {
       :customers="customers"
       :transactions="transactions"
       :storeName="storeProfile.name"
+      :fetchCustomerTransactions="getCustomerTransactions"
       @close="isDebtBookOpen = false"
       @recordPayment="handleRecordDebtPayment"
       @addCustomer="handleSaveCustomer"
@@ -805,6 +854,7 @@ onUnmounted(() => {
       :customers="customers"
       :transactions="transactions"
       :storeName="storeProfile.name"
+      :fetchCustomerTransactions="getCustomerTransactions"
       @close="isCustomerManageOpen = false"
       @saveCustomer="handleSaveCustomer"
       @deleteCustomer="handleDeleteCustomer"
@@ -835,6 +885,11 @@ onUnmounted(() => {
       :hasPendingDriveBackup="hasPendingDriveBackup"
       :syncStatusMessage="googleSyncStatus"
       :customClientId="customClientId"
+      :totalTransactionCount="totalTransactionCount"
+      :olderTransactionCount="olderTransactionCount"
+      :productCount="products.length"
+      :customerCount="customers.length"
+      :getArchivableSummary="getArchivableSummary"
       @close="isSettingsOpen = false"
       @updateProfile="handleUpdateProfile"
       @connectGoogle="handleConnectGoogle"
@@ -844,6 +899,7 @@ onUnmounted(() => {
       @exportBackup="handleExportBackup"
       @importBackup="handleImportBackup"
       @updateClientId="handleUpdateCustomClientId"
+      @archiveOldData="handleArchiveOldData"
     />
 
     <!-- Modal Struk / Nota Pembayaran Berhasil -->

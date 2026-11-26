@@ -77,6 +77,26 @@ const props = defineProps({
   customClientId: {
     type: String,
     default: ''
+  },
+  totalTransactionCount: {
+    type: Number,
+    default: 0
+  },
+  olderTransactionCount: {
+    type: Number,
+    default: 0
+  },
+  productCount: {
+    type: Number,
+    default: 0
+  },
+  customerCount: {
+    type: Number,
+    default: 0
+  },
+  getArchivableSummary: {
+    type: Function,
+    default: null
   }
 })
 
@@ -89,7 +109,8 @@ const emit = defineEmits([
   'openGoogleSheet', 
   'exportBackup', 
   'importBackup',
-  'updateClientId'
+  'updateClientId',
+  'archiveOldData'
 ])
 
 // 2 Tabs: 'profile' (Nama Pemilik) | 'backup' (Cadangan & Google)
@@ -108,12 +129,78 @@ const isSaved = ref(false)
 const pendingImportPreview = ref(null)
 const importError = ref('')
 
+// State Kesehatan & Arsip Data Tahunan
+const archiveRetentionDays = ref(180)
+const archivableSummary = ref({
+  countToArchive: 0,
+  debtPaymentCount: 0,
+  remainingCount: 0,
+  cutoffDateLabel: ''
+})
+const confirmingArchive = ref(false)
+const isArchiving = ref(false)
+
+const refreshArchivePreview = async (days = archiveRetentionDays.value) => {
+  if (typeof props.getArchivableSummary === 'function') {
+    try {
+      const res = await props.getArchivableSummary(days)
+      const countToArchive = Number(res?.txCount ?? res?.countToArchive ?? 0)
+      const debtPaymentCount = Number(res?.payCount ?? res?.debtPaymentCount ?? 0)
+      const cutoffDateLabel = res?.cutoffTimestamp
+        ? new Date(res.cutoffTimestamp).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          })
+        : ''
+      archivableSummary.value = {
+        countToArchive,
+        debtPaymentCount,
+        remainingCount: Math.max(0, props.totalTransactionCount - countToArchive),
+        cutoffDateLabel
+      }
+      return
+    } catch {
+      // Abaikan error pratinjau
+    }
+  }
+  archivableSummary.value = {
+    countToArchive: days === 90 ? props.olderTransactionCount : 0,
+    debtPaymentCount: 0,
+    remainingCount: props.totalTransactionCount,
+    cutoffDateLabel: ''
+  }
+}
+
+const triggerArchiveOldData = () => {
+  if (isArchiving.value) return
+  isArchiving.value = true
+  confirmingArchive.value = false
+  emit('archiveOldData', {
+    retentionDays: archiveRetentionDays.value,
+    onComplete: async () => {
+      isArchiving.value = false
+      await refreshArchivePreview()
+    }
+  })
+}
+
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     pendingImportPreview.value = null
     importError.value = ''
+    confirmingArchive.value = false
     showClientIdConfig.value = false
     formClientId.value = props.customClientId || ''
+    if (activeTab.value === 'backup') {
+      refreshArchivePreview()
+    }
+  }
+})
+
+watch([activeTab, archiveRetentionDays, () => props.totalTransactionCount], ([tab]) => {
+  if (props.isOpen && tab === 'backup') {
+    refreshArchivePreview()
   }
 })
 
@@ -707,6 +794,120 @@ const cancelImport = () => {
                 class="hidden" 
                 @change="onFileSelected"
               />
+            </div>
+
+            <!-- Bagian 3: Kesehatan Data & Arsip Tahunan -->
+            <div class="p-4 bg-white rounded-2xl border border-gray-200/80 shadow-xs space-y-3">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                    <Database class="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-gray-800 text-sm">Kesehatan &amp; Arsip Data Tahunan</h4>
+                    <p class="text-[11px] text-gray-500">Jaga kasir tetap ngebut walau dipakai bertahun-tahun.</p>
+                  </div>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-700 tabular-nums shrink-0">
+                  {{ totalTransactionCount.toLocaleString('id-ID') }} Transaksi
+                </span>
+              </div>
+
+              <!-- Ringkasan Statistik Memori -->
+              <div class="grid grid-cols-3 gap-2 text-center bg-gray-50 rounded-xl p-2.5 border border-gray-100">
+                <div>
+                  <div class="text-[10px] font-semibold text-gray-500 uppercase">Barang</div>
+                  <div class="text-xs font-extrabold text-gray-800 tabular-nums">{{ productCount.toLocaleString('id-ID') }}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] font-semibold text-gray-500 uppercase">Pelanggan</div>
+                  <div class="text-xs font-extrabold text-gray-800 tabular-nums">{{ customerCount.toLocaleString('id-ID') }}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] font-semibold text-gray-500 uppercase">&gt; 90 Hari</div>
+                  <div class="text-xs font-extrabold text-amber-700 tabular-nums">{{ olderTransactionCount.toLocaleString('id-ID') }}</div>
+                </div>
+              </div>
+
+              <!-- Pilihan Rentang Arsip -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                  <Clock class="w-3.5 h-3.5 text-gray-400" />
+                  Pilih batas transaksi lama untuk diarsipkan:
+                </label>
+                <div class="grid grid-cols-3 gap-2">
+                  <button
+                    v-for="opt in [
+                      { days: 90, label: '> 3 Bulan' },
+                      { days: 180, label: '> 6 Bulan' },
+                      { days: 365, label: '> 1 Tahun' }
+                    ]"
+                    :key="opt.days"
+                    type="button"
+                    @click="archiveRetentionDays = opt.days; confirmingArchive = false"
+                    class="py-2 px-2.5 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                    :class="archiveRetentionDays === opt.days
+                      ? 'bg-sky-50 border-[#0284c7] text-[#0284c7] shadow-xs'
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
+                  >
+                    {{ opt.label }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Info Pratinjau & Tombol Eksekusi -->
+              <div v-if="archivableSummary && archivableSummary.countToArchive > 0" class="space-y-2.5">
+                <div class="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/70 text-[11px] text-amber-900 space-y-1">
+                  <p class="font-bold">
+                    Ditemukan {{ archivableSummary.countToArchive.toLocaleString('id-ID') }} transaksi lama (sebelum {{ archivableSummary.cutoffDateLabel }}).
+                  </p>
+                  <p class="text-amber-800/90 leading-relaxed">
+                    Sistem akan <strong>mengunduh file Arsip JSON</strong> terlebih dulu (dan menyimpan salinan ke Google Drive bila terhubung), lalu membersihkan memori HP. <strong>Daftar barang &amp; total saldo utang pelanggan tetap 100% aman.</strong>
+                  </p>
+                </div>
+
+                <div v-if="!confirmingArchive">
+                  <button
+                    type="button"
+                    :disabled="isArchiving"
+                    @click="confirmingArchive = true"
+                    class="w-full py-2.5 px-3 rounded-xl font-bold text-xs text-amber-900 bg-amber-100 hover:bg-amber-200/80 border border-amber-300 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <Download class="w-4 h-4" />
+                    Unduh Arsip &amp; Ringankan Memori HP
+                  </button>
+                </div>
+
+                <div v-else class="p-3 rounded-xl bg-red-50 border border-red-200 space-y-2">
+                  <p class="text-[11px] font-bold text-red-900">
+                    Yakin arsipkan &amp; bersihkan {{ archivableSummary.countToArchive.toLocaleString('id-ID') }} transaksi lama dari memori kasir?
+                  </p>
+                  <div class="flex gap-2">
+                    <button
+                      type="button"
+                      :disabled="isArchiving"
+                      @click="confirmingArchive = false"
+                      class="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      :disabled="isArchiving"
+                      @click="triggerArchiveOldData"
+                      class="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <RefreshCw v-if="isArchiving" class="w-3.5 h-3.5 animate-spin" />
+                      <span>{{ isArchiving ? 'Mengarsipkan...' : 'Ya, Unduh & Ringankan' }}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/70 flex items-center gap-2 text-xs text-emerald-800 font-semibold">
+                <CheckCircle class="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Memori kasir ringan! Belum ada transaksi lama yang perlu diarsipkan untuk rentang ini.</span>
+              </div>
             </div>
 
             <div class="p-3 bg-sky-50/60 rounded-xl border border-sky-100 flex items-center gap-2 text-xs text-sky-900 mt-2">

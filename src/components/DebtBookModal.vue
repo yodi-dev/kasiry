@@ -27,6 +27,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  fetchCustomerTransactions: {
+    type: Function,
+    default: null
+  },
   storeName: {
     type: String,
     default: 'Habiba Store'
@@ -44,6 +48,7 @@ const activeFilter = ref('unpaid') // 'unpaid' | 'all' | 'paid'
 // State untuk Pembayaran Cicilan / Pelunasan
 const selectedCustomer = ref(null)
 const paymentAmount = ref('')
+const fullCustomerHistory = ref([])
 
 // State untuk Tambah Pelanggan Baru
 const customerForm = ref({
@@ -57,6 +62,7 @@ watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     currentView.value = 'list'
     selectedCustomer.value = null
+    fullCustomerHistory.value = []
     paymentAmount.value = ''
     searchQuery.value = ''
   }
@@ -65,6 +71,7 @@ watch(() => props.isOpen, (newVal) => {
 const handleClose = () => {
   currentView.value = 'list'
   selectedCustomer.value = null
+  fullCustomerHistory.value = []
   paymentAmount.value = ''
   emit('close')
 }
@@ -137,10 +144,11 @@ const formatPhone = (phone) => {
   return phone
 }
 
-// Ambil riwayat bon belanja pelanggan jika ada transaksi tercatat
+// Ambil riwayat bon belanja pelanggan (memprioritaskan query IndexedDB lengkap bila tersedia)
 const customerDebtTransactions = computed(() => {
-  if (!selectedCustomer.value || !props.transactions) return []
-  return props.transactions
+  if (!selectedCustomer.value) return []
+  const source = fullCustomerHistory.value.length > 0 ? fullCustomerHistory.value : (props.transactions || [])
+  return source
     .filter(t => 
       (t.customerId === selectedCustomer.value.id || t.customerName === selectedCustomer.value.name) &&
       t.paymentMethod === 'UTANG / BON'
@@ -197,11 +205,23 @@ const handleSaveCustomer = () => {
   currentView.value = 'list'
 }
 
-// Buka Tampilan Bayar
-const openPayView = (c) => {
+// Buka Tampilan Bayar & muat histori bon lengkap dari IndexedDB bila tersedia
+const openPayView = async (c) => {
   selectedCustomer.value = c
+  fullCustomerHistory.value = []
   paymentAmount.value = String(c.totalDebt || 0)
   currentView.value = 'pay'
+  if (typeof props.fetchCustomerTransactions === 'function') {
+    const targetId = c.id
+    try {
+      const history = await props.fetchCustomerTransactions(c.id, c.name)
+      if (selectedCustomer.value?.id === targetId && Array.isArray(history)) {
+        fullCustomerHistory.value = history
+      }
+    } catch {
+      // Tetap gunakan transaksi 90 hari aktif sebagai fallback
+    }
+  }
 }
 
 // Pecahan uang kertas standar (persis seperti di Kasa / PaymentModal)

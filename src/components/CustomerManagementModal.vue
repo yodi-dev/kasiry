@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { buildCustomerStatsMap } from '../utils/customerStats'
 import { 
   X, 
   Users, 
@@ -32,6 +33,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  fetchCustomerTransactions: {
+    type: Function,
+    default: null
+  },
   storeName: {
     type: String,
     default: 'Habiba Store'
@@ -45,6 +50,7 @@ const currentView = ref('list')
 
 const searchQuery = ref('')
 const selectedCustomer = ref(null)
+const fullCustomerHistory = ref([])
 
 const customerForm = ref({
   id: null,
@@ -59,6 +65,7 @@ watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     currentView.value = 'list'
     selectedCustomer.value = null
+    fullCustomerHistory.value = []
     searchQuery.value = ''
   }
 })
@@ -66,29 +73,32 @@ watch(() => props.isOpen, (newVal) => {
 const handleClose = () => {
   currentView.value = 'list'
   selectedCustomer.value = null
+  fullCustomerHistory.value = []
   emit('close')
 }
 
-// Hitung total belanja & jumlah transaksi per pelanggan
+// Prekomputasi statistik pelanggan sekali jalan O(N)
+const customerStatsMap = computed(() => buildCustomerStatsMap(props.transactions))
+
+// Hitung total belanja & jumlah transaksi per pelanggan secara O(1)
 const getCustomerStats = (customerId, customerName) => {
-  if (!props.transactions || props.transactions.length === 0) {
-    return { count: 0, totalSpent: 0 }
+  if (
+    selectedCustomer.value &&
+    fullCustomerHistory.value.length > 0 &&
+    ((customerId && selectedCustomer.value.id === customerId) ||
+      (customerName && selectedCustomer.value.name === customerName))
+  ) {
+    return {
+      count: fullCustomerHistory.value.length,
+      totalSpent: fullCustomerHistory.value.reduce((sum, t) => sum + (t.totalAmount || 0), 0)
+    }
   }
-
-  const matches = props.transactions.filter(t => 
-    (customerId && (t.customerId === customerId || t.customer?.id === customerId)) || 
-    (customerName && (t.customerName === customerName || t.customer?.name === customerName))
-  )
-
-  const totalSpent = matches.reduce((sum, t) => sum + (t.totalAmount || 0), 0)
-  return {
-    count: matches.length,
-    totalSpent
-  }
+  return customerStatsMap.value.getStats({ id: customerId, name: customerName })
 }
 
 // Urutkan pelanggan berdasarkan yang paling sering belanja (terbanyak di atas)
 const filteredCustomers = computed(() => {
+  const stats = customerStatsMap.value
   const sorted = [...props.customers].sort((a, b) => {
     // "Umum" selalu di posisi paling atas jika ada
     const isAUmum = a.name?.toLowerCase() === 'umum'
@@ -96,8 +106,8 @@ const filteredCustomers = computed(() => {
     if (isAUmum && !isBUmum) return -1
     if (!isAUmum && isBUmum) return 1
 
-    const countA = getCustomerStats(a.id, a.name).count
-    const countB = getCustomerStats(b.id, b.name).count
+    const countA = stats.getStats(a).count
+    const countB = stats.getStats(b).count
     if (countB !== countA) {
       return countB - countA // Frekuensi belanja terbanyak di atas
     }
@@ -114,9 +124,13 @@ const filteredCustomers = computed(() => {
   )
 })
 
-// Ambil riwayat seluruh transaksi pelanggan (Tunai maupun Utang)
+// Ambil riwayat seluruh transaksi pelanggan (on-demand full history dari IndexedDB jika tersedia)
 const customerTransactions = computed(() => {
-  if (!selectedCustomer.value || !props.transactions) return []
+  if (!selectedCustomer.value) return []
+  if (fullCustomerHistory.value.length > 0) {
+    return fullCustomerHistory.value
+  }
+  if (!props.transactions) return []
   const cid = selectedCustomer.value.id
   const cname = selectedCustomer.value.name
 
@@ -173,10 +187,22 @@ const openEditForm = (c) => {
   currentView.value = 'form'
 }
 
-// Buka Detail Pelanggan
-const openDetailView = (c) => {
+// Buka Detail Pelanggan & muat seluruh histori belanja lengkap dari IndexedDB bila tersedia
+const openDetailView = async (c) => {
   selectedCustomer.value = c
+  fullCustomerHistory.value = []
   currentView.value = 'detail'
+  if (typeof props.fetchCustomerTransactions === 'function') {
+    const targetId = c.id
+    try {
+      const history = await props.fetchCustomerTransactions(c.id, c.name)
+      if (selectedCustomer.value?.id === targetId && Array.isArray(history)) {
+        fullCustomerHistory.value = history
+      }
+    } catch {
+      // Tetap gunakan transaksi 90 hari aktif sebagai fallback
+    }
+  }
 }
 
 // Simpan Tambah / Edit

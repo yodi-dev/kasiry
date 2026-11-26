@@ -46,6 +46,9 @@ const isConnecting = ref(false)
 const isSyncing = ref(false)
 const statusMessage = ref('')
 let driveAutoBackupTimer = null
+let pendingDriveTxBatch = 0
+const DRIVE_TX_BATCH_THRESHOLD = 10
+const DRIVE_TX_THROTTLE_MS = 180000
 
 export function useGoogleSync() {
   const isConnected = computed(() => !!userProfile.value)
@@ -254,9 +257,9 @@ export function useGoogleSync() {
     return await queryFile(LEGACY_BACKUP_FILENAME)
   }
 
-  // Simpan Snapshot ke Google Drive
-  const uploadToDrive = async (payloadData, existingFileId = null, interactive = false) => {
-    const content = JSON.stringify(payloadData, null, 2)
+  // Simpan Snapshot ke Google Drive (JSON ringkas tanpa spasi agar hemat kuota & cepat di HP)
+  const uploadToDrive = async (payloadData, existingFileId = null, interactive = false, customFilename = BACKUP_FILENAME) => {
+    const content = JSON.stringify(payloadData)
 
     if (existingFileId) {
       const updateRes = await fetchWithAuth(
@@ -275,9 +278,9 @@ export function useGoogleSync() {
       return existingFileId
     } else {
       const metadata = {
-        name: BACKUP_FILENAME,
+        name: customFilename,
         mimeType: 'application/json',
-        description: 'Kasiry POS Warung Cloud Backup'
+        description: customFilename === BACKUP_FILENAME ? 'Kasiry POS Warung Cloud Backup' : 'Kasiry POS Archive Backup'
       }
 
       const boundary = '-------kasiry_boundary_' + Date.now()
@@ -583,30 +586,7 @@ export function useGoogleSync() {
       })
       const mergedCustomers = Array.from(customerMap.values())
 
-      // 3. Merge Transaksi (berdasarkan invoiceNumber agar tidak tertimpa bentrok ID)
-      const txMap = new Map()
-      ;(lData.transactions || []).forEach(t => txMap.set(t.invoiceNumber || t.id, t))
-      ;(rData.transactions || []).forEach(rt => {
-        const key = rt.invoiceNumber || rt.id
-        if (!txMap.has(key)) {
-          txMap.set(key, rt)
-        }
-      })
-      const mergedTransactions = Array.from(txMap.values())
-        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-
-      // 4. Merge Pembayaran Utang (berdasarkan kunci unik komposit)
-      const payMap = new Map()
-      ;(lData.debtPayments || []).forEach(dp => payMap.set(`${dp.customerId}_${dp.paymentDate}_${dp.amount}`, dp))
-      ;(rData.debtPayments || []).forEach(rdp => {
-        const key = `${rdp.customerId}_${rdp.paymentDate}_${rdp.amount}`
-        if (!payMap.has(key)) {
-          payMap.set(key, rdp)
-        }
-      })
-      const mergedDebtPayments = Array.from(payMap.values())
-
-      // 5. Merge Pengaturan Toko per key berdasarkan updatedAt
+      // 3. Merge Pengaturan Toko per key berdasarkan updatedAt lebih dulu (agar cutoff arsip terbaca)
       const settingsMap = new Map()
       ;(lData.settings || []).forEach(s => settingsMap.set(s.key, s))
       ;(rData.settings || []).forEach(rs => {
@@ -616,6 +596,44 @@ export function useGoogleSync() {
         }
       })
       const mergedSettings = Array.from(settingsMap.values())
+      const archiveCutoff = Number(settingsMap.get('archiveState')?.value?.cutoffAt || 0)
+
+      const toTimestamp = (val) => {
+        if (typeof val === 'number') return val
+        const parsed = Date.parse(val)
+        return Number.isFinite(parsed) ? parsed : 0
+      }
+
+      // 4. Merge Transaksi (berdasarkan invoiceNumber agar tidak tertimpa bentrok ID, hormati cutoff arsip)
+      const txMap = new Map()
+      ;(lData.transactions || []).forEach(t => {
+        if (archiveCutoff > 0 && toTimestamp(t.createdAt) < archiveCutoff) return
+        txMap.set(t.invoiceNumber || t.id, t)
+      })
+      ;(rData.transactions || []).forEach(rt => {
+        if (archiveCutoff > 0 && toTimestamp(rt.createdAt) < archiveCutoff) return
+        const key = rt.invoiceNumber || rt.id
+        if (!txMap.has(key)) {
+          txMap.set(key, rt)
+        }
+      })
+      const mergedTransactions = Array.from(txMap.values())
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+
+      // 5. Merge Pembayaran Utang (berdasarkan kunci unik komposit, hormati cutoff arsip)
+      const payMap = new Map()
+      ;(lData.debtPayments || []).forEach(dp => {
+        if (archiveCutoff > 0 && toTimestamp(dp.paymentDate) < archiveCutoff) return
+        payMap.set(`${dp.customerId}_${dp.paymentDate}_${dp.amount}`, dp)
+      })
+      ;(rData.debtPayments || []).forEach(rdp => {
+        if (archiveCutoff > 0 && toTimestamp(rdp.paymentDate) < archiveCutoff) return
+        const key = `${rdp.customerId}_${rdp.paymentDate}_${rdp.amount}`
+        if (!payMap.has(key)) {
+          payMap.set(key, rdp)
+        }
+      })
+      const mergedDebtPayments = Array.from(payMap.values())
 
       const mergedPayload = {
         app: 'Kasiry POS',
@@ -640,6 +658,7 @@ export function useGoogleSync() {
       await uploadToDrive(mergedPayload, fileId, interactive)
       await flushPendingSheetQueue(mergedPayload.storeProfile?.name, interactive)
       markDrivePending(false)
+      pendingDriveTxBatch = 0
 
       const nowIso = new Date().toISOString()
       lastSyncTime.value = nowIso
@@ -657,10 +676,37 @@ export function useGoogleSync() {
     }
   }
 
+  // Unggah file arsip tahunan terpisah ke Google Drive agar tidak menimpa backup aktif
+  const uploadArchiveToDrive = async (archivePayload, archiveFilename, interactive = false) => {
+    if (!isConnected.value) return null
+    try {
+      return await uploadToDrive(archivePayload, null, interactive, archiveFilename)
+    } catch (err) {
+      console.warn('[Archive Drive] Gagal mengunggah salinan arsip ke Drive:', err)
+      return null
+    }
+  }
+
+  // Dorong snapshot bersih ke Drive setelah proses arsip tahunan (tanpa menghidupkan data lama)
+  const pushCleanCloudSnapshot = async (localData, interactive = false) => {
+    if (!isConnected.value) return { success: false, skipped: true }
+    return await syncWithCloud(localData, null, interactive)
+  }
+
   // Jadwalkan auto-backup Google Drive secara senyap setelah perubahan data lokal
-  const scheduleDriveAutoBackup = (getLocalPayloadFn, applyMergedFn, getStoreNameFn) => {
+  // Ketika data transaksi sudah besar (>= 200), snapshot Drive dibatch setiap 10 transaksi atau 3 menit
+  // karena setiap transaksi kasir sudah dicatat realtime per baris ke Google Sheets.
+  const scheduleDriveAutoBackup = (getLocalPayloadFn, applyMergedFn, getStoreNameFn, options = {}) => {
     if (!isConnected.value) return
     markDrivePending(true)
+
+    const { isTransactional = false, txCount = 0 } = options
+    let delayMs = 2500
+
+    if (isTransactional && txCount >= 200) {
+      pendingDriveTxBatch += 1
+      delayMs = pendingDriveTxBatch >= DRIVE_TX_BATCH_THRESHOLD ? 2500 : DRIVE_TX_THROTTLE_MS
+    }
 
     if (driveAutoBackupTimer) {
       clearTimeout(driveAutoBackupTimer)
@@ -682,7 +728,7 @@ export function useGoogleSync() {
       } catch (err) {
         console.warn('[AutoBackup Drive] Ditunda hingga koneksi/token siap:', err)
       }
-    }, 2500)
+    }, delayMs)
   }
 
   return {
@@ -702,6 +748,8 @@ export function useGoogleSync() {
     disconnect,
     setCustomClientId,
     syncWithCloud,
+    uploadArchiveToDrive,
+    pushCleanCloudSnapshot,
     scheduleDriveAutoBackup,
     flushPendingSheetQueue,
     appendTransactionToSheet,

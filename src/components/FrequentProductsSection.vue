@@ -136,14 +136,17 @@ const displayedProducts = computed(() => {
     <div class="kasiry-scroll-pane md:flex-1 md:min-h-0 md:overflow-y-auto md:pr-0.5">
       <div class="frequent-products-grid gap-2 sm:gap-2.5">
         <button 
-          v-for="item in displayedProducts"
+          v-for="(item, idx) in displayedProducts"
           :key="item.id"
           type="button"
           @click="emit('selectProduct', item)"
           class="relative min-h-[78px] md:min-h-[92px] p-2.5 sm:p-3 bg-white/95 hover:bg-white active:scale-96 text-left rounded-2xl border shadow-2xs hover:shadow-md flex flex-col justify-between cursor-pointer transition-all group"
-          :class="cartQtyMap[item.id] > 0
-            ? 'border-[#0284c7]/60 ring-2 ring-sky-400/20 bg-sky-50/40'
-            : 'border-slate-200/60 hover:border-sky-300'"
+          :class="[
+            idx >= 16 ? 'offscreen-card-defer' : '',
+            cartQtyMap[item.id] > 0
+              ? 'border-[#0284c7]/60 ring-2 ring-sky-400/20 bg-sky-50/40'
+              : 'border-slate-200/60 hover:border-sky-300'
+          ]"
         >
           <!-- Badge Kuantitas Aktif di Struk -->
           <span

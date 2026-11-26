@@ -49,6 +49,12 @@ p {
   overscroll-behavior-y: contain;
 }
 
+/* Tunda layout/paint kartu katalog yang berada jauh di bawah lipatan layar */
+.offscreen-card-defer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 92px;
+}
+
 /* Container query: Grid Barang Sering Terjual beradaptasi ke lebar panelnya */
 .products-pane-container {
   container: products-pane / inline-size;

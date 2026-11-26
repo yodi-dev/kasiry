@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { buildCustomerStatsMap } from '../utils/customerStats'
 import { X, CheckCircle, Banknote, UserCheck, Plus, AlertCircle, CreditCard, User, Search, ChevronRight } from '@lucide/vue'
 
 const props = defineProps({
@@ -172,26 +173,19 @@ const onManualCashInput = (e) => {
   cashInputStr.value = num > 0 ? String(num) : ''
 }
 
-// Menghitung frekuensi transaksi belanja pelanggan
-const getCustomerTxCount = (cust) => {
-  if (!props.transactions || props.transactions.length === 0 || !cust) return 0
-  const cid = cust.id
-  const cname = cust.name
-  return props.transactions.filter(t => 
-    (cid && (t.customerId === cid || t.customer?.id === cid)) ||
-    (cname && (t.customerName === cname || t.customer?.name === cname))
-  ).length
-}
+// Peta statistik transaksi pelanggan terprekomputasi O(N)
+const customerStatsMap = computed(() => buildCustomerStatsMap(props.transactions))
 
-// Filter pelanggan di mode kas (diurutkan berdasarkan yang paling sering belanja)
+// Filter pelanggan di mode kas (diurutkan berdasarkan yang paling sering belanja secara O(1) lookup)
 const filteredCashCustomers = computed(() => {
+  const stats = customerStatsMap.value
   const sorted = [...props.savedCustomers].sort((a, b) => {
     // Umum selalu di posisi pertama
     if (a.name.toLowerCase() === 'umum') return -1
     if (b.name.toLowerCase() === 'umum') return 1
 
-    const countA = getCustomerTxCount(a)
-    const countB = getCustomerTxCount(b)
+    const countA = stats.getStats(a).count
+    const countB = stats.getStats(b).count
     if (countB !== countA) {
       return countB - countA // Yang paling sering belanja di atas
     }
