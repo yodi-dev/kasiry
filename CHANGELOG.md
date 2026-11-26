@@ -6,6 +6,16 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.8.1] - 2026-11-26 (Hotfix Modal Pembayaran Utang & Vue SFC UI Tests)
+
+### Fixed
+- Mengembalikan helper O(1) `getCustomerTxCount` berbasis `customerStatsMap` di `src/components/PaymentModal.vue` agar perpindahan ke tab **Utang / Bon** serta pembukaan dropdown pelanggan di tab Tunai/QRIS berjalan mulus tanpa error `ReferenceError`.
+
+### Added
+- Menambahkan `@vue/test-utils` dan `happy-dom` ke `vitest.config.js` dengan suite integrasi komponen Vue (`tests/uiModals.test.js`) untuk menguji langsung perpindahan tab (`Tunai` -> `QRIS` -> `Utang / Bon`), validasi Buku Utang, struk, laporan, pelanggan, lazy inventory, katalog produk, dan pengaturan arsip tahunan.
+
+---
+
 ## [2.8.0] - 2026-11-26 (Roadmap #1: Metode Bayar QRIS & Pemisahan Arus Kas Laci)
 
 ### Added

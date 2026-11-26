@@ -173,8 +173,9 @@ const onManualCashInput = (e) => {
   cashInputStr.value = num > 0 ? String(num) : ''
 }
 
-// Peta statistik transaksi pelanggan terprekomputasi O(N)
+// Peta statistik transaksi pelanggan terprekomputasi O(N) & lookup O(1)
 const customerStatsMap = computed(() => buildCustomerStatsMap(props.transactions))
+const getCustomerTxCount = (customer) => customerStatsMap.value.getStats(customer).count
 
 // Filter pelanggan di mode kas (diurutkan berdasarkan yang paling sering belanja secara O(1) lookup)
 const filteredCashCustomers = computed(() => {
