@@ -14,6 +14,10 @@ const props = defineProps({
   modalOpen: {
     type: Boolean,
     default: false
+  },
+  variant: {
+    type: String,
+    default: 'floating' // 'floating' (Mobile) | 'inline' (Tablet & Desktop)
   }
 })
 
@@ -27,10 +31,14 @@ const emit = defineEmits([
 const inputRef = ref(null)
 const isFocused = ref(false)
 
+const isVisibleInstance = () => {
+  return Boolean(inputRef.value && inputRef.value.offsetParent !== null)
+}
+
 const focusInput = () => {
-  if (props.modalOpen) return
+  if (props.modalOpen || !isVisibleInstance()) return
   nextTick(() => {
-    if (props.modalOpen) return
+    if (props.modalOpen || !isVisibleInstance()) return
     if (inputRef.value) {
       const activeEl = document.activeElement
       const isOtherInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl !== inputRef.value
@@ -42,13 +50,17 @@ const focusInput = () => {
   })
 }
 
-// Global keydown: jika kasir mulai mengetik karakter atau barcode scanner nembak,
-// langsung arahkan fokus ke input barcode secara otomatis (kecuali jika ada modal terbuka)
+// Global keydown: hanya instance yang terlihat yang menangkap input barcode / hotkey '/'
 const handleGlobalKeyDown = (e) => {
-  if (props.modalOpen) return
+  if (props.modalOpen || !isVisibleInstance()) return
   const activeEl = document.activeElement
   if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) return
-  if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+  if (e.key === '/') {
+    e.preventDefault()
+    focusInput()
+    return
+  }
+  if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey && e.key !== 'F2') {
     focusInput()
   }
 }
@@ -120,13 +132,26 @@ const handleEnter = () => {
           :value="searchQuery"
           @input="handleInput"
           @keydown.enter.prevent="handleEnter"
+          @keydown.esc="clearInput"
           @focus="isFocused = true"
           @blur="isFocused = false"
-          placeholder="Cari barang / scan barcode..."
+          :placeholder="variant === 'inline' ? 'Cari nama barang atau tembak barcode...' : 'Cari barang / scan barcode...'"
           aria-label="Cari nama barang atau scan barcode"
-          class="w-full h-11 sm:h-12 pl-10 pr-10 text-base sm:text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border-2 transition-all shadow-md outline-none"
-          :class="isFocused ? 'border-sky-500 ring-4 ring-sky-500/20 bg-white' : 'border-slate-200/80 hover:border-slate-300'"
+          class="w-full h-11 sm:h-11 pl-10 pr-10 text-base sm:text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border-2 transition-all outline-none"
+          :class="[
+            variant === 'inline' ? 'shadow-xs' : 'shadow-md',
+            isFocused ? 'border-sky-500 ring-4 ring-sky-500/20 bg-white' : 'border-slate-200/80 hover:border-slate-300'
+          ]"
         />
+
+        <!-- Shortcut badge di Desktop/Tablet saat kosong -->
+        <span
+          v-if="variant === 'inline' && !searchQuery && !isFocused"
+          aria-hidden="true"
+          class="hidden lg:inline-flex items-center justify-center absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-mono font-bold text-slate-400 pointer-events-none"
+        >
+          /
+        </span>
 
         <button 
           v-if="searchQuery"
@@ -144,18 +169,19 @@ const handleEnter = () => {
         type="button"
         @click="emit('openCamera')"
         aria-label="Buka kamera scanner barcode"
-        class="h-11 sm:h-12 min-w-11 px-3 sm:px-3.5 bg-[#0a193d] hover:bg-[#102b66] text-white rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors active:scale-95 shrink-0 shadow-sm"
+        class="h-11 min-w-11 px-3 sm:px-4 bg-[#0a193d] hover:bg-[#102b66] text-white rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors active:scale-95 shrink-0 shadow-sm"
         title="Buka Kamera Barcode"
       >
         <Camera aria-hidden="true" class="w-4 h-4 text-sky-400" />
-        <span class="hidden sm:inline text-xs font-semibold">Scan</span>
+        <span class="hidden sm:inline text-xs font-semibold">Scan Kamera</span>
       </button>
     </div>
 
-    <!-- Dropdown Hasil Pencarian Dinamis (Membuka ke Atas karena Posisi Input Sticky di Bawah) -->
+    <!-- Dropdown Hasil Pencarian Dinamis (Membuka ke Atas pada Mobile Floating, ke Bawah pada Tablet/Desktop Inline) -->
     <div 
       v-if="searchQuery.trim().length > 0"
-      class="kasiry-scroll-pane absolute left-0 right-0 bottom-full mb-2.5 bg-white/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden divide-y divide-slate-100 max-h-[42dvh] sm:max-h-64 overflow-y-auto"
+      class="kasiry-scroll-pane absolute left-0 right-0 bg-white/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/90 z-40 overflow-hidden divide-y divide-slate-100 max-h-[42dvh] sm:max-h-72 overflow-y-auto"
+      :class="variant === 'inline' ? 'top-full mt-2' : 'bottom-full mb-2.5'"
     >
       <div 
         v-for="product in searchResults" 

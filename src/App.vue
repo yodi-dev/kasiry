@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import TopBar from './components/TopBar.vue'
 import BarcodeInputBar from './components/BarcodeInputBar.vue'
 import CartSection from './components/CartSection.vue'
@@ -99,7 +99,8 @@ const cart = ref([])
 // State Pencarian Barcode / Barang
 const searchQuery = ref('')
 const scannedBarcode = ref('')
-const barcodeInputBarRef = ref(null)
+const mobileBarcodeRef = ref(null)
+const desktopBarcodeRef = ref(null)
 
 // State Modals
 const isPaymentOpen = ref(false)
@@ -217,7 +218,7 @@ const addToCart = (product) => {
       qty: 1
     })
   }
-  barcodeInputBarRef.value?.focusInput()
+  ensureKasaFocus()
 }
 
 const increaseQty = (productId) => {
@@ -537,13 +538,22 @@ const handleActivateLicense = (code) => {
   }
 }
 
-// Memastikan fokus kursor selalu aktif di input pencarian/barcode Kasa
+// Memastikan fokus kursor selalu aktif di input pencarian/barcode Kasa yang sedang tampil
 const ensureKasaFocus = () => {
   nextTick(() => {
     if (!isAnyModalOpen.value) {
-      barcodeInputBarRef.value?.focusInput()
+      mobileBarcodeRef.value?.focusInput()
+      desktopBarcodeRef.value?.focusInput()
     }
   })
+}
+
+// Shortcut keyboard kasir Desktop (F2 langsung buka modal Pembayaran jika keranjang ada isi)
+const handleGlobalCheckoutShortcut = (e) => {
+  if (e.key === 'F2' && !isAnyModalOpen.value && cart.value.length > 0) {
+    e.preventDefault()
+    isPaymentOpen.value = true
+  }
 }
 
 // Watch setiap penutupan modal agar otomatis fokus kembali ke input barang di kasa
@@ -581,6 +591,7 @@ const handleKasaClick = (e) => {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleGlobalCheckoutShortcut)
   await loadDatabase()
   ensureKasaFocus()
   setTimeout(ensureKasaFocus, 200)
@@ -594,19 +605,24 @@ onMounted(async () => {
     }, false)
   }
 })
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalCheckoutShortcut)
+})
 </script>
 
 <template>
   <div
-    class="min-h-dvh flex flex-col antialiased transition-[padding] duration-200"
-    :class="cart.length > 0 ? 'pb-40 sm:pb-44 lg:pb-36' : 'pb-24 sm:pb-28'"
+    class="min-h-dvh md:h-dvh md:overflow-hidden flex flex-col antialiased transition-[padding] duration-200"
+    :class="cart.length > 0 ? 'pb-40 md:pb-0' : 'pb-24 md:pb-0'"
     @click="handleKasaClick"
   >
-    <!-- 1. Top Bar Header -->
+    <!-- 1. Top Bar Header (Mobile: Compact Bar | Tablet & Desktop: Glass Command Dock) -->
     <TopBar 
       :storeName="storeProfile.name"
       :isOnline="isOnline"
       :totalDebtCount="unpaidDebtCount"
+      :todayTxCount="stats.transactionCount"
       :isGoogleConnected="isGoogleConnected"
       :googleUser="googleUser"
       @openDebtBook="isDebtBookOpen = true"
@@ -618,36 +634,57 @@ onMounted(async () => {
       @drawerClosed="ensureKasaFocus"
     />
 
-    <!-- 2. Ergonomic Workspace (Mobile: Keranjang di Atas; Tablet & Desktop: Kiri-Kanan Seimbang) -->
-    <main class="w-full max-w-6xl mx-auto px-3 sm:px-5 lg:px-6 pt-1 pb-2 flex-1 flex flex-col">
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 md:gap-4 lg:gap-6 items-start">
+    <!-- 2. Ergonomic Workspace (Mobile: Scrollable Thumb Zone | Tablet & Desktop: Locked Bento Workstation) -->
+    <main class="w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 pt-1 pb-2 md:py-2.5 lg:py-3 flex-1 md:min-h-0 flex flex-col">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 md:gap-4 lg:gap-5 items-start md:items-stretch md:flex-1 md:min-h-0">
         
-        <!-- BAGIAN 1: KERANJANG BELANJAAN / STRUK -->
-        <div class="md:col-span-5 md:sticky md:top-3 flex flex-col gap-3 min-w-0">
+        <!-- BAGIAN 1: STRUK BELANJAAN / REGISTER CHECKOUT -->
+        <div class="md:col-span-5 lg:col-span-4 min-w-0 md:h-full md:min-h-0 flex flex-col">
           <CartSection 
             :cartItems="cart"
+            :totalAmount="totalCartAmount"
+            :totalCount="totalCartCount"
             @increaseQty="increaseQty"
             @decreaseQty="decreaseQty"
             @removeItem="removeItem"
             @clearCart="clearCart"
+            @openPayment="isPaymentOpen = true"
           />
         </div>
 
-        <!-- BAGIAN 2: BARANG SERING TERJUAL -->
-        <div class="md:col-span-7 flex flex-col gap-3 min-w-0">
+        <!-- BAGIAN 2: KATALOG PRODUK, KATEGORI & PENCARIAN INLINE -->
+        <div class="md:col-span-7 lg:col-span-8 min-w-0 md:h-full md:min-h-0 flex flex-col">
           <FrequentProductsSection 
             :frequentProducts="frequentProducts"
+            :allProducts="products"
+            :categories="categories"
+            :cartItems="cart"
             @selectProduct="addToCart"
-          />
+          >
+            <template #search>
+              <BarcodeInputBar 
+                ref="desktopBarcodeRef"
+                variant="inline"
+                v-model:searchQuery="searchQuery"
+                :searchResults="searchResults"
+                :modalOpen="isAnyModalOpen"
+                @selectProduct="addToCart"
+                @openCamera="isCameraOpen = true"
+                @triggerLazyInventory="triggerLazyInventory"
+              />
+            </template>
+          </FrequentProductsSection>
         </div>
 
       </div>
 
-      <!-- Kepatuhan & Identitas Aplikasi (Khusus Desktop agar Layar Transaksi Mobile & Tablet Bebas Gangguan) -->
-      <footer class="hidden lg:flex mt-auto pt-6 border-t border-[#0a193d]/8 items-center justify-between gap-2 text-[11px] text-slate-400">
-        <span>
-          <strong class="font-semibold text-[#0a193d]/70">Kasiry</strong> — Aplikasi Kasir Warung &amp; Pencadangan Buku Kas
-        </span>
+      <!-- Bar Info Workstation & Tautan Kepatuhan (Khusus Desktop agar Mobile & Tablet Bebas Gangguan) -->
+      <footer class="hidden lg:flex shrink-0 pt-2.5 items-center justify-between gap-3 text-[11px] text-slate-500">
+        <div class="flex items-center gap-3">
+          <span><strong class="font-semibold text-[#0a193d]/80">Kasiry</strong> — Kasir Warung &amp; Buku Utang</span>
+          <span aria-hidden="true" class="text-slate-300">•</span>
+          <span class="text-slate-400">Pintasan: <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">/</kbd> Cari • <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">F2</kbd> Bayar</span>
+        </div>
         <nav class="flex items-center gap-3" aria-label="Tautan Kepatuhan">
           <a href="/privacy.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Kebijakan Privasi</a>
           <span aria-hidden="true" class="text-slate-300">•</span>
@@ -656,11 +693,11 @@ onMounted(async () => {
       </footer>
     </main>
 
-    <!-- 3. Floating Sticky Bottom Console (Input Barcode Sticky Tepat di Atas Total Tagihan) -->
-    <div class="safe-bottom-dock fixed inset-x-3 sm:inset-x-5 max-w-3xl lg:max-w-4xl mx-auto z-30 flex flex-col gap-2">
-      <!-- Form Input Barcode & Search (Sticky di Atas Total Tagihan, Autofocus, Dropdown Membuka ke Atas) -->
+    <!-- 3. Mobile-Only Floating Sticky Bottom Console (Thumb Zone HP) -->
+    <div class="md:hidden safe-bottom-dock fixed inset-x-3 z-30 flex flex-col gap-2">
       <BarcodeInputBar 
-        ref="barcodeInputBarRef"
+        ref="mobileBarcodeRef"
+        variant="floating"
         v-model:searchQuery="searchQuery"
         :searchResults="searchResults"
         :modalOpen="isAnyModalOpen"
@@ -669,7 +706,6 @@ onMounted(async () => {
         @triggerLazyInventory="triggerLazyInventory"
       />
 
-      <!-- Bar Total Tagihan & Bayar Sekarang (Sticky di Paling Bawah) -->
       <StickyBottomBar 
         :totalAmount="totalCartAmount"
         :itemCount="totalCartCount"

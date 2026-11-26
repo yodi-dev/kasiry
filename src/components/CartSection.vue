@@ -1,28 +1,36 @@
 <script setup>
 import { computed } from 'vue'
-import { Plus, Minus, Trash2, ShoppingBag } from '@lucide/vue'
+import { Plus, Minus, Trash2, ShoppingBag, ArrowRight } from '@lucide/vue'
 
 const props = defineProps({
   cartItems: {
     type: Array,
     default: () => []
+  },
+  totalAmount: {
+    type: Number,
+    default: 0
+  },
+  totalCount: {
+    type: Number,
+    default: 0
   }
 })
 
-const emit = defineEmits(['increaseQty', 'decreaseQty', 'removeItem', 'clearCart'])
+const emit = defineEmits(['increaseQty', 'decreaseQty', 'removeItem', 'clearCart', 'openPayment'])
 
 const totalItemCount = computed(() => {
-  return props.cartItems.reduce((acc, item) => acc + item.qty, 0)
+  return props.totalCount || props.cartItems.reduce((acc, item) => acc + item.qty, 0)
 })
 </script>
 
 <template>
-  <div class="cart-pane-container bg-white/90 backdrop-blur-md rounded-3xl border border-white/90 shadow-sm overflow-hidden transition-all">
-    <!-- Header Keranjang (Live Struk / Pandangan Mata di Atas) -->
-    <div class="px-4 sm:px-5 py-2.5 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+  <div class="cart-pane-container bg-white/90 backdrop-blur-md rounded-3xl border border-white/90 shadow-sm overflow-hidden transition-all md:h-full md:flex md:flex-col md:min-h-0">
+    <!-- Header Keranjang -->
+    <div class="px-4 sm:px-5 py-2.5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 shrink-0">
       <div class="flex items-center gap-2.5 min-w-0">
-        <div class="w-7 h-7 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-100/60 shrink-0">
-          <ShoppingBag aria-hidden="true" class="w-3.5 h-3.5" />
+        <div class="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-100/60 shrink-0">
+          <ShoppingBag aria-hidden="true" class="w-4 h-4" />
         </div>
         <div class="min-w-0">
           <h3 class="font-bold text-[#0a193d] text-sm leading-tight">
@@ -38,22 +46,26 @@ const totalItemCount = computed(() => {
         v-if="cartItems.length > 0"
         type="button"
         @click="emit('clearCart')"
-        class="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors cursor-pointer py-1.5 px-2.5 rounded-lg hover:bg-red-50 shrink-0"
+        class="text-xs font-semibold text-slate-400 hover:text-red-600 transition-colors cursor-pointer py-1.5 px-2.5 rounded-lg hover:bg-red-50 shrink-0"
       >
         Kosongkan
       </button>
     </div>
 
-    <!-- Daftar Barang Belanjaan (Scrollable Ringan, Stabil & Bebas Scroll-Chain) -->
-    <div class="kasiry-scroll-pane divide-y divide-slate-100/80 p-2 sm:p-2.5 min-h-[104px] sm:min-h-[120px] md:min-h-[220px] max-h-[30dvh] sm:max-h-[34dvh] md:max-h-[calc(100dvh-16rem)] overflow-y-auto">
+    <!-- Daftar Barang Belanjaan (Mobile: Max 30dvh | Tablet & Desktop: Mengisi Sisa Tinggi Panel) -->
+    <div class="kasiry-scroll-pane divide-y divide-slate-100/80 p-2 sm:p-2.5 min-h-[104px] max-h-[30dvh] md:min-h-0 md:max-h-none md:flex-1 overflow-y-auto">
       <!-- Jika Keranjang Kosong -->
       <div 
         v-if="cartItems.length === 0" 
-        class="h-24 sm:h-28 md:h-40 px-3 flex flex-col items-center justify-center text-center text-slate-400"
+        class="h-24 md:h-full md:min-h-[180px] px-4 flex flex-col items-center justify-center text-center text-slate-400"
       >
+        <div class="hidden md:flex size-12 rounded-2xl bg-sky-50 border border-sky-100 text-[#0284c7] items-center justify-center mb-3">
+          <ShoppingBag aria-hidden="true" class="size-5" />
+        </div>
         <p class="font-bold text-[#0a193d] text-sm">Keranjang Masih Kosong</p>
-        <p class="text-xs text-slate-400 mt-0.5">
-          Ketuk barang cepat di bawah atau tembak barcode.
+        <p class="text-xs text-slate-400 mt-1 max-w-[230px]">
+          <span class="md:hidden">Ketuk barang cepat di bawah atau tembak barcode.</span>
+          <span class="hidden md:inline">Ketuk produk di sebelah kanan atau scan barcode untuk mulai transaksi.</span>
         </p>
       </div>
 
@@ -61,7 +73,7 @@ const totalItemCount = computed(() => {
       <div 
         v-for="item in cartItems" 
         :key="item.id"
-        class="cart-item-row py-2.5 px-2.5 sm:px-3 hover:bg-sky-50/30 rounded-2xl transition-colors group"
+        class="cart-item-row py-2.5 px-2.5 sm:px-3 hover:bg-sky-50/40 rounded-2xl transition-colors group"
       >
         <!-- Info Barang -->
         <div class="cart-item-info">
@@ -132,6 +144,37 @@ const totalItemCount = computed(() => {
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Dock Pembayaran Terintegrasi (Khusus Tablet & Desktop) -->
+    <div class="hidden md:flex flex-col shrink-0 border-t border-slate-200/70 bg-slate-50/85 px-4 lg:px-5 py-3.5 lg:py-4 gap-3">
+      <div class="flex items-end justify-between gap-2">
+        <div>
+          <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Tagihan</p>
+          <p class="text-xs text-slate-400 tabular-nums mt-0.5">{{ totalItemCount }} barang di struk</p>
+        </div>
+        <p class="text-2xl font-black text-[#0a193d] tracking-tight tabular-nums leading-none">
+          Rp {{ totalAmount.toLocaleString('id-ID') }}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        :disabled="cartItems.length === 0"
+        @click="emit('openPayment')"
+        class="h-12 px-4 rounded-2xl font-bold text-sm flex items-center justify-between transition-all cursor-pointer disabled:bg-slate-200/80 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed"
+        :class="cartItems.length > 0
+          ? 'bg-linear-to-r from-[#0a193d] via-[#102b66] to-[#0284c7] hover:brightness-110 active:scale-98 text-white shadow-lg shadow-sky-900/15'
+          : ''"
+      >
+        <span class="flex items-center gap-2">
+          <span>{{ cartItems.length > 0 ? 'Proses Pembayaran' : 'Pilih atau Scan Barang' }}</span>
+        </span>
+        <span v-if="cartItems.length > 0" class="flex items-center gap-2">
+          <kbd class="hidden lg:inline-flex px-1.5 py-0.5 text-[10px] font-mono bg-white/15 text-sky-100 rounded-md border border-white/20">F2</kbd>
+          <ArrowRight aria-hidden="true" class="size-4 stroke-[2.5]" />
+        </span>
+      </button>
     </div>
   </div>
 </template>

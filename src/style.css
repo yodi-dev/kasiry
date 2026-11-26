@@ -67,6 +67,11 @@ p {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+@container products-pane (inline-size >= 780px) {
+  .frequent-products-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
 
 /* Container query: Baris Struk Keranjang rapi di layar sempit maupun lebar */
 .cart-pane-container {

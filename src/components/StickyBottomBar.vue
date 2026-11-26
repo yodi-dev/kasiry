@@ -43,7 +43,7 @@ const emit = defineEmits(['openPayment'])
       <button 
         type="button"
         @click="emit('openPayment')"
-        class="h-11 sm:h-12 px-4 sm:px-7 bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-400 hover:to-sky-500 active:scale-95 text-white rounded-2xl font-bold text-sm sm:text-base shadow-lg shadow-sky-500/30 flex items-center gap-1.5 sm:gap-2 cursor-pointer transition-all shrink-0 whitespace-nowrap"
+        class="h-11 sm:h-12 px-4 sm:px-7 bg-linear-to-r from-sky-500 to-sky-600 hover:from-sky-400 hover:to-sky-500 active:scale-95 text-white rounded-2xl font-bold text-sm sm:text-base shadow-lg shadow-sky-500/30 flex items-center gap-1.5 sm:gap-2 cursor-pointer transition-all shrink-0 whitespace-nowrap"
       >
         <span>Pembayaran</span>
         <ArrowRight aria-hidden="true" class="w-4 h-4 stroke-[2.5]" />
