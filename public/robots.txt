@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kasiry.pages.dev/sitemap.xml
+Sitemap: https://kasiry.awanbeo.my.id/sitemap.xml

@@ -1209,9 +1209,9 @@ onUnmounted(() => {
           <span class="text-slate-400">Pintasan: <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">/</kbd> Cari • <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">F2</kbd> Bayar</span>
         </div>
         <nav class="flex items-center gap-3" aria-label="Tautan Kepatuhan">
-          <a href="/privacy.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Kebijakan Privasi</a>
+          <a href="/privacy" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Kebijakan Privasi</a>
           <span aria-hidden="true" class="text-slate-300">•</span>
-          <a href="/terms.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Ketentuan Layanan</a>
+          <a href="/terms" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Ketentuan Layanan</a>
         </nav>
       </footer>
     </main>

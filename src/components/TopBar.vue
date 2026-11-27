@@ -568,7 +568,7 @@ const drawerGroups = computed(() => [
 
         <div class="p-4 border-t border-slate-100 text-xs text-slate-500 space-y-2">
           <div>
-            <p class="font-bold text-slate-700">Kasiry</p>
+            <p class="font-bold text-slate-700">Kasiry by Awanbeo</p>
             <p class="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
               <span>Crafted with ❤️ by</span>
               <a
@@ -582,9 +582,9 @@ const drawerGroups = computed(() => [
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-2.5 pt-1 text-[11px] text-slate-400">
-            <a href="/privacy.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2">Kebijakan Privasi</a>
+            <a href="/privacy" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2">Kebijakan Privasi</a>
             <span aria-hidden="true">•</span>
-            <a href="/terms.html" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2">Ketentuan Layanan</a>
+            <a href="/terms" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2">Ketentuan Layanan</a>
           </div>
         </div>
       </div>

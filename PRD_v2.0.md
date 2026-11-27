@@ -111,7 +111,7 @@ flowchart TD
 
 ### 4.5 Cloud Sync `$0` (Google Drive, Google Sheets & Kepatuhan OAuth)
 - Koneksi Google 1-klik via Google Identity Services (`useGoogleSync.js`), mendukung offline queue untuk Google Sheets (`flushPendingSheetQueue`), merge two-way LWW berbasis `updatedAt`, penghormatan `archiveState` antar-perangkat (sementara impor JSON manual tetap dapat memulihkan file arsip lama via `honorArchiveCutoff: false`), dan *adaptive Drive batching* (10 transaksi / 3 menit saat transaksi $\ge 200$).
-- Mendukung penayangan di Cloudflare Pages dengan `/privacy.html`, `/terms.html`, `_headers` COOP (`same-origin-allow-popups`), serta bypass SW fallback di `vite.config.js`.
+- Mendukung penayangan di Cloudflare Pages (`https://kasiry.awanbeo.my.id`) dengan rute `/privacy`, `/terms`, `_headers` COOP (`same-origin-allow-popups`), serta bypass SW fallback di `vite.config.js`.
 
 ---
 
@@ -169,12 +169,12 @@ Status terbaru sebelum rilis penuh ke pemilik warung:
 - [x] Build produksi bersih (`npm run build`), 0 error & 0 warning ukuran chunk.
 - [x] Automated tests Vitest lulus (`npm test`: 10 suite, 42 skenario).
 - [x] Verifikasi domain Google Search Console aktif (`public/google50a425d7a5de8ecd.html`).
-- [x] Halaman `/privacy.html`, `/terms.html`, ikon OAuth (`kasiry-oauth-120x120.png`), serta COOP header tersedia di `public/`.
+- [x] Halaman kepatuhan `/privacy` & `/terms`, ikon OAuth (`kasiry-oauth-120x120.png`), serta COOP header tersedia di `public/` (siap di domain privat `https://kasiry.awanbeo.my.id`).
 - [x] Test cetak printer thermal kabel USB langsung (`WebUSB` + `WinUSB`) terkonfirmasi berhasil oleh pemilik produk.
 - [ ] **Uji Fungsional & UI Per Modul (Tahap Aktif Sekarang):**
   - Verifikasi browser E2E per modul (Modul 1–10: Kasa/Katalog, Pembayaran, Struk/Printer, Shift, Kas Keluar, Kulakan, Buku Utang/Pelanggan, Kelola Barang Pasif, Laporan/Excel, & Pengaturan/Cloud Sync) sekaligus kumpulkan list revisi UI.
   - Test hardware barcode scanner USB OTG / Bluetooth, kamera belakang/depan HP, USB OTG Android & Bluetooth BLE printer pada perangkat fisik tambahan.
-  - Test mode restore **Timpa Total (Reset)**, **Arsip Tahunan + Drive**, dan reload offline PWA (`npm run preview` / `https://kasiry.pages.dev`).
+  - Test mode restore **Timpa Total (Reset)**, **Arsip Tahunan + Drive**, dan reload offline PWA (`npm run preview` / `https://kasiry.awanbeo.my.id`).
   - Pastikan status **Google OAuth Consent Screen** di Google Cloud Console berstatus *Published / Verified* agar akun Google toko baru tidak terkena batasan *Testing mode*.
 
 ---

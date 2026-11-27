@@ -6,6 +6,15 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.15.3] - 2026-11-27 (Migrasi Custom Domain kasiry.awanbeo.my.id & Kepatuhan OAuth Branding)
+
+### Changed
+- **Custom Domain `https://kasiry.awanbeo.my.id` & Kepatuhan Google Auth Platform:**
+  - Mengubah canonical, Open Graph, Twitter Card, JSON-LD Schema, `public/sitemap.xml`, dan `public/robots.txt` dari `kasiry.pages.dev` menjadi **`https://kasiry.awanbeo.my.id`**.
+  - Mengarahkan seluruh tautan Kebijakan Privasi & Ketentuan Layanan (`index.html`, `src/App.vue`, `src/components/TopBar.vue`, `public/privacy.html`, `public/terms.html`, `sitemap.xml`) ke rute bersih **`/privacy`** dan **`/terms`** (`HTTP 200 OK` langsung tanpa redirect `308` `.html` Cloudflare Pages), serta menyelaraskan judul/nama produk di manifest PWA dan halaman kepatuhan menjadi **`Kasiry by Awanbeo`** sesuai Google Auth Platform Branding.
+
+---
+
 ## [2.15.2] - 2026-11-27 (Konsistensi Branding Kasiry by Awanbeo, Tautan Portofolio & Auto-Refresh SW)
 
 ### Changed

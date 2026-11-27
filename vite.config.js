@@ -47,9 +47,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
-        name: 'Kasiry - Aplikasi Kasir Warung Paling Gampang',
+        name: 'Kasiry by Awanbeo — Aplikasi Kasir Warung & Buku Utang',
         short_name: 'Kasiry',
-        description: 'Aplikasi Kasir Warung Kelontong & UMKM Indonesia Offline-First',
+        description: 'Kasiry by Awanbeo — Aplikasi Kasir Warung Kelontong & UMKM Indonesia Offline-First',
         lang: 'id',
         theme_color: '#0a193d',
         background_color: '#edf5fd',

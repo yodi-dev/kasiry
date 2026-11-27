@@ -106,7 +106,7 @@ kasiryy/
 
 - **Build command:** `npm run build`
 - **Build output directory:** `dist`
-- **Konfigurasi Statis:** Sudah dilengkapi `public/_headers` (`Cross-Origin-Opener-Policy: same-origin-allow-popups` untuk popup GIS OAuth), `public/_redirects`, `robots.txt`, `sitemap.xml`, dan `navigateFallbackDenylist` di `vite.config.js` agar halaman kepatuhan `/privacy.html` & `/terms.html` serta verifikasi Google Search Console lolos langsung tanpa terhalang fallback SPA.
+- **Konfigurasi Statis:** Sudah dilengkapi `public/_headers` (`Cross-Origin-Opener-Policy: same-origin-allow-popups` untuk popup GIS OAuth), `public/_redirects`, `robots.txt`, `sitemap.xml`, dan `navigateFallbackDenylist` di `vite.config.js` agar halaman kepatuhan `/privacy` & `/terms` (`Kasiry by Awanbeo`) serta verifikasi Google Search Console di custom domain `https://kasiry.awanbeo.my.id` lolos langsung tanpa terhalang fallback SPA maupun redirect `.html`.
 
 ---
 
