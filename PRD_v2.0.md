@@ -109,8 +109,8 @@ flowchart TD
 - **Koneksi Printer Thermal Bluetooth & Fallback Browser (`useThermalPrinter.js`, `thermalPrinter.js`, `ReceiptModal.vue`, `SettingsModal.vue`):**
   - Mendukung koneksi langsung **Web Bluetooth GATT (ESC/POS)** tanpa dependensi pihak ketiga dengan chunking BLE aman (80 byte -> retry 20 byte) untuk kertas **`58mm` (32 kolom)** dan **`80mm` (48 kolom)**, pengaturan **`autoPrint`** pasca-bayar, catatan bawah struk kustom, **`Tes Cetak Printer`**, penyembunyian baris `WA:` kosong, serta fallback otomatis ke `window.print()`.
 
-### 4.5 Cloud Sync `$0` (Google Drive, Google Sheets & Kepatuhan OAuth)
-- Koneksi Google 1-klik via Google Identity Services (`useGoogleSync.js`), mendukung offline queue untuk Google Sheets (`flushPendingSheetQueue`), merge two-way LWW berbasis `updatedAt`, penghormatan `archiveState` antar-perangkat (sementara impor JSON manual tetap dapat memulihkan file arsip lama via `honorArchiveCutoff: false`), dan *adaptive Drive batching* (10 transaksi / 3 menit saat transaksi $\ge 200$).
+### 4.5 Cloud Sync `$0` (Google Drive, Google Sheets via `drive.file` Non-Sensitive & Kepatuhan OAuth)
+- Koneksi Google 1-klik via Google Identity Services (`useGoogleSync.js`) hanya memakai scope **Non-Sensitive** (`drive.file`, `userinfo.profile`, `userinfo.email` — tanpa scope sensitif `spreadsheets` karena Buku Kas Sheets dibuat langsung oleh aplikasi ini sehingga sah diakses lewat `drive.file`), mendukung offline queue untuk Google Sheets (`flushPendingSheetQueue`) + auto-recovery sheet `403`/`404`, merge two-way LWW berbasis `updatedAt`, penghormatan `archiveState` antar-perangkat, dan *adaptive Drive batching* (10 transaksi / 3 menit saat transaksi $\ge 200$).
 - Mendukung penayangan di Cloudflare Pages (`https://kasiry.awanbeo.my.id`) dengan rute `/privacy`, `/terms`, `_headers` COOP (`same-origin-allow-popups`), serta bypass SW fallback di `vite.config.js`.
 
 ---
@@ -158,7 +158,7 @@ db.version(5).stores({
    - Konfigurasi Rolldown `codeSplitting.groups` di `vite.config.js` memisahkan `vendor-vue`, `vendor-dexie`, `vendor-xlsx`, dan `vendor-zxing`.
    - Entry bundle `index` terjaga ringan (< target 60 KB gzip per chunk utama), bebas chunk warning `> 500 kB`, dengan 12 modal sekunder terpisah sebagai async chunks (`prewarmCheckoutChunks` menghangatkan `PaymentModal`, `LazyInventoryModal`, dan `ReceiptModal` saat browser luang).
 2. **Offline PWA Precaching:** Workbox men-generate service worker precache di `dist/sw.js` sehingga seluruh chunk pecahan & aset statis tetap berjalan offline 100%.
-3. **Automated Tests:** Dijalankan melalui `npm test` (`Vitest` + `fake-indexeddb` + `@vue/test-utils`/`happy-dom`) mencakup 10 suite & 42 skenario di folder `tests/` (`customerStats`, `dailyStats`, `pricing`, `productUsage`, `thermalPrinter`, `useKasiryDB`, `useGoogleSync`, `dbMigration` `v1 -> v5`, `excelExport`, dan `uiModals`).
+3. **Automated Tests:** Dijalankan melalui `npm test` (`Vitest` + `fake-indexeddb` + `@vue/test-utils`/`happy-dom`) mencakup 10 suite & 43 skenario di folder `tests/` (`customerStats`, `dailyStats`, `pricing`, `productUsage`, `thermalPrinter`, `useKasiryDB`, `useGoogleSync`, `dbMigration` `v1 -> v5`, `excelExport`, dan `uiModals`).
 4. **Penyimpanan Persisten & Render Katalog:** `navigator.storage.persist()` aktif saat inisialisasi DB, dan kartu katalog di bawah lipatan layar (`idx >= 16`) memakai `.offscreen-card-defer` (`content-visibility: auto; contain-intrinsic-size: auto none auto 92px;`).
 
 ---
@@ -167,7 +167,7 @@ db.version(5).stores({
 
 Status terbaru sebelum rilis penuh ke pemilik warung:
 - [x] Build produksi bersih (`npm run build`), 0 error & 0 warning ukuran chunk.
-- [x] Automated tests Vitest lulus (`npm test`: 10 suite, 42 skenario).
+- [x] Automated tests Vitest lulus (`npm test`: 10 suite, 43 skenario).
 - [x] Verifikasi domain Google Search Console aktif (`public/google50a425d7a5de8ecd.html`).
 - [x] Halaman kepatuhan `/privacy` & `/terms`, ikon OAuth (`kasiry-oauth-120x120.png`), serta COOP header tersedia di `public/` (siap di domain privat `https://kasiry.awanbeo.my.id`).
 - [x] Test cetak printer thermal kabel USB langsung (`WebUSB` + `WinUSB`) terkonfirmasi berhasil oleh pemilik produk.

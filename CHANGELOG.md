@@ -6,6 +6,16 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.15.4] - 2026-11-27 (OAuth Non-Sensitive Scope: drive.file Saja Tanpa Scope Sensitif Spreadsheets)
+
+### Changed
+- **Hapus Scope Sensitif Google Sheets (`src/composables/useGoogleSync.js`, `public/privacy.html`):**
+  - Menghapus `https://www.googleapis.com/auth/spreadsheets` dari `SCOPES` sehingga Kasiry kini hanya meminta izin **Non-Sensitive** (`drive.file`, `userinfo.profile`, `userinfo.email`). Karena file `Kasiry - Buku Kas ...` dibuat langsung oleh aplikasi ini via API, akses tulis ke Sheets API tetap berjalan penuh menggunakan `drive.file` tanpa perlu review scope sensitif Google.
+  - Menambahkan auto-recovery di `appendRowsBatch` saat menemui respons `403`/`404` pada `linkedSheetId` usang agar otomatis mereset ID sheet dan membuat ulang Buku Kas milik `drive.file`.
+  - Memperbarui penjelasan izin di `public/privacy.html` agar 100% sesuai scope `drive.file` non-sensitif.
+
+---
+
 ## [2.15.3] - 2026-11-27 (Migrasi Custom Domain kasiry.awanbeo.my.id & Kepatuhan OAuth Branding)
 
 ### Changed

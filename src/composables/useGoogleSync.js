@@ -5,9 +5,9 @@ const DEFAULT_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   '1057500468203-6pa94u5k9b18hq6jjdkb5bg1sb4541lt.apps.googleusercontent.com'
 
+// Hanya memakai scope Non-Sensitive (drive.file mencakup Drive backup JSON & Google Sheets buatan Kasiry)
 const SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
-  'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/userinfo.profile',
   'https://www.googleapis.com/auth/userinfo.email'
 ].join(' ')
@@ -439,7 +439,7 @@ export function useGoogleSync() {
     persistPendingQueue([...pendingSheetQueue.value, entry])
   }
 
-  const appendRowsBatch = async (rows, storeName = 'Toko', interactive = false) => {
+  const appendRowsBatch = async (rows, storeName = 'Toko', interactive = false, allowSheetReset = true) => {
     const sheetId = await ensureSpreadsheet(storeName, interactive)
     if (!sheetId) {
       throw new Error('Spreadsheet Buku Kas belum tersedia.')
@@ -457,6 +457,12 @@ export function useGoogleSync() {
     )
 
     if (!res.ok) {
+      if ((res.status === 403 || res.status === 404) && allowSheetReset) {
+        // Jika sheet terhapus atau berasal dari Client ID lama (batasan drive.file), buat ulang sheet baru milik Kasiry
+        linkedSheetId.value = null
+        localStorage.removeItem('kasiry_linked_sheet_id')
+        return appendRowsBatch(rows, storeName, interactive, false)
+      }
       const errBody = await res.json().catch(() => ({}))
       throw new Error(errBody.error?.message || 'Gagal menulis data ke Google Sheets.')
     }

@@ -274,4 +274,60 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(appliedPayload.data.shifts[0].shiftCode).toBe('SHF-SYNC')
     expect(appliedPayload.data.shifts[0].status).toBe('CLOSED')
   })
+
+  it('requests strictly non-sensitive scopes (no spreadsheets scope) and auto-recovers stale 403/404 linkedSheetId', async () => {
+    let capturedScope = ''
+    globalThis.window = {
+      location: { origin: 'https://kasiry.awanbeo.my.id' },
+      google: {
+        accounts: {
+          oauth2: {
+            initTokenClient: vi.fn((opts) => {
+              capturedScope = opts.scope
+              return {
+                requestAccessToken: () => opts.callback({ access_token: 'fresh-tok', expires_in: 3600 })
+              }
+            })
+          }
+        }
+      }
+    }
+
+    localStorage.setItem('kasiry_linked_sheet_id', 'stale-sheet-id')
+
+    const fetchMock = vi.fn()
+      // 1. connect() -> userinfo
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ name: 'Kasir', email: 'kasir@test.id' }) })
+      // 2. appendRowsBatch pada stale-sheet-id -> 403 Forbidden
+      .mockResolvedValueOnce({ ok: false, status: 403, json: async () => ({ error: { message: 'Caller does not have permission' } }) })
+      // 3. ensureSpreadsheet cari file -> kosong
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ files: [] }) })
+      // 4. ensureSpreadsheet buat sheet baru via Sheets API (sah di scope drive.file)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ spreadsheetId: 'new-drivefile-sheet' }) })
+      // 5. appendRowsBatch retry ke sheet baru -> 200 OK
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ updates: { updatedRows: 1 } }) })
+
+    globalThis.fetch = fetchMock
+
+    const { useGoogleSync } = await import('../src/composables/useGoogleSync')
+    const sync = useGoogleSync()
+
+    const connRes = await sync.connect()
+    expect(connRes.success).toBe(true)
+    expect(capturedScope).toContain('https://www.googleapis.com/auth/drive.file')
+    expect(capturedScope).not.toContain('https://www.googleapis.com/auth/spreadsheets')
+
+    const writeRes = await sync.appendTransactionToSheet({
+      invoiceNumber: 'KSR-DRIVEFILE',
+      totalAmount: 15000,
+      paymentMethod: 'TUNAI',
+      items: [{ name: 'Gula', qty: 1 }]
+    }, 'Warung Kasiry')
+
+    expect(writeRes).toEqual({ sent: true, queued: false })
+    expect(localStorage.getItem('kasiry_linked_sheet_id')).toBe('new-drivefile-sheet')
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+
+    delete globalThis.window
+  })
 })
