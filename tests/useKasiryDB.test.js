@@ -61,6 +61,7 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(kasiry.storeProfile.value.name).toBe('Warung Kasiry')
     expect(kasiry.categories.value).toContain('Sembako')
     expect(kasiry.categories.value).toContain('Bumbu Dapur')
+    expect(kasiry.frequentProducts.value).toHaveLength(24)
   })
 
   it('records cash and bon transactions, caps overpayment debt, and guards Umum from bon debt', async () => {
@@ -546,6 +547,10 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
 
     const usage = await kasiry.getAllProductUsageStats(30)
     expect(usage.byId[pA.id].totalQtySold).toBe(2)
+    // pA yang terjual otomatis menempati posisi #1 di Terlaris, disusul pB yang sudah berharga
+    expect(kasiry.frequentProducts.value[0].id).toBe(pA.id)
+    expect(kasiry.frequentProducts.value[1].id).toBe(pB.id)
+    expect(kasiry.frequentProducts.value).toHaveLength(24)
     expect(usage.byId[pA.id].isNeverSold).toBe(false)
     expect(usage.byId[pB.id].totalQtySold).toBe(0)
     expect(usage.byId[pB.id].isNeverSold).toBe(true)

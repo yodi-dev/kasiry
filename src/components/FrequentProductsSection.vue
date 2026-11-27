@@ -82,7 +82,7 @@ const displayedProducts = computed(() => {
         {{ activeTab === 'Terlaris' ? 'Barang Sering Terjual' : activeTab }}
       </h2>
       <button
-        v-if="allProducts.length > frequentProducts.length"
+        v-if="allProducts.length > 8"
         type="button"
         @click="activeTab = activeTab === 'Terlaris' ? 'Semua' : 'Terlaris'"
         class="text-[11px] font-semibold text-[#0284c7] hover:underline cursor-pointer"
@@ -106,6 +106,7 @@ const displayedProducts = computed(() => {
         >
           <Flame aria-hidden="true" class="size-3.5" :class="activeTab === 'Terlaris' ? 'text-sky-400' : 'text-[#0284c7]'" />
           <span>Terlaris</span>
+          <span class="text-[10px] opacity-75 tabular-nums">({{ frequentProducts.length }})</span>
         </button>
 
         <button
@@ -149,8 +150,9 @@ const displayedProducts = computed(() => {
           :key="item.id"
           type="button"
           @click="emit('selectProduct', item)"
-          class="relative min-h-[78px] md:min-h-[92px] p-2.5 sm:p-3 bg-white/95 hover:bg-white active:scale-96 text-left rounded-2xl border shadow-2xs hover:shadow-md flex flex-col justify-between cursor-pointer transition-all group"
+          class="relative min-h-[78px] md:min-h-[92px] p-2.5 sm:p-3 bg-white/95 hover:bg-white active:scale-96 text-left rounded-2xl border shadow-2xs hover:shadow-md flex-col justify-between cursor-pointer transition-all group"
           :class="[
+            activeTab === 'Terlaris' && idx >= 8 ? 'hidden md:flex' : 'flex',
             idx >= 16 ? 'offscreen-card-defer' : '',
             cartQtyMap[item.id] > 0
               ? 'border-[#0284c7]/60 ring-2 ring-sky-400/20 bg-sky-50/40'

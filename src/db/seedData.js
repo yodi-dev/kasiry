@@ -3,7 +3,7 @@
 
 const STARTER_PRODUCT_TUPLES = [
   // ============================================================================
-  // 1. CURAH & KEBUTUHAN HARIAN POKOK (18 item — 8 item terlaris jadi tombol cepat)
+  // 1. CURAH & KEBUTUHAN HARIAN POKOK (18 item — 8 item inti + total 24 terlaris cepat)
   // ============================================================================
   ['Gas LPG 3 Kg', 'Curah', true],
   ['Galon Aqua 19L (Tukar Galon)', 'Curah', true],
@@ -27,12 +27,12 @@ const STARTER_PRODUCT_TUPLES = [
   // ============================================================================
   // 2. SEMBAKO KEMASAN (34 item)
   // ============================================================================
-  ['Beras Sania Premium 5 Kg', 'Sembako'],
+  ['Beras Sania Premium 5 Kg', 'Sembako', true],
   ['Beras Raja Platinum 5 Kg', 'Sembako'],
   ['Beras Pandan Wangi 5 Kg', 'Sembako'],
   ['Beras Rojo Lele 5 Kg', 'Sembako'],
   ['Beras Setra Ramos 2.5 Kg', 'Sembako'],
-  ['Minyakita Bantal 1 Liter', 'Sembako'],
+  ['Minyakita Bantal 1 Liter', 'Sembako', true],
   ['Minyakita Pouch 2 Liter', 'Sembako'],
   ['Bimoli Minyak Goreng Pouch 1 Liter', 'Sembako'],
   ['Bimoli Minyak Goreng Pouch 2 Liter', 'Sembako'],
@@ -44,7 +44,7 @@ const STARTER_PRODUCT_TUPLES = [
   ['Fortune Minyak Goreng Pouch 1 Liter', 'Sembako'],
   ['Sovia Minyak Goreng Pouch 1 Liter', 'Sembako'],
   ['Gula Pasir Gulaku Kuning 1 Kg', 'Sembako'],
-  ['Gula Pasir Gulaku Putih 1 Kg', 'Sembako'],
+  ['Gula Pasir Gulaku Putih 1 Kg', 'Sembako', true],
   ['Gula Pasir Rose Brand 1 Kg', 'Sembako'],
   ['Gula Pasir Kemasan 500g', 'Sembako'],
   ['Gula Merah / Gula Jawa 250g', 'Sembako'],
@@ -65,12 +65,12 @@ const STARTER_PRODUCT_TUPLES = [
   // ============================================================================
   // 3. MIE INSTAN, MAKANAN & PELENGKAP (42 item)
   // ============================================================================
-  ['Indomie Goreng Spesial 85g', 'Makanan'],
+  ['Indomie Goreng Spesial 85g', 'Makanan', true],
   ['Indomie Goreng Jumbo 129g', 'Makanan'],
   ['Indomie Goreng Aceh 90g', 'Makanan'],
   ['Indomie Goreng Rendang 91g', 'Makanan'],
   ['Indomie Ayam Bawang 69g', 'Makanan'],
-  ['Indomie Soto Mie 70g', 'Makanan'],
+  ['Indomie Soto Mie 70g', 'Makanan', true],
   ['Indomie Kari Ayam 72g', 'Makanan'],
   ['Indomie Ayam Geprek 85g', 'Makanan'],
   ['Mie Sedaap Goreng 90g', 'Makanan'],
@@ -92,7 +92,7 @@ const STARTER_PRODUCT_TUPLES = [
   ['Sarden ABC Besar 425g', 'Makanan'],
   ['Kornet Sapi Pronas 198g', 'Makanan'],
   ['Kecap Manis Bango Sachet 21ml', 'Makanan'],
-  ['Kecap Manis Bango Pouch 135ml', 'Makanan'],
+  ['Kecap Manis Bango Pouch 135ml', 'Makanan', true],
   ['Kecap Manis Bango Pouch 210ml', 'Makanan'],
   ['Kecap Manis Bango Pouch 520ml', 'Makanan'],
   ['Kecap Manis ABC Sachet', 'Makanan'],
@@ -111,17 +111,17 @@ const STARTER_PRODUCT_TUPLES = [
   // ============================================================================
   // 4. MINUMAN DINGIN, AIR MINERAL & SUSU (44 item)
   // ============================================================================
-  ['Aqua Botol 600ml', 'Minuman'],
+  ['Aqua Botol 600ml', 'Minuman', true],
   ['Aqua Botol 1500ml', 'Minuman'],
   ['Aqua Botol 330ml', 'Minuman'],
   ['Aqua Gelas 220ml (Satuan)', 'Minuman'],
   ['Aqua Dus 220ml (48 Gelas)', 'Minuman'],
-  ['Le Minerale 600ml', 'Minuman'],
+  ['Le Minerale 600ml', 'Minuman', true],
   ['Le Minerale 1500ml', 'Minuman'],
   ['Le Minerale 330ml', 'Minuman'],
   ['Vit Botol 550ml', 'Minuman'],
   ['Club Gelas 220ml (1 Dus)', 'Minuman'],
-  ['Teh Pucuk Harum 350ml', 'Minuman'],
+  ['Teh Pucuk Harum 350ml', 'Minuman', true],
   ['Teh Pucuk Harum Less Sugar 350ml', 'Minuman'],
   ['Teh Botol Sosro Kotak 250ml', 'Minuman'],
   ['Teh Botol Sosro Kotak 330ml', 'Minuman'],
@@ -159,10 +159,10 @@ const STARTER_PRODUCT_TUPLES = [
   // ============================================================================
   // 5. JAJANAN, KOPI, TEH & SACHET (46 item)
   // ============================================================================
-  ['Kopi Kapal Api Special Mix (1 Sachet)', 'Jajanan & Kopi'],
+  ['Kopi Kapal Api Special Mix (1 Sachet)', 'Jajanan & Kopi', true],
   ['Kopi Kapal Api Special Mix (1 Renceng)', 'Jajanan & Kopi'],
   ['Kopi Kapal Api Hitam 65g', 'Jajanan & Kopi'],
-  ['Kopi Good Day Cappuccino (1 Sachet)', 'Jajanan & Kopi'],
+  ['Kopi Good Day Cappuccino (1 Sachet)', 'Jajanan & Kopi', true],
   ['Kopi Good Day Mocacinno (1 Sachet)', 'Jajanan & Kopi'],
   ['Kopi ABC Susu (1 Sachet)', 'Jajanan & Kopi'],
   ['Kopi Torabika Duo Susu (1 Sachet)', 'Jajanan & Kopi'],
@@ -209,7 +209,7 @@ const STARTER_PRODUCT_TUPLES = [
   // ============================================================================
   // 6. BUMBU DAPUR & PENYEDAP (32 item)
   // ============================================================================
-  ['Royco Ayam (1 Sachet)', 'Bumbu Dapur'],
+  ['Royco Ayam (1 Sachet)', 'Bumbu Dapur', true],
   ['Royco Sapi (1 Sachet)', 'Bumbu Dapur'],
   ['Royco Ayam 1 Renceng (12 Sachet)', 'Bumbu Dapur'],
   ['Masako Ayam (1 Sachet)', 'Bumbu Dapur'],
@@ -245,11 +245,11 @@ const STARTER_PRODUCT_TUPLES = [
   // ============================================================================
   // 7. KEBERSIHAN, MANDI & PERLENGKAPAN RUMAH (36 item)
   // ============================================================================
-  ['Sunlight Jeruk Nipis 210ml', 'Kebersihan'],
+  ['Sunlight Jeruk Nipis 210ml', 'Kebersihan', true],
   ['Sunlight Jeruk Nipis 650ml', 'Kebersihan'],
   ['Sunlight Sachet 90ml', 'Kebersihan'],
   ['Mama Lemon Pencuci Piring 230ml', 'Kebersihan'],
-  ['Sabun Mandi Lifebuoy Total 10 85g', 'Kebersihan'],
+  ['Sabun Mandi Lifebuoy Total 10 85g', 'Kebersihan', true],
   ['Sabun Mandi Nuvo Family 76g', 'Kebersihan'],
   ['Sabun Mandi Lux Soft Touch 80g', 'Kebersihan'],
   ['Sabun Mandi Dettol Original 100g', 'Kebersihan'],
@@ -285,12 +285,12 @@ const STARTER_PRODUCT_TUPLES = [
   // ============================================================================
   // 8. ROKOK & KOREK (22 item)
   // ============================================================================
-  ['Sampoerna A Mild 16', 'Rokok'],
+  ['Sampoerna A Mild 16', 'Rokok', true],
   ['Sampoerna A Mild 12', 'Rokok'],
   ['Djarum Super 12', 'Rokok'],
   ['Djarum Super 16', 'Rokok'],
   ['Djarum 76 Filter Gold 12', 'Rokok'],
-  ['Gudang Garam Surya 16', 'Rokok'],
+  ['Gudang Garam Surya 16', 'Rokok', true],
   ['Gudang Garam Surya 12', 'Rokok'],
   ['Gudang Garam International Filter 12', 'Rokok'],
   ['Gudang Garam Merah 12', 'Rokok'],

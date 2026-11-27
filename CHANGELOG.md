@@ -6,6 +6,16 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.15.5] - 2026-11-27 (Modul 1 UI Polish: Perluasan Grid Terlaris Desktop ke 24 Produk & Ranking Dinamis)
+
+### Changed
+- **Grid Terlaris Desktop Lebih Padat & Ranking Dinamis (`src/composables/useKasiryDB.js`, `src/db/seedData.js`, `src/components/FrequentProductsSection.vue`):**
+  - Meningkatkan kapasitas `frequentProducts` dari `8` menjadi hingga **`24` produk** (`FREQUENT_PRODUCTS_LIMIT = 24`) dan menandai 24 barang populer harian lintas 9 kategori di `seedData.js` agar tampilan Bento Workstation desktop terisi penuh tanpa area kosong.
+  - Menambahkan perangkingan cerdas memakai `buildProductUsageMap`: produk yang benar-benar laku terjual otomatis naik ke posisi teratas, disusul produk yang sudah berharga (`sellPrice > 0`), item cepat (`isMacro`), lalu urutan katalog.
+  - Pada tampilan mobile (`< 768px`), item ke-9 s/d ke-24 disembunyikan dengan `hidden md:flex` agar jangkauan jempol HP tetap ringkas dengan tautan `Lihat Semua`, sekaligus menampilkan counter `Terlaris (24)` di tab Desktop.
+
+---
+
 ## [2.15.4] - 2026-11-27 (OAuth Non-Sensitive Scope: drive.file Saja Tanpa Scope Sensitif Spreadsheets)
 
 ### Changed

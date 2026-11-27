@@ -228,11 +228,33 @@ export function useKasiryDB() {
     ])
   }
 
-  // Computed: 6–8 Barang Sering Terjual (isMacro)
+  const FREQUENT_PRODUCTS_LIMIT = 24
+
+  // Computed: hingga 24 Barang Terlaris (prioritas: laku terjual 90hr -> sudah punya harga -> isMacro -> urutan katalog)
   const frequentProducts = computed(() => {
-    const macros = products.value.filter(p => p.isMacro)
-    if (macros.length > 0) return macros.slice(0, 8)
-    return products.value.slice(0, 8)
+    const active = products.value
+    if (!active || active.length === 0) return []
+
+    const usage = buildProductUsageMap(active, transactions.value)
+    const ranked = active.map((prod, idx) => {
+      const stats = usage.byId[prod.id]
+      return {
+        prod,
+        idx,
+        soldQty: stats?.totalQtySold || 0,
+        hasPrice: Number(prod.sellPrice || 0) > 0 ? 1 : 0,
+        isMacro: prod.isMacro ? 1 : 0
+      }
+    })
+
+    ranked.sort((a, b) => {
+      if (b.soldQty !== a.soldQty) return b.soldQty - a.soldQty
+      if (b.hasPrice !== a.hasPrice) return b.hasPrice - a.hasPrice
+      if (b.isMacro !== a.isMacro) return b.isMacro - a.isMacro
+      return a.idx - b.idx
+    })
+
+    return ranked.slice(0, FREQUENT_PRODUCTS_LIMIT).map(entry => entry.prod)
   })
 
   // CRUD Produk (mendukung harga ecer + opsional multi harga grosir/agen + stok lunak opsional)

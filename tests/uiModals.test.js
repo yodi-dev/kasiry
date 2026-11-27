@@ -706,6 +706,26 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     })
     expect(freqUnpriced.text()).toContain('Atur Harga')
 
+    // 1b. Desktop Terlaris mendukung 24 produk tanpa memadati layar mobile (idx >= 8 hidden md:flex)
+    const freq24 = Array.from({ length: 24 }, (_, idx) => ({
+      id: idx + 1,
+      name: `Produk Terlaris ${idx + 1}`,
+      sellPrice: 5000 + idx * 500,
+      category: 'Sembako'
+    }))
+    const freqDesktop = mount(FrequentProductsSection, {
+      props: {
+        frequentProducts: freq24,
+        allProducts: freq24,
+        categories: ['Sembako'],
+        cartItems: []
+      }
+    })
+    expect(freqDesktop.text()).toContain('Terlaris(24)')
+    const card24 = freqDesktop.findAll('button').find(b => b.text().includes('Produk Terlaris 24'))
+    expect(card24.classes()).toContain('hidden')
+    expect(card24.classes()).toContain('md:flex')
+
     // 2. CartSection membuka inline editor otomatis saat item Rp 0 masuk (autoEditProductId)
     const cartAuto = mount(CartSection, {
       props: {
