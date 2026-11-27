@@ -334,8 +334,9 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ files: [] }) })
       // 4. ensureSpreadsheet buat sheet baru via Sheets API (sah di scope drive.file)
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ spreadsheetId: 'new-drivefile-sheet' }) })
-      // 5. appendRowsBatch retry ke sheet baru -> 200 OK
+      // 5. appendRowsBatch retry ke sheet baru -> 200 OK (+ default response untuk call berikutnya)
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ updates: { updatedRows: 1 } }) })
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ updates: { updatedRows: 1 } }) })
 
     globalThis.fetch = fetchMock
 
@@ -357,6 +358,28 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(writeRes).toEqual({ sent: true, queued: false })
     expect(localStorage.getItem('kasiry_linked_sheet_id')).toBe('new-drivefile-sheet')
     expect(fetchMock).toHaveBeenCalledTimes(5)
+
+    // Uji log pembatalan & CashService dengan cashSource KAS
+    await sync.appendCashServiceToSheet({
+      serviceNumber: 'TT-KAS-1',
+      type: 'TARIK_TUNAI',
+      cashSource: 'KAS',
+      amount: 100000,
+      adminFee: 5000,
+      channel: 'QRIS'
+    }, 'Warung Kasiry')
+    const csBody = JSON.parse(fetchMock.mock.calls[5][1].body)
+    expect(csBody.values[0][7]).toContain('Uang Kas')
+
+    await sync.appendCancellationToSheet({
+      refNumber: 'KSR-001',
+      actionLabel: 'BATAL TRANSAKSI',
+      detail: 'Void test',
+      amount: -25000
+    }, 'Warung Kasiry')
+    const cancelBody = JSON.parse(fetchMock.mock.calls[6][1].body)
+    expect(cancelBody.values[0][1]).toBe('BATAL-KSR-001')
+    expect(cancelBody.values[0][2]).toBe('BATAL TRANSAKSI')
 
     delete globalThis.window
   })

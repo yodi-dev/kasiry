@@ -11,7 +11,7 @@ export function buildCustomerStatsMap(transactions = []) {
 
   for (let i = 0; i < transactions.length; i++) {
     const tx = transactions[i]
-    if (!tx) continue
+    if (!tx || tx.deleted) continue
     const amount = Number(tx.totalAmount || 0)
 
     const cid = tx.customerId ?? tx.customer?.id ?? null

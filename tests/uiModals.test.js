@@ -360,8 +360,8 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     expect(expenseModal.text()).toContain('Rp 81.000')
     expect(expenseModal.text()).toContain('KLR-101')
 
-    await expenseModal.findAll('button').find(b => b.text().includes('Tarik / Setor Owner')).trigger('click')
-    await expenseModal.findAll('button').find(b => b.text().trim() === 'Non-Tunai (QRIS / Rek)').trigger('click')
+    await expenseModal.findAll('button').find(b => b.text().includes('Ambil Kas Laci')).trigger('click')
+    await expenseModal.findAll('button').find(b => b.text().trim() === 'Non-Tunai').trigger('click')
     await expenseModal.findAll('button').find(b => b.text().trim() === '50rb').trigger('click')
     await expenseModal.find('input[placeholder*="galon"]').setValue('Setor ke rekening')
     await expenseModal.find('form').trigger('submit.prevent')
@@ -484,7 +484,8 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     expect(shiftCloseModal.emitted('closeShift')?.[0]?.[0]).toEqual({
       shiftId: 92,
       actualCash: 206000,
-      closingNote: ''
+      closingNote: '',
+      handoverToKasAmount: 0
     })
 
     // Summary mode setelah ditutup
@@ -1022,7 +1023,7 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
       tokenCode: '1234 5678 9012 3456 7890',
       sellPrice: 53000,
       paymentMethod: 'TUNAI',
-      costSource: 'SALDO_AGEN'
+      costSource: 'PIHAK_KETIGA'
     })
 
     // Verifikasi preset 50rb tersimpan di localStorage dan tampil saat mount ulang
@@ -1227,5 +1228,117 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
       cashSource: 'KAS',
       amount: 200000
     })
+  })
+
+  it('verifies audit fixes: 5th pocket Saldo Pihak Ketiga, Uang Kas in Expense/Restock, Shift handover, Report Reprint/Void, and Digital Bon in DebtBook', async () => {
+    const now = Date.now()
+    // 1. FinanceModal menampilkan kantong ke-5 Saldo Pihak Ketiga & shortcut Isi Saldo
+    const fin = mount(FinanceModal, {
+      props: {
+        isOpen: true,
+        precomputedPockets: {
+          kasBalance: 200000,
+          rekeningBalance: 150000,
+          tabunganBalance: 100000,
+          pihakKetigaBalance: 85000
+        },
+        customers: sampleCustomers
+      }
+    })
+    expect(fin.text()).toContain('Saldo Pihak Ketiga')
+    expect(fin.text()).toContain('Rp 85.000')
+
+    // 2. ExpenseModal menghormati expectedCashDrawer saat shift aktif & menyediakan Uang Kas Toko
+    const exp = mount(ExpenseModal, {
+      props: {
+        isOpen: true,
+        activeShift: { id: 1, shiftCode: 'SHF-EXP', status: 'OPEN', openingCash: 100000 },
+        stats: {
+          isShiftScoped: true,
+          openingCash: 100000,
+          todayNetCashDrawer: 25000,
+          expectedCashDrawer: 125000,
+          todayExpensesCash: 0,
+          todayExpensesNonCash: 0,
+          todayExpensesTotal: 0
+        }
+      }
+    })
+    expect(exp.text()).toContain('Rp 125.000')
+    await exp.findAll('button').find(b => b.text().trim() === 'Uang Kas').trigger('click')
+    await exp.findAll('button').find(b => b.text().trim() === '50rb').trigger('click')
+    await exp.find('form').trigger('submit.prevent')
+    expect(exp.emitted('recordExpense')?.[0]?.[0]).toMatchObject({
+      amount: 50000,
+      source: 'KAS'
+    })
+
+    // 3. RestockModal menyediakan sumber Uang Kas & menampilkan Sisa Tunai Laci konsisten dg Shift
+    const restock = mount(RestockModal, {
+      props: {
+        isOpen: true,
+        products: [{ id: 1, name: 'Beras', buyPrice: 50000, sellPrice: 60000, stock: 5 }],
+        stats: {
+          isShiftScoped: true,
+          openingCash: 100000,
+          todayNetCashDrawer: 0,
+          expectedCashDrawer: 100000
+        }
+      }
+    })
+    expect(restock.text()).toContain('Rp 100.000')
+    expect(restock.text()).toContain('Uang Kas')
+
+    // 4. DailyReportModal memicu Cetak Struk & Batalkan -> Ya, Void pada Riwayat Transaksi
+    const report = mount(DailyReportModal, {
+      props: {
+        isOpen: true,
+        transactions: [
+          {
+            id: 777,
+            invoiceNumber: 'KSR-RPT1',
+            createdAt: now,
+            paymentMethod: 'TUNAI',
+            totalAmount: 25000,
+            items: [{ id: 1, name: 'Beras', sellPrice: 25000, qty: 1 }]
+          }
+        ]
+      }
+    })
+    await report.findAll('button').find(b => b.text().includes('Riwayat')).trigger('click')
+    await nextTick()
+    await report.findAll('button').find(b => b.text().includes('Cetak Struk')).trigger('click')
+    expect(report.emitted('openReceipt')?.[0]?.[0]?.invoiceNumber).toBe('KSR-RPT1')
+    await report.findAll('button').find(b => b.text().includes('Batalkan')).trigger('click')
+    await nextTick()
+    await report.findAll('button').find(b => b.text().includes('Ya, Void')).trigger('click')
+    expect(report.emitted('deleteTransaction')?.[0]?.[0]?.id).toBe(777)
+
+    // 5. DebtBookModal menampilkan rincian utang dari Pulsa / Token Listrik (digitalProducts UTANG / BON)
+    const debtModal = mount(DebtBookModal, {
+      props: {
+        isOpen: true,
+        customers: sampleCustomers,
+        transactions: [],
+        digitalProducts: [
+          {
+            id: 888,
+            digitalNumber: 'PLS-BON1',
+            createdAt: now,
+            productName: 'Pulsa 20.000',
+            targetNumber: '081234567890',
+            sellPrice: 22000,
+            paymentMethod: 'UTANG / BON',
+            customerId: 2,
+            customerName: 'Bu Tejo',
+            deleted: false
+          }
+        ]
+      }
+    })
+    await debtModal.findAll('button').find(b => b.text().trim() === 'Bayar').trigger('click')
+    await nextTick()
+    expect(debtModal.text()).toContain('PLS-BON1')
+    expect(debtModal.text()).toContain('Pulsa 20.000')
   })
 })

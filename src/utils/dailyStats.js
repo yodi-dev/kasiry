@@ -34,6 +34,7 @@ function aggregateRecords(
   const productCountMap = {}
 
   periodTx.forEach(t => {
+    if (!t || t.deleted) return
     const amount = Number(t.totalAmount || 0)
     const debtAmt = Number(t.debtAmount || 0)
     if (t.paymentMethod === 'TUNAI (SEBAGIAN BON)' || (t.paymentMethod === 'TUNAI' && debtAmt > 0)) {
@@ -80,6 +81,7 @@ function aggregateRecords(
   })
 
   let todayExpensesCash = 0
+  let todayExpensesKas = 0
   let todayExpensesNonCash = 0
   let todayOperationalExpenses = 0
   let todayPriveTotal = 0
@@ -93,6 +95,8 @@ function aggregateRecords(
     todayExpenseCount += 1
     if (exp.source === 'NON_TUNAI') {
       todayExpensesNonCash += amt
+    } else if (exp.source === 'KAS') {
+      todayExpensesKas += amt
     } else {
       todayExpensesCash += amt
     }
@@ -212,8 +216,9 @@ function aggregateRecords(
     todayCashDrawer,
     todayQrisTotal,
     todayExpensesCash,
+    todayExpensesKas,
     todayExpensesNonCash,
-    todayExpensesTotal: todayExpensesCash + todayExpensesNonCash,
+    todayExpensesTotal: todayExpensesCash + todayExpensesKas + todayExpensesNonCash,
     todayOperationalExpenses,
     todayPriveTotal,
     todayExpenseCount,
@@ -246,7 +251,7 @@ function aggregateRecords(
       todayCashServiceAdminProfit +
       todayDigitalProfit -
       todayOperationalExpenses,
-    transactionCount: periodTx.length,
+    transactionCount: periodTx.filter(t => t && !t.deleted).length,
     todayNewDebt: debt + todayDigitalSalesDebt,
     topProducts
   }
@@ -294,7 +299,7 @@ export function computeDailyStats(
   let periodFundMovements
 
   if (activeShift && activeShift.status === 'OPEN') {
-    periodTx = (transactions || []).filter(t => recordBelongsToShift(t, activeShift, 'createdAt'))
+    periodTx = (transactions || []).filter(t => !t?.deleted && recordBelongsToShift(t, activeShift, 'createdAt'))
     periodPays = (debtPayments || []).filter(p => recordBelongsToShift(p, activeShift, 'paymentDate'))
     periodExpenses = (expenses || []).filter(e => !e?.deleted && recordBelongsToShift(e, activeShift, 'createdAt'))
     periodCashServices = cashServices.filter(s => !s?.deleted && recordBelongsToShift(s, activeShift, 'createdAt'))
@@ -305,7 +310,7 @@ export function computeDailyStats(
     startOfDay.setHours(0, 0, 0, 0)
     const todayTimestamp = startOfDay.getTime()
 
-    periodTx = (transactions || []).filter(t => (t?.createdAt || 0) >= todayTimestamp)
+    periodTx = (transactions || []).filter(t => !t?.deleted && (t?.createdAt || 0) >= todayTimestamp)
     periodPays = (debtPayments || []).filter(p => (p?.paymentDate || 0) >= todayTimestamp)
     periodExpenses = (expenses || []).filter(e => !e?.deleted && (e?.createdAt || 0) >= todayTimestamp)
     periodCashServices = cashServices.filter(s => !s?.deleted && (s?.createdAt || 0) >= todayTimestamp)
@@ -347,7 +352,7 @@ export function computeShiftClosingPreview({
   actualCash = 0
 } = {}) {
   if (!shift) return null
-  const periodTx = (transactions || []).filter(t => recordBelongsToShift(t, shift, 'createdAt'))
+  const periodTx = (transactions || []).filter(t => !t?.deleted && recordBelongsToShift(t, shift, 'createdAt'))
   const periodPays = (debtPayments || []).filter(p => recordBelongsToShift(p, shift, 'paymentDate'))
   const periodExpenses = (expenses || []).filter(e => !e?.deleted && recordBelongsToShift(e, shift, 'createdAt'))
   const periodCashServices = (cashServices || []).filter(s => !s?.deleted && recordBelongsToShift(s, shift, 'createdAt'))

@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry POS
 
-**Versi Dokumen:** 2.19 (Manajemen Keuangan & Tabungan, Tarik Tunai Laci/Uang Kas, Pulsa & Token PLN, Bayar Sebagian Bon, QRIS, Shift, Multi Harga, Kulakan, 300 Katalog Bersih & Printer Thermal)  
+**Versi Dokumen:** 2.20 (Manajemen Keuangan 5 Kantong + Saldo Pihak Ketiga, Tarik Tunai Laci/Uang Kas, Pulsa & Token PLN, Bayar Sebagian Bon, QRIS, Shift Setor Kas, Multi Harga, Kulakan, 300 Katalog Bersih & Printer Thermal)  
 **Status:** Production-Ready & Terverifikasi Build/Unit-Integration Test  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
 **Identitas Toko Bawaan:** Warung Kasiry (Generik siap pakai — profil disesuaikan pemilik warung di Pengaturan)  
@@ -16,6 +16,7 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
+| **v2.20.0** | 27 November 2026 | **Audit & Penyempurnaan Menyeluruh:** Penambahan kantong ke-5 **`Saldo Pihak Ketiga`** (`PIHAK_KETIGA`) utk modal Pulsa/Token + pilihan sumber modal (`Pihak Ketiga`/`Rekening`/`Uang Kas`/`Luar`), perhitungan saldo kumulatif lintas >90 hari + `financeBaseline` saat arsip, sumber `Uang Kas` di `ExpenseModal` & `RestockModal`, seragamkan `Sisa Tunai Laci` shift, setor laci ke Uang Kas saat Tutup Shift, cetak ulang/void transaksi (`deleteTransaction`) di `DailyReportModal`, bon Pulsa di `DebtBookModal`, & log batal/koreksi Google Sheets. |
 | **v2.19.0** | 27 November 2026 | **Backlog Fase 2 #4 (Manajemen Keuangan & Tabungan Terpadu):** Modal `FinanceModal.vue` terpisah dari `DailyReportModal` & `ShiftModal`, engine `financeEngine.js` 4 kantong (`Laci Kasir`, `Uang Kas`, `Rekening & QRIS`, `Tabungan`), mutasi **`Tambah Tabungan` / `Pindah Kantong` / `Setor Modal` / `Ambil Dana`**, ringkasan `Shift Ini / 7 Hari / 30 Hari`, pemilihan sumber `Laci` vs `Uang Kas` di `CashServiceModal.vue`, skema Dexie `v8` `fundMovements`, Google Sync, & Excel 10 sheet (`Mutasi Kas & Tabungan`). |
 | **v2.18.0** | 27 November 2026 | **Backlog Fase 2 #3 (Bayar Kurang / Sebagian Otomatis Masuk Buku Utang):** Dukungan pembayaran kurang (`0 < bayar < total`) pada mode Tunai & QRIS di `PaymentModal.vue`, blokir akun `"Umum"` di UI & `recordTransaction()`, pencatatan `paidAmount` & `debtAmount` (`TUNAI/QRIS (SEBAGIAN BON)`), pemisahan laci/QRIS vs `todayNewDebt` di `dailyStats.js`, struk ESC/POS & WA, `DebtBookModal`, Excel, & Google Sheets. |
 | **v2.17.0** | 27 November 2026 | **Backlog Fase 2 #2 (Penjualan Pulsa, Paket Data, Token PLN & Reorganisasi TopBar):** Modal `DigitalProductModal.vue` (`Pulsa`, `Paket Data`, `Token PLN`, preset harga diingat via `localStorage`, input No. HP/ID PLN & Token SN 20 digit + edit ulang, bayar Tunai/QRIS/Utang dg rollback), skema Dexie `v7` `digitalProducts`, cetak nota & WA Token PLN, reorganisasi TopBar dropdown `Layanan ▾`, Google Sync, & Excel 9 sheet (`Pulsa & Token Listrik`). |

@@ -788,4 +788,82 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(deleted).toBe(true)
     expect(kasiry.fundMovements.value).toHaveLength(1)
   })
+
+  it('preserves >90-day pocket balances + archive financeBaseline, supports Saldo Pihak Ketiga, shift Kas handover, and atomic void transaction', async () => {
+    const oldTs = Date.now() - 200 * 24 * 60 * 60 * 1000
+    // 1. Catat Setor Modal ke Uang Kas & Isi Saldo Pihak Ketiga 200 hari yang lalu (>90 hari RAM & >180 hari arsip)
+    await kasiry.recordFundMovement({
+      type: 'SETOR_MODAL',
+      fromAccount: 'LUAR',
+      toAccount: 'KAS',
+      amount: 500000,
+      createdAt: oldTs
+    })
+    await kasiry.recordFundMovement({
+      type: 'MUTASI',
+      fromAccount: 'KAS',
+      toAccount: 'PIHAK_KETIGA',
+      amount: 200000,
+      createdAt: oldTs + 1000
+    })
+
+    // Walau >90 hari (di luar kasiry.fundMovements RAM), cumulativePocketBalances tetap mencatat penuh
+    expect(kasiry.cumulativePocketBalances.value.kasBalance).toBe(300000)
+    expect(kasiry.cumulativePocketBalances.value.pihakKetigaBalance).toBe(200000)
+
+    // 2. Arsipkan data >180 hari -> financeBaseline menyimpan saldo sehingga setelah data dipangkas saldo tetap 300rb & 200rb!
+    const archRes = await kasiry.archiveOldTransactions(180)
+    expect(archRes.archivedFundMovementCount).toBe(2)
+    expect(kasiry.financeBaseline.value.kasBalance).toBe(300000)
+    expect(kasiry.financeBaseline.value.pihakKetigaBalance).toBe(200000)
+    expect(kasiry.cumulativePocketBalances.value.kasBalance).toBe(300000)
+    expect(kasiry.cumulativePocketBalances.value.pihakKetigaBalance).toBe(200000)
+
+    // 3. Jual Token PLN modal dari Saldo Pihak Ketiga -> pihakKetigaBalance berkurang
+    await kasiry.recordDigitalProduct({
+      category: 'TOKEN_LISTRIK',
+      productName: 'Token PLN 50.000',
+      costPrice: 50500,
+      sellPrice: 52500,
+      costSource: 'PIHAK_KETIGA',
+      paymentMethod: 'QRIS'
+    })
+    expect(kasiry.cumulativePocketBalances.value.pihakKetigaBalance).toBe(149500)
+    expect(kasiry.cumulativePocketBalances.value.rekeningBalance).toBe(52500)
+
+    // 4. Transaksi Sebagian Bon & stok terlacak, lalu Void / Batal -> stok & utang otomatis kembali!
+    const trackedProd = kasiry.products.value[0]
+    await kasiry.saveProduct({ ...trackedProd, sellPrice: 25000, buyPrice: 20000, stock: 10 })
+    const txId = await kasiry.recordTransaction({
+      invoiceNumber: 'KSR-VOID-1',
+      totalAmount: 50000,
+      paymentMethod: 'TUNAI (SEBAGIAN BON)',
+      paidAmount: 20000,
+      debtAmount: 30000,
+      cashGiven: 20000,
+      changeAmount: 0,
+      customer: { name: 'Pak Void' },
+      items: [{ ...trackedProd, sellPrice: 25000, buyPrice: 20000, qty: 2 }]
+    })
+    expect(kasiry.products.value.find(p => p.id === trackedProd.id).stock).toBe(8)
+    expect(kasiry.customers.value.find(c => c.name === 'Pak Void').totalDebt).toBe(30000)
+
+    const voided = await kasiry.deleteTransaction(txId)
+    expect(voided.deleted).toBe(true)
+    expect(kasiry.products.value.find(p => p.id === trackedProd.id).stock).toBe(10)
+    expect(kasiry.customers.value.find(c => c.name === 'Pak Void').totalDebt).toBe(0)
+
+    // 5. Buka Shift & Tutup Shift dengan Setoran Laci ke Uang Kas
+    const shift = await kasiry.openShift({ cashierName: 'Yodi', openingCash: 100000 })
+    const closed = await kasiry.closeShift({
+      shiftId: shift.id,
+      actualCash: 250000,
+      handoverToKasAmount: 150000
+    })
+    expect(closed.handoverMovement.fromAccount).toBe('LACI')
+    expect(closed.handoverMovement.toAccount).toBe('KAS')
+    expect(closed.handoverMovement.amount).toBe(150000)
+    expect(kasiry.lastOpeningCash.value).toBe(100000)
+    expect(kasiry.cumulativePocketBalances.value.kasBalance).toBe(450000)
+  })
 })

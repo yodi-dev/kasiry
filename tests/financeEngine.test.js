@@ -57,9 +57,46 @@ describe('financeEngine (4 Pocket Balances & Multi-Period Summary)', () => {
     expect(balances.rekeningBalance).toBe(55000)
     // TABUNGAN = 40.000 + 30.000 = 70.000
     expect(balances.tabunganBalance).toBe(70000)
+    expect(balances.pihakKetigaBalance).toBe(0)
     expect(balances.totalLiquidAssets).toBe(70000 + 563000 + 55000 + 70000)
     expect(balances.totalReceivables).toBe(75000)
     expect(balances.totalNetWealth).toBe(758000 + 75000)
+  })
+
+  it('tracks 5th pocket Saldo Pihak Ketiga, KAS expenses, digital cost sources, and archived financeBaseline', () => {
+    const now = Date.now()
+    const fundMovements = [
+      { id: 1, createdAt: now, type: 'MUTASI', fromAccount: 'REKENING', toAccount: 'PIHAK_KETIGA', amount: 250000, deleted: false }
+    ]
+    const digitalProducts = [
+      { id: 1, createdAt: now, category: 'TOKEN_LISTRIK', costPrice: 50500, sellPrice: 52500, costSource: 'PIHAK_KETIGA', paymentMethod: 'QRIS', deleted: false },
+      { id: 2, createdAt: now, category: 'PULSA', costPrice: 10500, sellPrice: 12000, costSource: 'KAS', paymentMethod: 'TUNAI', deleted: false },
+      { id: 3, createdAt: now, category: 'PULSA', costPrice: 20500, sellPrice: 22000, costSource: 'SALDO_AGEN', paymentMethod: 'TUNAI', deleted: false }
+    ]
+    const expenses = [
+      { id: 1, createdAt: now, category: 'operasional', source: 'KAS', amount: 15000, deleted: false }
+    ]
+
+    const res = computeFinanceBalances({
+      digitalProducts,
+      fundMovements,
+      expenses,
+      liveDrawerBalance: 34000,
+      financeBaseline: {
+        kasBalance: 100000,
+        rekeningBalance: 300000,
+        tabunganBalance: 50000,
+        pihakKetigaBalance: 20000
+      }
+    })
+
+    // PIHAK_KETIGA = 20rb baseline + 250rb topup - 50.5rb (PIHAK_KETIGA) - 20.5rb (legacy SALDO_AGEN) = 199.000
+    expect(res.pihakKetigaBalance).toBe(199000)
+    // KAS = 100rb baseline - 10.5rb (digital KAS) - 15rb (expense KAS) = 74.500
+    expect(res.kasBalance).toBe(74500)
+    // REKENING = 300rb baseline - 250rb (topup mitra) + 52.5rb (QRIS PLN) = 102.500
+    expect(res.rekeningBalance).toBe(102500)
+    expect(res.tabunganBalance).toBe(50000)
   })
 
   it('aggregates 7d and 30d finance summaries accurately including savings flows', () => {

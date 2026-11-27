@@ -15,6 +15,7 @@ import {
   Search
 } from '@lucide/vue'
 import { recordBelongsToShift } from '../utils/dailyStats'
+import { computeFinanceBalances } from '../utils/financeEngine'
 
 const DIGITAL_PRESETS_STORAGE_KEY = 'kasiry_digital_presets_v1'
 
@@ -110,6 +111,30 @@ const props = defineProps({
       todayDigitalProfit: 0,
       todayDigitalCount: 0
     })
+  },
+  precomputedPockets: {
+    type: Object,
+    default: null
+  },
+  transactions: {
+    type: Array,
+    default: () => []
+  },
+  debtPayments: {
+    type: Array,
+    default: () => []
+  },
+  expenses: {
+    type: Array,
+    default: () => []
+  },
+  cashServices: {
+    type: Array,
+    default: () => []
+  },
+  fundMovements: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -132,6 +157,7 @@ const tokenCodeInput = ref('')
 const nominalValue = ref(10000)
 const costPriceInput = ref('10500')
 const sellPriceInput = ref('12000')
+const selectedCostSource = ref('PIHAK_KETIGA')
 const paymentMethod = ref('TUNAI')
 const customerSearchQuery = ref('')
 const selectedCustomerId = ref(null)
@@ -187,6 +213,7 @@ watch(() => props.isOpen, (open) => {
     providerInput.value = 'Telkomsel'
     targetNumberInput.value = ''
     tokenCodeInput.value = ''
+    selectedCostSource.value = 'PIHAK_KETIGA'
     paymentMethod.value = 'TUNAI'
     customerSearchQuery.value = ''
     selectedCustomerId.value = null
@@ -229,6 +256,43 @@ const parsedSellPrice = computed(() => {
 })
 
 const estimatedProfit = computed(() => parsedSellPrice.value - parsedCostPrice.value)
+
+const costSourceOptions = [
+  { id: 'PIHAK_KETIGA', label: 'Saldo Pihak Ketiga' },
+  { id: 'REKENING', label: 'Rekening / QRIS' },
+  { id: 'KAS', label: 'Uang Kas' },
+  { id: 'LUAR', label: 'Dana Luar' }
+]
+
+const pocketBalances = computed(() =>
+  computeFinanceBalances({
+    transactions: props.transactions,
+    debtPayments: props.debtPayments,
+    expenses: props.expenses,
+    cashServices: props.cashServices,
+    digitalProducts: props.digitalProducts,
+    fundMovements: props.fundMovements,
+    customers: props.customers,
+    precomputedPockets: props.precomputedPockets
+  })
+)
+
+const getCostBalanceForSource = (src) => {
+  if (src === 'PIHAK_KETIGA') return Number(pocketBalances.value.pihakKetigaBalance || 0)
+  if (src === 'REKENING') return Number(pocketBalances.value.rekeningBalance || 0)
+  if (src === 'KAS') return Number(pocketBalances.value.kasBalance || 0)
+  return Infinity
+}
+
+const activeCostSourceLabel = computed(() => {
+  return costSourceOptions.find(o => o.id === selectedCostSource.value)?.label || 'Saldo Pihak Ketiga'
+})
+
+const isCostBalanceLow = computed(() => {
+  if (selectedCostSource.value === 'LUAR') return false
+  if (parsedCostPrice.value <= 0) return false
+  return getCostBalanceForSource(selectedCostSource.value) < parsedCostPrice.value
+})
 
 const eligibleDebtCustomers = computed(() => {
   const q = customerSearchQuery.value.trim().toLowerCase()
@@ -300,7 +364,7 @@ const handleSubmit = () => {
     nominal: nominalValue.value,
     costPrice: parsedCostPrice.value,
     sellPrice: parsedSellPrice.value,
-    costSource: 'SALDO_AGEN',
+    costSource: selectedCostSource.value,
     paymentMethod: paymentMethod.value,
     customer: paymentMethod.value === 'UTANG / BON'
       ? resolvedCustomerForDebt.value
@@ -363,7 +427,7 @@ const triggerDelete = (id) => {
               Pulsa, Paket Data &amp; Token PLN
             </h3>
             <p class="text-xs text-slate-500 font-medium">
-              {{ activeShift ? `Shift ${activeShift.shiftCode} • Modal: Saldo Agen / PPOB` : 'Hitung Harian • Modal: Saldo Agen / PPOB' }}
+              {{ activeShift ? `Shift ${activeShift.shiftCode} • Modal: ${activeCostSourceLabel}` : `Hitung Harian • Modal: ${activeCostSourceLabel}` }}
             </p>
           </div>
         </div>
@@ -583,7 +647,7 @@ const triggerDelete = (id) => {
             <div class="grid grid-cols-2 gap-2.5">
               <div>
                 <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                  Modal Saldo Agen (Rp)
+                  Harga Modal (Rp)
                 </label>
                 <div class="relative">
                   <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-slate-400">Rp</span>
@@ -614,9 +678,39 @@ const triggerDelete = (id) => {
               </div>
             </div>
 
+            <!-- Sumber Modal Transaksi Digital -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                Modal Diambil Dari
+              </label>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button
+                  v-for="opt in costSourceOptions"
+                  :key="opt.id"
+                  type="button"
+                  @click="selectedCostSource = opt.id"
+                  :class="[
+                    'p-2 rounded-xl border text-left cursor-pointer transition-all',
+                    selectedCostSource === opt.id
+                      ? 'bg-sky-50 border-[#0284c7] text-[#0a193d]'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                  ]"
+                >
+                  <span class="text-[11px] font-bold block leading-tight">{{ opt.label }}</span>
+                  <span v-if="opt.id !== 'LUAR'" class="text-[10px] font-mono text-slate-500 block mt-0.5">
+                    Saldo Rp {{ getCostBalanceForSource(opt.id).toLocaleString('id-ID') }}
+                  </span>
+                  <span v-else class="text-[10px] text-slate-500 block mt-0.5">Dompet luar / tidak potong kas</span>
+                </button>
+              </div>
+              <p v-if="isCostBalanceLow" class="mt-1.5 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 font-medium">
+                Catatan: {{ activeCostSourceLabel }} saat ini Rp {{ getCostBalanceForSource(selectedCostSource).toLocaleString('id-ID') }} (&lt; modal Rp {{ parsedCostPrice.toLocaleString('id-ID') }}). Transaksi tetap bisa disimpan dan dapat diisi ulang dari menu Keuangan.
+              </p>
+            </div>
+
             <!-- Live Strip Laba -->
             <div class="px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
-              <span class="text-slate-600 font-medium">Laba Bersih (Jual - Modal Agen):</span>
+              <span class="text-slate-600 font-medium">Laba Bersih (Jual - Modal):</span>
               <span
                 :class="[
                   'font-bold font-mono',

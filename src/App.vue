@@ -141,6 +141,7 @@ const {
   activeShift,
   isActiveShiftStale,
   lastOpeningCash,
+  cumulativePocketBalances,
   unassignedTodayCount,
   totalTransactionCount,
   olderTransactionCount,
@@ -172,6 +173,7 @@ const {
   openShift,
   closeShift,
   recordTransaction,
+  deleteTransaction,
   saveStoreProfile,
   getFullDatabasePayload,
   getAllTransactionsForExport,
@@ -209,6 +211,7 @@ const {
   appendCashServiceToSheet,
   appendDigitalProductToSheet,
   appendFundMovementToSheet,
+  appendCancellationToSheet,
   appendShiftEventToSheet,
   ensureSpreadsheet
 } = useGoogleSync()
@@ -691,10 +694,59 @@ const handleRecordExpense = async (payload) => {
 }
 
 const handleDeleteExpense = async (expenseId) => {
+  const target = expenses.value.find(e => e.id === expenseId)
   const ok = await deleteExpense(expenseId)
   if (ok) {
+    if (target) {
+      appendCancellationToSheet({
+        refNumber: target.expenseNumber || String(expenseId),
+        actionLabel: 'HAPUS KAS KELUAR',
+        detail: `Hapus kas keluar: ${target.note || target.category || '-'}`,
+        amount: target.amount || 0
+      }, storeProfile.value?.name)
+    }
     triggerCloudAutoBackup(true)
   }
+}
+
+const handleDeleteTransaction = async (tx) => {
+  if (!tx?.id) return
+  const voided = await deleteTransaction(tx.id)
+  if (voided) {
+    playBeepSound('success')
+    appendCancellationToSheet({
+      refNumber: voided.invoiceNumber || String(tx.id),
+      actionLabel: 'BATAL TRANSAKSI',
+      detail: `Void struk ${voided.invoiceNumber || ''} (${voided.paymentMethod || '-'})`,
+      amount: -Math.abs(Number(voided.totalAmount || 0))
+    }, storeProfile.value?.name)
+    triggerCloudAutoBackup(true)
+  }
+}
+
+const handleOpenReportReceipt = (tx) => {
+  if (!tx) return
+  const matchedCustomer = tx.customerId
+    ? customers.value.find(c => c.id === tx.customerId)
+    : null
+  receiptData.value = {
+    invoiceNumber: tx.invoiceNumber || '-',
+    time: tx.createdAt
+      ? new Date(tx.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      : new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+    totalAmount: Number(tx.totalAmount || 0),
+    paymentMethod: tx.paymentMethod || 'TUNAI',
+    paidAmount: tx.paidAmount ?? tx.cashGiven ?? tx.totalAmount,
+    debtAmount: tx.debtAmount || 0,
+    cashGiven: tx.cashGiven ?? tx.totalAmount,
+    changeAmount: tx.changeAmount || 0,
+    customer: tx.customerName
+      ? { id: tx.customerId, name: tx.customerName, phone: matchedCustomer?.phone || '' }
+      : { id: 1, name: 'Umum', phone: '' },
+    items: Array.isArray(tx.items) ? tx.items : []
+  }
+  isDailyReportOpen.value = false
+  isReceiptOpen.value = true
 }
 
 // Record & Hapus Nota Kulakan / Belanja Stok (update stok lunak, modal, kas keluar & sync Sheets/Drive)
@@ -728,8 +780,17 @@ const handleRecordRestock = async (payload) => {
 }
 
 const handleDeleteRestock = async (restockId) => {
+  const target = restocks.value.find(r => r.id === restockId)
   const ok = await deleteRestock(restockId)
   if (ok) {
+    if (target) {
+      appendCancellationToSheet({
+        refNumber: target.restockNumber || String(restockId),
+        actionLabel: 'HAPUS KULAKAN',
+        detail: `Hapus kulakan ${target.supplierName || ''} (rollback stok/kas)`,
+        amount: target.totalCost || 0
+      }, storeProfile.value?.name)
+    }
     triggerCloudAutoBackup(true)
   }
 }
@@ -783,16 +844,7 @@ const handleRecordCashService = async (payload) => {
     ? Number(stats.value.expectedCashDrawer ?? 0)
     : Number(stats.value.todayNetCashDrawer ?? 0)
   const availableSourceCash = payload?.cashSource === 'KAS'
-    ? computeFinanceBalances({
-        transactions: transactions.value,
-        debtPayments: debtPayments.value,
-        expenses: expenses.value,
-        cashServices: cashServices.value,
-        digitalProducts: digitalProducts.value,
-        fundMovements: fundMovements.value,
-        customers: customers.value,
-        liveDrawerBalance: liveDrawerCash
-      }).kasBalance
+    ? Number(cumulativePocketBalances.value.kasBalance || 0)
     : liveDrawerCash
 
   try {
@@ -817,8 +869,17 @@ const handleRecordCashService = async (payload) => {
 }
 
 const handleDeleteCashService = async (serviceId) => {
+  const target = cashServices.value.find(s => s.id === serviceId)
   const ok = await deleteCashService(serviceId)
   if (ok) {
+    if (target) {
+      appendCancellationToSheet({
+        refNumber: target.serviceNumber || String(serviceId),
+        actionLabel: 'HAPUS TARIK/TRANSFER',
+        detail: `Hapus layanan ${target.type || ''} (${target.channel || '-'})`,
+        amount: target.amount || 0
+      }, storeProfile.value?.name)
+    }
     triggerCloudAutoBackup(true)
   }
 }
@@ -846,8 +907,17 @@ const handleRecordFundMovement = async (payload) => {
 }
 
 const handleDeleteFundMovement = async (movementId) => {
+  const target = fundMovements.value.find(m => m.id === movementId)
   const ok = await deleteFundMovement(movementId)
   if (ok) {
+    if (target) {
+      appendCancellationToSheet({
+        refNumber: target.movementNumber || String(movementId),
+        actionLabel: 'HAPUS MUTASI DANA',
+        detail: `Hapus mutasi ${target.fromAccount} -> ${target.toAccount}`,
+        amount: target.amount || 0
+      }, storeProfile.value?.name)
+    }
     triggerCloudAutoBackup(true)
   }
 }
@@ -915,13 +985,28 @@ const handleUpdateDigitalTokenCode = async ({ id, tokenCode }) => {
   const updated = await updateDigitalTokenCode(id, tokenCode)
   if (updated) {
     playBeepSound('success')
+    appendCancellationToSheet({
+      refNumber: updated.digitalNumber || String(id),
+      actionLabel: 'UPDATE TOKEN/SN',
+      detail: `Token/SN diperbarui: ${updated.tokenCode || '-'}`,
+      amount: updated.sellPrice || 0
+    }, storeProfile.value?.name)
     triggerCloudAutoBackup(true)
   }
 }
 
 const handleDeleteDigitalProduct = async (digitalId) => {
+  const target = digitalProducts.value.find(d => d.id === digitalId)
   const ok = await deleteDigitalProduct(digitalId)
   if (ok) {
+    if (target) {
+      appendCancellationToSheet({
+        refNumber: target.digitalNumber || String(digitalId),
+        actionLabel: 'HAPUS PULSA/TOKEN',
+        detail: `Hapus ${target.productName || 'produk digital'} (${target.paymentMethod || 'TUNAI'})`,
+        amount: target.sellPrice || 0
+      }, storeProfile.value?.name)
+    }
     triggerCloudAutoBackup(true)
   }
 }
@@ -967,6 +1052,9 @@ const handleCloseShift = async (payload) => {
     isShiftAutoPrompt.value = false
     completedShiftSummary.value = closed
     appendShiftEventToSheet({ action: 'TUTUP SHIFT', shift: closed }, storeProfile.value?.name)
+    if (closed.handoverMovement) {
+      appendFundMovementToSheet(closed.handoverMovement, storeProfile.value?.name)
+    }
     triggerCloudAutoBackup(true)
   }
 }
@@ -1112,14 +1200,9 @@ const handleDownloadExcel = async () => {
       ? Number(stats.value.expectedCashDrawer ?? 0)
       : Number(stats.value.todayNetCashDrawer ?? 0)
     const financeBalances = computeFinanceBalances({
-      transactions: allTransactions,
-      debtPayments: allDebtPayments,
-      expenses: allExpenses,
-      cashServices: allCashServices,
-      digitalProducts: allDigitalProducts,
-      fundMovements: allFundMovements,
       customers: customers.value,
-      liveDrawerBalance: liveDrawerCash
+      liveDrawerBalance: liveDrawerCash,
+      precomputedPockets: cumulativePocketBalances.value
     })
     await exportKasiryExcel({
       storeProfile: storeProfile.value,
@@ -1563,6 +1646,7 @@ onUnmounted(() => {
       :isOpen="isDebtBookOpen"
       :customers="customers"
       :transactions="transactions"
+      :digitalProducts="digitalProducts"
       :storeName="storeProfile.name"
       :fetchCustomerTransactions="getCustomerTransactions"
       @close="isDebtBookOpen = false"
@@ -1577,6 +1661,7 @@ onUnmounted(() => {
       :isOpen="isCustomerManageOpen"
       :customers="customers"
       :transactions="transactions"
+      :digitalProducts="digitalProducts"
       :storeName="storeProfile.name"
       :fetchCustomerTransactions="getCustomerTransactions"
       @close="isCustomerManageOpen = false"
@@ -1603,6 +1688,8 @@ onUnmounted(() => {
       @openDigitalProduct="isDailyReportOpen = false; isDigitalProductOpen = true"
       @openShift="isDailyReportOpen = false; openShiftModalManual()"
       @deleteExpense="handleDeleteExpense"
+      @deleteTransaction="handleDeleteTransaction"
+      @openReceipt="handleOpenReportReceipt"
     />
 
     <!-- Modal Catatan Kas Keluar / Pengeluaran Harian -->
@@ -1628,6 +1715,7 @@ onUnmounted(() => {
       :digitalProducts="digitalProducts"
       :fundMovements="fundMovements"
       :customers="customers"
+      :precomputedPockets="cumulativePocketBalances"
       :activeShift="activeShift"
       :stats="stats"
       @close="isCashServiceOpen = false"
@@ -1642,6 +1730,12 @@ onUnmounted(() => {
       :isOpen="isDigitalProductOpen"
       :digitalProducts="digitalProducts"
       :customers="customers"
+      :transactions="transactions"
+      :debtPayments="debtPayments"
+      :expenses="expenses"
+      :cashServices="cashServices"
+      :fundMovements="fundMovements"
+      :precomputedPockets="cumulativePocketBalances"
       :activeShift="activeShift"
       :stats="stats"
       @close="isDigitalProductOpen = false"
@@ -1664,6 +1758,7 @@ onUnmounted(() => {
       :digitalProducts="digitalProducts"
       :fundMovements="fundMovements"
       :customers="customers"
+      :precomputedPockets="cumulativePocketBalances"
       @close="isFinanceOpen = false"
       @recordFundMovement="handleRecordFundMovement"
       @deleteFundMovement="handleDeleteFundMovement"

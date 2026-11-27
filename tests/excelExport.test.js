@@ -193,8 +193,10 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
         kasBalance: 250000,
         rekeningBalance: 85000,
         tabunganBalance: 50000,
+        pihakKetigaBalance: 120000,
+        totalLiquidAssets: 630000,
         totalReceivables: 15000,
-        totalNetWealth: 525000
+        totalNetWealth: 645000
       }
     })
 
@@ -225,6 +227,8 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(summaryMap['Sisa Tunai Fisik di Laci (Bersih)']).toBe(25000)
     expect(summaryMap['Modal Awal Laci (Shift Aktif)']).toBe(100000)
     expect(summaryMap['Total Seharusnya di Laci (Termasuk Modal)']).toBe(125000)
+    expect(summaryMap['Saldo Pihak Ketiga (Pulsa / Token)']).toBe(120000)
+    expect(summaryMap['Total Dana Likuid (5 Kantong)']).toBe(630000)
 
     const txRows = XLSX.utils.sheet_to_json(workbook.Sheets['Daftar Transaksi'])
     expect(txRows).toHaveLength(4)
@@ -272,6 +276,7 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(digitalRows[0]['No. Nota']).toBe('PLN-401')
     expect(digitalRows[0]['No. HP / ID PLN']).toBe('541200889911')
     expect(digitalRows[0]['No. Token / SN']).toBe('1234 5678 9012 3456 7890')
+    expect(digitalRows[0]['Sumber Modal']).toBe('Saldo Pihak Ketiga')
     expect(digitalRows[0]['Laba (Rp)']).toBe(2000)
 
     const fundRows = XLSX.utils.sheet_to_json(workbook.Sheets['Mutasi Kas & Tabungan'])

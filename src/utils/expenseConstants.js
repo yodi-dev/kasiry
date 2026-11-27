@@ -13,8 +13,8 @@ export const EXPENSE_CATEGORIES = [
   },
   {
     id: 'prive',
-    label: 'Tarik / Setor Owner',
-    hint: 'Ambil kas laci (tidak kurangi untung)',
+    label: 'Ambil Kas Laci',
+    hint: 'Ambil uang harian laci (tidak kurangi untung)',
     affectsProfit: false
   },
   {
@@ -30,6 +30,11 @@ export const EXPENSE_SOURCES = [
     id: 'TUNAI_LACI',
     label: 'Tunai (Dari Laci)',
     shortLabel: 'Dari Laci'
+  },
+  {
+    id: 'KAS',
+    label: 'Uang Kas Toko',
+    shortLabel: 'Uang Kas'
   },
   {
     id: 'NON_TUNAI',

@@ -70,15 +70,27 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'downloadExcel', 'openExpense', 'openCashService', 'openDigitalProduct', 'deleteExpense', 'openShift'])
+const emit = defineEmits([
+  'close',
+  'downloadExcel',
+  'openExpense',
+  'openCashService',
+  'openDigitalProduct',
+  'deleteExpense',
+  'deleteTransaction',
+  'openReceipt',
+  'openShift'
+])
 
 // Active Tab: 'summary' | 'expenses' | 'history'
 const activeTab = ref('summary')
 const confirmingDeleteId = ref(null)
+const confirmingDeleteTxId = ref(null)
 
 watch(() => props.isOpen, (open) => {
   if (open) {
     confirmingDeleteId.value = null
+    confirmingDeleteTxId.value = null
   }
 }, { immediate: true })
 
@@ -96,7 +108,7 @@ const todayTransactions = computed(() => {
   if (!props.transactions || props.transactions.length === 0) return []
   if (props.activeShift && props.activeShift.status === 'OPEN') {
     return props.transactions
-      .filter(t => recordBelongsToShift(t, props.activeShift, 'createdAt'))
+      .filter(t => t && !t.deleted && recordBelongsToShift(t, props.activeShift, 'createdAt'))
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   }
   const startOfDay = new Date()
@@ -104,7 +116,7 @@ const todayTransactions = computed(() => {
   const todayTimestamp = startOfDay.getTime()
 
   return props.transactions
-    .filter(t => (t.createdAt || 0) >= todayTimestamp)
+    .filter(t => t && !t.deleted && (t.createdAt || 0) >= todayTimestamp)
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 })
 
@@ -227,7 +239,18 @@ const generateWhatsAppText = () => {
       text += `   • Tarik / Setor Owner: Rp ${priveTotal.toLocaleString('id-ID')} (tidak kurangi untung)\n`
     }
   }
-  if (expensesTotal > 0 || cashServiceIn > 0 || cashServiceOut > 0) {
+  const fundToLaci = props.stats.todayFundToLaci || 0
+  const fundFromLaci = props.stats.todayFundFromLaci || 0
+  if (fundToLaci > 0 || fundFromLaci > 0) {
+    text += `🏦 *Mutasi Laci <-> Keuangan:*\n`
+    if (fundToLaci > 0) {
+      text += `   • Dana Masuk Laci: +Rp ${fundToLaci.toLocaleString('id-ID')}\n`
+    }
+    if (fundFromLaci > 0) {
+      text += `   • Setor/Tabungan Dari Laci: -Rp ${fundFromLaci.toLocaleString('id-ID')}\n`
+    }
+  }
+  if (expensesTotal > 0 || cashServiceIn > 0 || cashServiceOut > 0 || fundToLaci > 0 || fundFromLaci > 0) {
     text += `💰 *Sisa Tunai Fisik Laci:* Rp ${netCashDrawer.value.toLocaleString('id-ID')}\n`
   }
   text += `📈 *Perkiraan Untung Bersih:* Rp ${(props.stats.todayProfit || 0).toLocaleString('id-ID')}\n`
@@ -258,6 +281,11 @@ const shareToWhatsApp = () => {
 const confirmDeleteExpense = (id) => {
   emit('deleteExpense', id)
   confirmingDeleteId.value = null
+}
+
+const confirmDeleteTransaction = (tx) => {
+  emit('deleteTransaction', tx)
+  confirmingDeleteTxId.value = null
 }
 </script>
 
@@ -403,7 +431,7 @@ const confirmDeleteExpense = (id) => {
                 Rp {{ ((stats.todaySales || 0) + (stats.todayDebtPaid || 0) + (stats.todayDigitalSalesCash || 0) + (stats.todayDigitalSalesQris || 0)).toLocaleString('id-ID') }}
               </p>
               <p class="text-[11px] text-slate-500 font-medium mt-1 leading-snug break-words">
-                <template v-if="(stats.todayExpensesCash || 0) > 0 || (stats.todayCashServiceIn || 0) > 0 || (stats.todayCashServiceOut || 0) > 0">
+                <template v-if="(stats.todayExpensesCash || 0) > 0 || (stats.todayCashServiceIn || 0) > 0 || (stats.todayCashServiceOut || 0) > 0 || (stats.todayFundToLaci || 0) > 0 || (stats.todayFundFromLaci || 0) > 0">
                   Sisa Laci: Rp {{ netCashDrawer.toLocaleString('id-ID') }}
                   (Masuk Rp {{ grossCashDrawer.toLocaleString('id-ID') }})
                 </template>
@@ -526,7 +554,7 @@ const confirmDeleteExpense = (id) => {
               <p class="text-[11px] text-slate-600 mt-0.5 leading-snug">
                 <template v-if="(stats.todayDigitalCount || 0) > 0">
                   Omzet: Rp {{ (stats.todayDigitalSales || 0).toLocaleString('id-ID') }}
-                  • Modal Agen: Rp {{ (stats.todayDigitalCost || 0).toLocaleString('id-ID') }}
+                  • Modal Digital: Rp {{ (stats.todayDigitalCost || 0).toLocaleString('id-ID') }}
                   • Laba: <strong class="text-emerald-700">+Rp {{ (stats.todayDigitalProfit || 0).toLocaleString('id-ID') }}</strong>
                 </template>
                 <template v-else>
@@ -763,12 +791,51 @@ const confirmDeleteExpense = (id) => {
               </div>
             </div>
 
-            <!-- Total Akhir Struk -->
-            <div class="flex items-center justify-between pt-1 text-xs">
+            <!-- Total Akhir Struk & Aksi Cetak / Void -->
+            <div class="flex items-center justify-between pt-1 text-xs gap-2">
               <span class="text-slate-500 font-medium">Total Pembayaran:</span>
               <span class="font-mono font-bold text-sm text-[#0a193d]">
                 Rp {{ tx.totalAmount.toLocaleString('id-ID') }}
               </span>
+            </div>
+
+            <div v-if="confirmingDeleteTxId === (tx.id || tx.invoiceNumber)" class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+              <span class="text-rose-700 font-semibold">Batalkan struk ini &amp; pulihkan stok/bon?</span>
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  @click="confirmingDeleteTxId = null"
+                  class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  @click="confirmDeleteTransaction(tx)"
+                  class="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] cursor-pointer"
+                >
+                  Ya, Void
+                </button>
+              </div>
+            </div>
+            <div v-else class="pt-1.5 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                @click="emit('openReceipt', tx)"
+                class="h-7 px-2.5 rounded-lg bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-[#0284c7] font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <Receipt class="w-3 h-3" />
+                <span>Cetak Struk</span>
+              </button>
+              <button
+                v-if="tx.id"
+                type="button"
+                @click="confirmingDeleteTxId = tx.id || tx.invoiceNumber"
+                class="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <Trash2 class="w-3 h-3" />
+                <span>Batalkan</span>
+              </button>
             </div>
           </div>
         </div>

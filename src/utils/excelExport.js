@@ -48,6 +48,7 @@ export async function exportKasiryExcel({
   const cashDrawerTotal = stats.todayCashDrawer ?? (cashSales + debtPaidCash)
   const qrisTotal = stats.todayQrisTotal ?? (qrisSales + debtPaidQris)
   const expensesCash = stats.todayExpensesCash ?? 0
+  const expensesKas = stats.todayExpensesKas ?? 0
   const expensesNonCash = stats.todayExpensesNonCash ?? 0
   const cashServiceIn = stats.todayCashServiceIn ?? 0
   const cashServiceOut = stats.todayCashServiceOut ?? 0
@@ -71,7 +72,7 @@ export async function exportKasiryExcel({
     ['Pelunasan Utang - Tunai', debtPaidCash],
     ['Pelunasan Utang - QRIS', debtPaidQris],
     ['Penjualan Pulsa & Token PLN (Omzet)', digitalSales],
-    ['Modal Saldo Agen Pulsa & Token', digitalCost],
+    ['Harga Modal Produk Digital', digitalCost],
     ['Laba Pulsa & Token PLN', digitalProfit],
     ['Transfer / Top-Up Masuk Laci (Pokok + Admin)', cashServiceIn],
     ['Tarik Tunai Keluar Dari Laci (Pokok)', cashServiceOut],
@@ -80,9 +81,12 @@ export async function exportKasiryExcel({
     ['Total Penerimaan QRIS (Non-Tunai)', qrisTotal],
     ['Total Uang Masuk Kas (Keseluruhan)', cashDrawerTotal + qrisTotal],
     ['Pengeluaran Dari Laci (Tunai)', expensesCash],
+    ...(expensesKas > 0 ? [['Pengeluaran Dari Uang Kas Toko', expensesKas]] : []),
     ['Pengeluaran Non-Tunai', expensesNonCash],
     ['Biaya Operasional Hari Ini', stats.todayOperationalExpenses || 0],
-    ['Tarik / Setor Owner Hari Ini', stats.todayPriveTotal || 0],
+    ['Ambil Kas Laci (Prive) Hari Ini', stats.todayPriveTotal || 0],
+    ...((stats.todayFundToLaci || 0) > 0 ? [['Dana Masuk ke Laci (Mutasi Keuangan)', stats.todayFundToLaci]] : []),
+    ...((stats.todayFundFromLaci || 0) > 0 ? [['Setor / Tabungan Dari Laci (Mutasi Keuangan)', stats.todayFundFromLaci]] : []),
     ['Sisa Tunai Fisik di Laci (Bersih)', netCashDrawer],
     ...(stats.isShiftScoped
       ? [
@@ -98,9 +102,12 @@ export async function exportKasiryExcel({
       ? [
           [],
           ['POSISI KEUANGAN KANTONG DANA', 'SALDO (Rp)'],
+          ['Uang Laci Kasir', financeBalances.laciBalance || 0],
           ['Uang Kas Toko (Cadangan / Brankas)', financeBalances.kasBalance || 0],
           ['Saldo Rekening / QRIS (Kumulatif)', financeBalances.rekeningBalance || 0],
           ['Saldo Tabungan Usaha', financeBalances.tabunganBalance || 0],
+          ['Saldo Pihak Ketiga (Pulsa / Token)', financeBalances.pihakKetigaBalance || 0],
+          ['Total Dana Likuid (5 Kantong)', financeBalances.totalLiquidAssets || 0],
           ['Total Kekayaan Likuid + Piutang', financeBalances.totalNetWealth || 0]
         ]
       : [])
@@ -124,7 +131,8 @@ export async function exportKasiryExcel({
     'Jumlah Item',
     'Rincian Barang'
   ]
-  const txRows = transactions.map((t, idx) => {
+  const activeTxList = (transactions || []).filter(t => t && !t.deleted)
+  const txRows = activeTxList.map((t, idx) => {
     const itemsSummary = (t.items || [])
       .map(i => `${i.qty}x ${i.name}`)
       .join(', ')
@@ -173,7 +181,7 @@ export async function exportKasiryExcel({
   // SHEET 3: RINCIAN BARANG TERJUAL
   // ==========================================
   const productAgg = {}
-  transactions.forEach(t => {
+  activeTxList.forEach(t => {
     (t.items || []).forEach(item => {
       if (!productAgg[item.name]) {
         productAgg[item.name] = {
@@ -487,7 +495,8 @@ export async function exportKasiryExcel({
     'Provider / Operator',
     'No. HP / ID PLN',
     'No. Token / SN',
-    'Modal Agen (Rp)',
+    'Harga Modal (Rp)',
+    'Sumber Modal',
     'Harga Jual (Rp)',
     'Laba (Rp)',
     'Metode Bayar',
@@ -504,6 +513,13 @@ export async function exportKasiryExcel({
         : d.category === 'TAGIHAN'
           ? 'Tagihan PPOB'
           : 'Pulsa'
+    const costSrcLabel = d.costSource === 'REKENING'
+      ? 'Rekening / QRIS'
+      : d.costSource === 'KAS'
+        ? 'Uang Kas'
+        : (d.costSource === 'LUAR' || d.costSource === 'DANA_LUAR')
+          ? 'Dana Luar'
+          : 'Saldo Pihak Ketiga'
     return [
       idx + 1,
       d.digitalNumber || `#${d.id || ''}`,
@@ -514,6 +530,7 @@ export async function exportKasiryExcel({
       d.targetNumber || '-',
       d.tokenCode || '-',
       Number(d.costPrice || 0),
+      costSrcLabel,
       Number(d.sellPrice || 0),
       Number(d.profit ?? (Number(d.sellPrice || 0) - Number(d.costPrice || 0))),
       d.paymentMethod || 'TUNAI',

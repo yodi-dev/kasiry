@@ -59,19 +59,25 @@ const sourceOptions = [
   {
     id: 'TUNAI_LACI',
     label: 'Tunai Laci',
-    hint: 'Potong saldo laci & buat kas keluar',
+    hint: 'Potong laci & buat kas keluar',
     icon: Wallet
+  },
+  {
+    id: 'KAS',
+    label: 'Uang Kas',
+    hint: 'Potong saldo Uang Kas toko',
+    icon: Package
   },
   {
     id: 'NON_TUNAI',
     label: 'QRIS / Rek',
-    hint: 'Potong saldo non-tunai & buat kas keluar',
+    hint: 'Potong rekening & buat kas keluar',
     icon: CreditCard
   },
   {
     id: 'DANA_LUAR',
     label: 'Dana Luar',
-    hint: 'Uang pribadi owner (tidak potong laci)',
+    hint: 'Uang pribadi owner',
     icon: UserCheck
   }
 ]
@@ -90,6 +96,9 @@ watch(() => props.isOpen, (open) => {
 }, { immediate: true })
 
 const netDrawerDisplay = computed(() => {
+  if (props.stats?.isShiftScoped) {
+    return Number(props.stats.expectedCashDrawer ?? ((props.stats.openingCash || 0) + (props.stats.todayNetCashDrawer || 0)))
+  }
   if (props.stats?.todayNetCashDrawer !== undefined) {
     return props.stats.todayNetCashDrawer
   }
@@ -233,6 +242,9 @@ const formatDateTime = (ts) => {
 }
 
 const getSourceBadge = (src) => {
+  if (src === 'KAS') {
+    return { label: 'Uang Kas', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/80' }
+  }
   if (src === 'NON_TUNAI') {
     return { label: 'QRIS / Rek', badgeClass: 'bg-sky-50 text-[#0284c7] border-sky-200/80' }
   }
@@ -340,7 +352,7 @@ const confirmDelete = (id) => {
               <span class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                 Sumber Dana Pembayaran
               </span>
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   v-for="src in sourceOptions"
                   :key="src.id"

@@ -65,6 +65,10 @@ const props = defineProps({
   customers: {
     type: Array,
     default: () => []
+  },
+  precomputedPockets: {
+    type: Object,
+    default: null
   }
 })
 
@@ -86,7 +90,8 @@ const internalAccounts = [
   { id: 'LACI', label: 'Laci Kasir' },
   { id: 'KAS', label: 'Uang Kas' },
   { id: 'REKENING', label: 'Rekening/QRIS' },
-  { id: 'TABUNGAN', label: 'Tabungan' }
+  { id: 'TABUNGAN', label: 'Tabungan' },
+  { id: 'PIHAK_KETIGA', label: 'Saldo Pihak Ketiga' }
 ]
 
 const liveDrawerBalance = computed(() => {
@@ -105,7 +110,8 @@ const balances = computed(() =>
     digitalProducts: props.digitalProducts,
     fundMovements: props.fundMovements,
     customers: props.customers,
-    liveDrawerBalance: liveDrawerBalance.value
+    liveDrawerBalance: liveDrawerBalance.value,
+    precomputedPockets: props.precomputedPockets
   })
 )
 
@@ -133,6 +139,7 @@ const getBalanceForAccount = (accountId) => {
   if (accountId === 'KAS') return balances.value.kasBalance
   if (accountId === 'REKENING') return balances.value.rekeningBalance
   if (accountId === 'TABUNGAN') return balances.value.tabunganBalance
+  if (accountId === 'PIHAK_KETIGA' || accountId === 'SALDO_AGEN') return balances.value.pihakKetigaBalance
   return Infinity
 }
 
@@ -171,6 +178,14 @@ const selectActionMode = (mode) => {
 
 const openQuickAddTabungan = () => {
   selectActionMode('TAMBAH_TABUNGAN')
+  activeTab.value = 'action'
+}
+
+const openQuickTopUpMitra = () => {
+  actionType.value = 'MUTASI'
+  errorNotice.value = ''
+  fromAccount.value = 'REKENING'
+  toAccount.value = 'PIHAK_KETIGA'
   activeTab.value = 'action'
 }
 
@@ -270,7 +285,7 @@ const triggerDelete = (id) => {
               Manajemen Keuangan &amp; Tabungan
             </h3>
             <p class="text-xs text-slate-500 font-medium">
-              Pantau saldo Laci, Uang Kas, Rekening/QRIS &amp; Tabungan usaha secara terpisah
+              Pantau saldo Laci, Uang Kas, Rekening/QRIS, Tabungan &amp; Pihak Ketiga
             </p>
           </div>
         </div>
@@ -385,12 +400,31 @@ const triggerDelete = (id) => {
               </div>
               <p class="text-[11px] text-amber-900/75 leading-snug">Simpanan tabungan usaha</p>
             </div>
+
+            <!-- Saldo Pihak Ketiga (Pulsa & Token PLN) -->
+            <div class="col-span-2 min-w-0 p-3.5 rounded-2xl bg-purple-50/75 border border-purple-200/80 flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <span class="text-[11px] font-bold text-purple-800 uppercase tracking-wider block">Saldo Pihak Ketiga (Pulsa / PLN)</span>
+                <p class="text-lg sm:text-xl font-bold font-mono text-[#0a193d] mt-0.5 break-words">
+                  Rp {{ (balances.pihakKetigaBalance || 0).toLocaleString('id-ID') }}
+                </p>
+                <p class="text-[11px] text-purple-800/80 leading-snug">Otomatis terpotong modal saat jual pulsa/token memakai Saldo Pihak Ketiga</p>
+              </div>
+              <button
+                type="button"
+                @click="openQuickTopUpMitra"
+                class="px-3 py-1.5 rounded-xl bg-[#0a193d] hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
+              >
+                <Plus class="w-3.5 h-3.5 text-purple-300" />
+                <span>Isi Saldo</span>
+              </button>
+            </div>
           </div>
 
           <!-- Posisi Kekayaan Usaha -->
           <div class="p-4 rounded-2xl bg-[#0a193d] text-white space-y-2 shadow-xs">
             <div class="flex items-center justify-between gap-2 text-xs text-sky-200">
-              <span>Total Dana Likuid (Laci + Kas + Rek + Tabungan)</span>
+              <span>Total Dana Likuid (Laci + Kas + Rek + Tabungan + Mitra)</span>
               <span class="font-mono font-bold text-white">Rp {{ balances.totalLiquidAssets.toLocaleString('id-ID') }}</span>
             </div>
             <div class="flex items-center justify-between gap-2 text-xs text-sky-200">

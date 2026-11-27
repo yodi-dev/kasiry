@@ -49,6 +49,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  precomputedPockets: {
+    type: Object,
+    default: null
+  },
   activeShift: {
     type: Object,
     default: null
@@ -147,10 +151,12 @@ const financeBalances = computed(() => computeFinanceBalances({
   digitalProducts: props.digitalProducts,
   fundMovements: props.fundMovements,
   customers: props.customers,
-  liveDrawerBalance: availableDrawerCash.value
+  liveDrawerBalance: availableDrawerCash.value,
+  precomputedPockets: props.precomputedPockets
 }))
 
 const availableKasCash = computed(() => Number(financeBalances.value.kasBalance || 0))
+const availableRekeningCash = computed(() => Number(financeBalances.value.rekeningBalance || 0))
 
 const availableSourceCash = computed(() => (
   selectedCashSource.value === 'KAS' ? availableKasCash.value : availableDrawerCash.value
@@ -483,7 +489,19 @@ const triggerDelete = (id) => {
               </div>
             </div>
 
-            <!-- Guard Saldo Sumber Kurang -->
+            <!-- Info Saldo Rekening/QRIS saat Transfer / Top-Up -->
+            <div
+              v-if="selectedType === 'TRANSFER'"
+              :class="[
+                'p-3 rounded-2xl border text-xs flex items-center justify-between gap-2',
+                parsedAmount > 0 && parsedAmount > availableRekeningCash
+                  ? 'bg-amber-50 border-amber-200 text-amber-900'
+                  : 'bg-indigo-50/70 border-indigo-200/80 text-indigo-900'
+              ]"
+            >
+              <span>Saldo Rekening / QRIS Tercatat:</span>
+              <span class="font-bold font-mono">Rp {{ availableRekeningCash.toLocaleString('id-ID') }}</span>
+            </div>
             <div
               v-if="isDrawerInsufficient"
               class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5"

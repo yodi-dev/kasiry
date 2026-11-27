@@ -90,6 +90,8 @@ const adoptUnassigned = ref(true)
 
 const actualCashInput = ref('')
 const closingNoteInput = ref('')
+const handoverToKas = ref(false)
+const leaveInDrawerInput = ref(String(props.lastOpeningCash || 0))
 
 const openingPresets = [0, 100000, 200000, 300000, 500000]
 
@@ -108,6 +110,8 @@ watch(
       adoptUnassigned.value = true
       actualCashInput.value = ''
       closingNoteInput.value = ''
+      handoverToKas.value = false
+      leaveInDrawerInput.value = String(props.lastOpeningCash || 0)
     }
   },
   { immediate: true }
@@ -123,6 +127,11 @@ const parseNumericInput = (raw) => {
 const parsedOpeningCash = computed(() => parseNumericInput(openingCashInput.value))
 const hasActualCashEntered = computed(() => String(actualCashInput.value ?? '').trim().length > 0)
 const parsedActualCash = computed(() => parseNumericInput(actualCashInput.value))
+const parsedLeaveInDrawer = computed(() => Math.min(parsedActualCash.value, parseNumericInput(leaveInDrawerInput.value)))
+const computedHandoverToKas = computed(() => {
+  if (!handoverToKas.value || !hasActualCashEntered.value) return 0
+  return Math.max(0, parsedActualCash.value - parsedLeaveInDrawer.value)
+})
 
 const closingPreview = computed(() => {
   if (!props.activeShift) return null
@@ -175,7 +184,8 @@ const submitCloseShift = () => {
   emit('closeShift', {
     shiftId: props.activeShift.id,
     actualCash: parsedActualCash.value,
-    closingNote: closingNoteInput.value.trim()
+    closingNote: closingNoteInput.value.trim(),
+    handoverToKasAmount: computedHandoverToKas.value
   })
 }
 
@@ -459,6 +469,46 @@ const shareClosedShiftToWA = () => {
               placeholder="Misal: Uang laci disetorkan ke brankas / alasan selisih"
               class="w-full h-11 px-3.5 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-xs sm:text-sm font-medium text-[#0a193d] outline-hidden transition-all"
             />
+          </div>
+
+          <!-- Opsional: Setor Sisa Laci ke Uang Kas Toko -->
+          <div v-if="hasActualCashEntered && parsedActualCash > 0" class="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 space-y-2.5">
+            <label class="flex items-center gap-2 text-xs font-bold text-[#0a193d] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                v-model="handoverToKas"
+                class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>Sekalian setor sisa uang laci ke Uang Kas Toko</span>
+            </label>
+
+            <div v-if="handoverToKas" class="space-y-2 pt-2 border-t border-emerald-200/70 text-xs">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-slate-600 font-medium">Sisakan untuk modal laci besok:</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  v-model="leaveInDrawerInput"
+                  placeholder="0"
+                  class="w-32 h-9 px-2.5 bg-white border border-emerald-300 rounded-xl font-bold font-mono text-right text-[#0a193d] outline-hidden"
+                />
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="keep in [0, 100000, 200000]"
+                  :key="keep"
+                  type="button"
+                  @click="leaveInDrawerInput = String(Math.min(parsedActualCash, keep))"
+                  class="px-2 py-1 rounded-lg bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[11px] font-mono cursor-pointer"
+                >
+                  {{ keep === 0 ? 'Setor Semua' : `Sisa ${keep / 1000}rb` }}
+                </button>
+              </div>
+              <div class="flex justify-between font-bold text-emerald-800 pt-1">
+                <span>Otomatis Masuk Uang Kas Toko:</span>
+                <span class="font-mono">+Rp {{ computedHandoverToKas.toLocaleString('id-ID') }}</span>
+              </div>
+            </div>
           </div>
 
           <button

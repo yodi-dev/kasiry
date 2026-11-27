@@ -6,6 +6,26 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.0] - 2026-11-27 (Audit & Penyempurnaan Menyeluruh: Kantong Pihak Ketiga, Akuntansi >90 Hari & Sinkronisasi Antar Modal)
+
+### Added
+- **Kantong ke-5 `Saldo Pihak Ketiga` (`FinanceModal.vue`, `DigitalProductModal.vue`, `financeEngine.js`, `excelExport.js`):**
+  - Menambahkan kantong khusus **`Saldo Pihak Ketiga`** (`PIHAK_KETIGA`, kompatibel mundur dengan `SALDO_AGEN`) sebagai sumber modal transaksi Pulsa, Paket Data, & Token Listrik PLN, lengkap dengan shortcut **`+ Isi Saldo`** (`MUTASI` ke `PIHAK_KETIGA`) dan opsi pilihan sumber modal per transaksi (**Saldo Pihak Ketiga**, **Rekening/QRIS**, **Uang Kas**, atau **Dana Luar**).
+- **Perhitungan Saldo Kumulatif Lintas >90 Hari + Arsip Snapshot (`useKasiryDB.js`, `financeEngine.js`):**
+  - Saldo **`Uang Kas`**, **`Rekening & QRIS`**, **`Tabungan`**, dan **`Saldo Pihak Ketiga`** kini dihitung lintas seluruh riwayat aktif IndexedDB (`cumulativePocketBalances`) agar tidak menyusut setelah melewati jendela RAM 90 hari.
+  - `archiveOldTransactions()` kini menyimpan snapshot **`financeBaseline`** di `db.settings` sebelum memangkas catatan lama.
+- **Integrasi `Uang Kas Toko` di Kas Keluar & Kulakan + Setoran Tutup Shift (`ExpenseModal.vue`, `RestockModal.vue`, `ShiftModal.vue`):**
+  - Penambahan sumber dana **`Uang Kas Toko`** (`KAS`) di Kas Keluar & Kulakan, serta opsi **Sekalian setor sisa uang laci ke Uang Kas Toko** (mengatur modal laci besok otomatis ke `lastOpeningCash`) saat Tutup Buku Shift.
+- **Cetak Ulang Struk, Void Transaksi 2-Tap, & Bon Pulsa di Buku Utang (`DailyReportModal.vue`, `DebtBookModal.vue`, `CustomerManagementModal.vue`, `useGoogleSync.js`):**
+  - Daftar *Riwayat Transaksi* di `DailyReportModal.vue` kini mendukung **`Cetak Struk`** dan **`Batalkan` -> `Ya, Void`** (`deleteTransaction` dengan rollback atomik stok & piutang pelanggan).
+  - Rincian bon & riwayat pelanggan di `DebtBookModal` & `CustomerManagementModal` kini ikut menampilkan bon Pulsa / Token PLN (`digitalProducts`).
+  - Penambahan audit trail `appendCancellationToSheet` ke Google Sheets saat pembatalan/hapus/edit Token PLN, plus tag `Laci Kasir` vs `Uang Kas` pada Tarik Tunai/Transfer.
+
+### Changed & Fixed
+- **Penyelesaian Tumpang Tindih:** Menyeragamkan tampilan **Sisa Tunai Laci** (memasukkan `openingCash` & mutasi laci) di `ExpenseModal.vue` & `RestockModal.vue`, mengubah label kategori `prive` menjadi **`Ambil Kas Laci`**, memperbaiki kondisi tampilan `Sisa Laci` di `DailyReportModal` & pesan WA saat ada mutasi dana laci, serta menampilkan info saldo `Rekening & QRIS` saat Transfer/Top-Up di `CashServiceModal.vue`.
+
+---
+
 ## [2.19.0] - 2026-11-27 (Backlog Fase 2 #4: Modul Manajemen Keuangan, 4 Kantong Dana & Tabungan)
 
 ### Added

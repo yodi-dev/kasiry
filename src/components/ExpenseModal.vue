@@ -84,6 +84,9 @@ const todayExpenses = computed(() => {
 })
 
 const netDrawerDisplay = computed(() => {
+  if (props.stats?.isShiftScoped) {
+    return Number(props.stats.expectedCashDrawer ?? ((props.stats.openingCash || 0) + (props.stats.todayNetCashDrawer || 0)))
+  }
   if (props.stats?.todayNetCashDrawer !== undefined) {
     return props.stats.todayNetCashDrawer
   }
@@ -155,7 +158,7 @@ const confirmDelete = (id) => {
           ]"
         >
           <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-            Sisa Tunai Laci
+            {{ stats.isShiftScoped ? 'Uang Tunai di Laci' : 'Sisa Tunai Laci' }}
           </span>
           <p
             :class="[
@@ -166,7 +169,12 @@ const confirmDelete = (id) => {
             Rp {{ netDrawerDisplay.toLocaleString('id-ID') }}
           </p>
           <p class="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
-            Masuk Rp {{ (stats.todayCashDrawer || 0).toLocaleString('id-ID') }} - Keluar Rp {{ (stats.todayExpensesCash || 0).toLocaleString('id-ID') }}
+            <template v-if="stats.isShiftScoped">
+              Modal Rp {{ (stats.openingCash || 0).toLocaleString('id-ID') }} • Keluar Laci Rp {{ (stats.todayExpensesCash || 0).toLocaleString('id-ID') }}
+            </template>
+            <template v-else>
+              Masuk Rp {{ (stats.todayCashDrawer || 0).toLocaleString('id-ID') }} • Keluar Laci Rp {{ (stats.todayExpensesCash || 0).toLocaleString('id-ID') }}
+            </template>
           </p>
         </div>
 
@@ -232,20 +240,20 @@ const confirmDelete = (id) => {
               <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                 Sumber Uang
               </label>
-              <div class="p-1 bg-slate-100 rounded-2xl grid grid-cols-2 gap-1">
+              <div class="p-1 bg-slate-100 rounded-2xl grid grid-cols-3 gap-1">
                 <button
                   v-for="src in EXPENSE_SOURCES"
                   :key="src.id"
                   type="button"
                   @click="selectedSource = src.id"
                   :class="[
-                    'h-9 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer',
+                    'h-9 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer truncate',
                     selectedSource === src.id
                       ? 'bg-white text-[#0a193d] shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   ]"
                 >
-                  {{ src.label }}
+                  {{ src.shortLabel || src.label }}
                 </button>
               </div>
             </div>
@@ -410,7 +418,7 @@ const confirmDelete = (id) => {
       <!-- 4. Footer -->
       <div class="px-5 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between shrink-0">
         <span class="text-[11px] text-slate-500 font-medium">
-          Tarik / Setor Owner tidak mengurangi estimasi untung jualan
+          Ambil Kas Laci tidak mengurangi estimasi untung jualan
         </span>
         <button
           type="button"

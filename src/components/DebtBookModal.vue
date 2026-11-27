@@ -29,6 +29,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  digitalProducts: {
+    type: Array,
+    default: () => []
+  },
   fetchCustomerTransactions: {
     type: Function,
     default: null
@@ -149,15 +153,43 @@ const formatPhone = (phone) => {
   return phone
 }
 
-// Ambil riwayat bon belanja pelanggan (memprioritaskan query IndexedDB lengkap bila tersedia)
+// Ambil riwayat bon belanja pelanggan (barang kasir + pulsa/token utang)
 const customerDebtTransactions = computed(() => {
   if (!selectedCustomer.value) return []
+  const cid = selectedCustomer.value.id
+  const cname = selectedCustomer.value.name
   const source = fullCustomerHistory.value.length > 0 ? fullCustomerHistory.value : (props.transactions || [])
-  return source
-    .filter(t => 
-      (t.customerId === selectedCustomer.value.id || t.customerName === selectedCustomer.value.name) &&
+  const goodsDebts = source
+    .filter(t =>
+      t && !t.deleted &&
+      (t.customerId === cid || t.customerName === cname) &&
       (t.paymentMethod === 'UTANG / BON' || Number(t.debtAmount || 0) > 0 || String(t.paymentMethod || '').includes('SEBAGIAN BON'))
     )
+
+  const digitalDebts = (props.digitalProducts || [])
+    .filter(d =>
+      d && !d.deleted &&
+      d.paymentMethod === 'UTANG / BON' &&
+      ((cid && d.customerId === cid) || (cname && d.customerName === cname))
+    )
+    .map(d => ({
+      invoiceNumber: d.digitalNumber || `DIG-${d.id}`,
+      createdAt: d.createdAt,
+      paymentMethod: 'UTANG / BON',
+      totalAmount: Number(d.sellPrice || 0),
+      debtAmount: Number(d.sellPrice || 0),
+      paidAmount: 0,
+      items: [
+        {
+          id: `dig-${d.id}`,
+          name: `${d.productName || 'Pulsa / PLN'}${d.targetNumber ? ` (${d.targetNumber})` : ''}`,
+          qty: 1,
+          sellPrice: Number(d.sellPrice || 0)
+        }
+      ]
+    }))
+
+  return [...goodsDebts, ...digitalDebts]
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 })
 

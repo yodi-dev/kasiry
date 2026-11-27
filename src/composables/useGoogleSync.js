@@ -532,12 +532,16 @@ export function useGoogleSync() {
   // Catat Pengeluaran / Kas Keluar Harian ke Google Sheets melalui pipeline antrean yang sama
   const appendExpenseToSheet = async ({ expenseNumber, createdAt = Date.now(), category = 'operasional', source = 'TUNAI_LACI', amount = 0, note = '' } = {}, storeName = 'Toko') => {
     const meta = getExpenseCategoryMeta(category)
-    const isNonCash = source === 'NON_TUNAI'
+    const methodLabel = source === 'NON_TUNAI'
+      ? 'KAS KELUAR (NON-TUNAI)'
+      : source === 'KAS'
+        ? 'KAS KELUAR (UANG KAS)'
+        : 'KAS KELUAR (TUNAI)'
     const numericAmount = Math.abs(Number(amount || 0))
     return appendTransactionToSheet({
       invoiceNumber: expenseNumber || `KLR-${String(createdAt).slice(-6)}`,
       createdAt,
-      paymentMethod: isNonCash ? 'KAS KELUAR (NON-TUNAI)' : 'KAS KELUAR (TUNAI)',
+      paymentMethod: methodLabel,
       customerName: meta.label,
       totalAmount: -numericAmount,
       cashGiven: 0,
@@ -550,9 +554,11 @@ export function useGoogleSync() {
   const appendRestockToSheet = async ({ restockNumber, createdAt = Date.now(), supplierName = '', source = 'TUNAI_LACI', totalCost = 0, items = [], note = '' } = {}, storeName = 'Toko') => {
     const sourceLabel = source === 'NON_TUNAI'
       ? 'KULAKAN (NON-TUNAI)'
-      : source === 'DANA_LUAR'
-        ? 'KULAKAN (DANA LUAR)'
-        : 'KULAKAN (TUNAI)'
+      : source === 'KAS'
+        ? 'KULAKAN (UANG KAS)'
+        : source === 'DANA_LUAR'
+          ? 'KULAKAN (DANA LUAR)'
+          : 'KULAKAN (TUNAI)'
     const itemsSummary = Array.isArray(items) && items.length > 0
       ? items.map(it => `${it.productName || 'Barang'} x${it.qty || 0} (@Rp ${Number(it.unitBuyPrice || 0).toLocaleString('id-ID')})`).join(', ')
       : 'Kulakan stok'
@@ -599,6 +605,7 @@ export function useGoogleSync() {
     serviceNumber,
     createdAt = Date.now(),
     type = 'TARIK_TUNAI',
+    cashSource = 'LACI',
     amount = 0,
     adminFee = 0,
     channel = 'QRIS / Transfer',
@@ -610,7 +617,8 @@ export function useGoogleSync() {
     const cleanAdmin = Math.max(0, Math.round(Number(adminFee || 0)))
     const totalPaid = numericAmount + cleanAdmin
     const methodLabel = isTransfer ? 'TRANSFER / TOP-UP' : 'TARIK TUNAI'
-    const baseText = `${isTransfer ? 'Transfer/Top-Up' : 'Tarik Tunai'} (${channel}) • Pokok Rp ${numericAmount.toLocaleString('id-ID')} • Admin +Rp ${cleanAdmin.toLocaleString('id-ID')} • Total Rp ${totalPaid.toLocaleString('id-ID')}`
+    const sourceLabel = cashSource === 'KAS' ? 'Uang Kas' : 'Laci Kasir'
+    const baseText = `${isTransfer ? 'Transfer/Top-Up' : 'Tarik Tunai'} (${channel} • ${sourceLabel}) • Pokok Rp ${numericAmount.toLocaleString('id-ID')} • Admin +Rp ${cleanAdmin.toLocaleString('id-ID')} • Total Rp ${totalPaid.toLocaleString('id-ID')}`
     const fullText = note ? `${baseText} • ${note}` : baseText
 
     return appendTransactionToSheet({
@@ -636,6 +644,7 @@ export function useGoogleSync() {
     tokenCode = '',
     costPrice = 0,
     sellPrice = 0,
+    costSource = 'PIHAK_KETIGA',
     paymentMethod = 'TUNAI',
     customerName = '',
     note = ''
@@ -645,11 +654,18 @@ export function useGoogleSync() {
     const profit = cleanSell - cleanCost
     const methodSuffix = paymentMethod === 'QRIS' ? 'QRIS' : paymentMethod === 'UTANG / BON' ? 'UTANG' : 'TUNAI'
     const catLabel = category === 'TOKEN_LISTRIK' ? 'TOKEN PLN' : category === 'PAKET_DATA' ? 'PAKET DATA' : category === 'TAGIHAN' ? 'PPOB' : 'PULSA'
+    const modalSourceLabel = costSource === 'REKENING'
+      ? 'Rekening/QRIS'
+      : costSource === 'KAS'
+        ? 'Uang Kas'
+        : (costSource === 'LUAR' || costSource === 'DANA_LUAR')
+          ? 'Dana Luar'
+          : 'Saldo Pihak Ketiga'
     const parts = [
       `${productName || catLabel} (${provider || 'Umum'})`,
       targetNumber ? `No: ${targetNumber}` : '',
       tokenCode ? `Token/SN: ${tokenCode}` : '',
-      `Modal Rp ${cleanCost.toLocaleString('id-ID')} • Laba +Rp ${profit.toLocaleString('id-ID')}`,
+      `Modal (${modalSourceLabel}) Rp ${cleanCost.toLocaleString('id-ID')} • Laba +Rp ${profit.toLocaleString('id-ID')}`,
       note || ''
     ].filter(Boolean)
 
@@ -662,6 +678,25 @@ export function useGoogleSync() {
       cashGiven: paymentMethod === 'UTANG / BON' ? 0 : cleanSell,
       changeAmount: profit,
       itemsText: parts.join(' • ')
+    }, storeName)
+  }
+
+  // Catat log pembatalan / koreksi ke Google Sheets (append-only audit trail)
+  const appendCancellationToSheet = async ({
+    refNumber = '-',
+    actionLabel = 'PEMBATALAN / VOID',
+    detail = '',
+    amount = 0
+  } = {}, storeName = 'Toko') => {
+    return appendTransactionToSheet({
+      invoiceNumber: `BATAL-${refNumber}`,
+      createdAt: Date.now(),
+      paymentMethod: actionLabel,
+      customerName: 'Koreksi Kasir',
+      totalAmount: Math.round(Number(amount || 0)),
+      cashGiven: 0,
+      changeAmount: 0,
+      itemsText: detail || `Pembatalan / koreksi catatan ${refNumber}`
     }, storeName)
   }
 
@@ -792,7 +827,8 @@ export function useGoogleSync() {
       ;(rData.transactions || []).forEach(rt => {
         if (archiveCutoff > 0 && toTimestamp(rt.createdAt) < archiveCutoff) return
         const key = rt.invoiceNumber || rt.id
-        if (!txMap.has(key)) {
+        const lt = txMap.get(key)
+        if (!lt || (rt.updatedAt || 0) > (lt.updatedAt || 0)) {
           txMap.set(key, rt)
         }
       })
@@ -1052,6 +1088,7 @@ export function useGoogleSync() {
     appendCashServiceToSheet,
     appendDigitalProductToSheet,
     appendFundMovementToSheet,
+    appendCancellationToSheet,
     appendShiftEventToSheet,
     ensureSpreadsheet
   }

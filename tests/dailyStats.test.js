@@ -455,4 +455,24 @@ describe('computeDailyStats (Separation of Cash Drawer, QRIS Non-Cash, and Bon)'
     expect(stats.expectedCashDrawer).toBe(190000)
     expect(stats.todayCashServiceAdminProfit).toBe(5000)
   })
+
+  it('excludes KAS-sourced expenses from Laci drawer and ignores soft-deleted transactions', () => {
+    const now = Date.now()
+    const transactions = [
+      { invoiceNumber: 'KSR-KEEP', createdAt: now, paymentMethod: 'TUNAI', totalAmount: 50000, items: [{ sellPrice: 50000, buyPrice: 40000, qty: 1 }], deleted: false },
+      { invoiceNumber: 'KSR-VOID', createdAt: now, paymentMethod: 'TUNAI', totalAmount: 100000, items: [{ sellPrice: 100000, buyPrice: 80000, qty: 1 }], deleted: true }
+    ]
+    const expenses = [
+      { id: 1, createdAt: now, category: 'operasional', source: 'KAS', amount: 20000, deleted: false }
+    ]
+
+    const stats = computeDailyStats(transactions, [], expenses, { nowTs: now })
+    expect(stats.todaySales).toBe(50000)
+    expect(stats.transactionCount).toBe(1)
+    expect(stats.todayExpensesCash).toBe(0)
+    expect(stats.todayExpensesKas).toBe(20000)
+    expect(stats.todayExpensesTotal).toBe(20000)
+    expect(stats.todayNetCashDrawer).toBe(50000)
+    expect(stats.todayProfit).toBe(10000 - 20000)
+  })
 })

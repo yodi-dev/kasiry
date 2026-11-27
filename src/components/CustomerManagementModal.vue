@@ -34,6 +34,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  digitalProducts: {
+    type: Array,
+    default: () => []
+  },
   fetchCustomerTransactions: {
     type: Function,
     default: null
@@ -126,21 +130,43 @@ const filteredCustomers = computed(() => {
   )
 })
 
-// Ambil riwayat seluruh transaksi pelanggan (on-demand full history dari IndexedDB jika tersedia)
+// Ambil riwayat seluruh transaksi pelanggan (barang kasir + pulsa/token digital)
 const customerTransactions = computed(() => {
   if (!selectedCustomer.value) return []
-  if (fullCustomerHistory.value.length > 0) {
-    return fullCustomerHistory.value
-  }
-  if (!props.transactions) return []
   const cid = selectedCustomer.value.id
   const cname = selectedCustomer.value.name
+  const baseSource = fullCustomerHistory.value.length > 0
+    ? fullCustomerHistory.value
+    : (props.transactions || [])
 
-  return props.transactions
-    .filter(t => 
-      (cid && (t.customerId === cid || t.customer?.id === cid)) || 
-      (cname && (t.customerName === cname || t.customer?.name === cname))
+  const goodsList = baseSource
+    .filter(t =>
+      t && !t.deleted &&
+      ((cid && (t.customerId === cid || t.customer?.id === cid)) ||
+        (cname && (t.customerName === cname || t.customer?.name === cname)))
     )
+
+  const digitalList = (props.digitalProducts || [])
+    .filter(d =>
+      d && !d.deleted &&
+      ((cid && d.customerId === cid) || (cname && cname.toLowerCase() !== 'umum' && d.customerName === cname))
+    )
+    .map(d => ({
+      invoiceNumber: d.digitalNumber || `DIG-${d.id}`,
+      createdAt: d.createdAt,
+      paymentMethod: d.paymentMethod || 'TUNAI',
+      totalAmount: Number(d.sellPrice || 0),
+      items: [
+        {
+          id: `dig-${d.id}`,
+          name: `${d.productName || 'Pulsa / PLN'}${d.targetNumber ? ` (${d.targetNumber})` : ''}`,
+          qty: 1,
+          sellPrice: Number(d.sellPrice || 0)
+        }
+      ]
+    }))
+
+  return [...goodsList, ...digitalList]
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 })
 

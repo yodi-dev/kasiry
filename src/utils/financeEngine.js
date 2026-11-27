@@ -28,10 +28,18 @@ export const FINANCE_ACCOUNT_META = {
     shortLabel: 'Tabungan',
     description: 'Dana tabungan usaha / simpanan khusus pemilik',
     badgeClass: 'bg-amber-50 text-amber-800 border-amber-200'
+  },
+  PIHAK_KETIGA: {
+    id: 'PIHAK_KETIGA',
+    label: 'Saldo Pihak Ketiga',
+    shortLabel: 'Pihak Ketiga',
+    description: 'Saldo mitra / aplikasi untuk modal isi pulsa, data & token PLN',
+    badgeClass: 'bg-purple-50 text-purple-700 border-purple-200'
   }
 }
 
 export function getFinanceAccountMeta(accountId) {
+  if (accountId === 'SALDO_AGEN') return FINANCE_ACCOUNT_META.PIHAK_KETIGA
   return FINANCE_ACCOUNT_META[accountId] || {
     id: accountId || 'LUAR',
     label: accountId === 'LUAR' ? 'Dana Luar / Pemilik' : (accountId || 'Lainnya'),
@@ -42,7 +50,8 @@ export function getFinanceAccountMeta(accountId) {
 }
 
 /**
- * Hitung saldo aktual masing-masing kantong dana toko (Laci, Uang Kas, Rekening/QRIS, & Tabungan).
+ * Hitung saldo kumulatif 4 kantong non-laci (Uang Kas, Rekening/QRIS, Tabungan, Saldo Pihak Ketiga)
+ * serta gabungkan dengan saldo Laci Kasir & Piutang Pelanggan menjadi Kekayaan Bersih.
  */
 export function computeFinanceBalances({
   transactions = [],
@@ -52,85 +61,110 @@ export function computeFinanceBalances({
   digitalProducts = [],
   fundMovements = [],
   customers = [],
-  liveDrawerBalance = 0
+  liveDrawerBalance = 0,
+  financeBaseline = null,
+  precomputedPockets = null
 } = {}) {
-  let kasBalance = 0
-  let rekeningBalance = 0
-  let tabunganBalance = 0
+  let kasBalance = Math.round(Number(financeBaseline?.kasBalance || 0))
+  let rekeningBalance = Math.round(Number(financeBaseline?.rekeningBalance || 0))
+  let tabunganBalance = Math.round(Number(financeBaseline?.tabunganBalance || 0))
+  let pihakKetigaBalance = Math.round(Number(financeBaseline?.pihakKetigaBalance || 0))
 
-  ;(transactions || []).forEach(t => {
-    if (!t) return
-    const amount = Math.round(Number(t.totalAmount || 0))
-    const debtAmt = Math.round(Number(t.debtAmount || 0))
-    if (t.paymentMethod === 'QRIS (SEBAGIAN BON)' || (t.paymentMethod === 'QRIS' && debtAmt > 0)) {
-      rekeningBalance += Math.max(0, Math.min(amount, Math.round(Number(t.paidAmount ?? t.cashGiven ?? 0))))
-    } else if (t.paymentMethod === 'QRIS') {
-      rekeningBalance += amount
-    }
-  })
-
-  ;(debtPayments || []).forEach(p => {
-    if (!p) return
-    if (p.paymentMethod === 'QRIS') {
-      rekeningBalance += Math.round(Number(p.amount || 0))
-    }
-  })
-
-  ;(digitalProducts || []).forEach(d => {
-    if (!d || d.deleted) return
-    if (d.paymentMethod === 'QRIS') {
-      rekeningBalance += Math.round(Number(d.sellPrice || 0))
-    }
-  })
-
-  ;(expenses || []).forEach(e => {
-    if (!e || e.deleted) return
-    if (e.source === 'NON_TUNAI') {
-      rekeningBalance -= Math.round(Number(e.amount || 0))
-    }
-  })
-
-  ;(cashServices || []).forEach(svc => {
-    if (!svc || svc.deleted) return
-    const amount = Math.round(Number(svc.amount || 0))
-    const adminFee = Math.max(0, Math.round(Number(svc.adminFee || 0)))
-    const totalPaid = amount + adminFee
-    const usesKas = svc.cashSource === 'KAS'
-
-    if (svc.type === 'TRANSFER') {
-      if (usesKas) {
-        kasBalance += totalPaid
+  if (precomputedPockets && typeof precomputedPockets === 'object') {
+    kasBalance = Math.round(Number(precomputedPockets.kasBalance || 0))
+    rekeningBalance = Math.round(Number(precomputedPockets.rekeningBalance || 0))
+    tabunganBalance = Math.round(Number(precomputedPockets.tabunganBalance || 0))
+    pihakKetigaBalance = Math.round(Number(precomputedPockets.pihakKetigaBalance || 0))
+  } else {
+    ;(transactions || []).forEach(t => {
+      if (!t || t.deleted) return
+      const amount = Math.round(Number(t.totalAmount || 0))
+      const debtAmt = Math.round(Number(t.debtAmount || 0))
+      if (t.paymentMethod === 'QRIS (SEBAGIAN BON)' || (t.paymentMethod === 'QRIS' && debtAmt > 0)) {
+        rekeningBalance += Math.max(0, Math.min(amount, Math.round(Number(t.paidAmount ?? t.cashGiven ?? 0))))
+      } else if (t.paymentMethod === 'QRIS') {
+        rekeningBalance += amount
       }
-      rekeningBalance -= amount
-    } else {
-      // TARIK_TUNAI
-      if (usesKas) {
-        kasBalance -= amount
+    })
+
+    ;(debtPayments || []).forEach(p => {
+      if (!p) return
+      if (p.paymentMethod === 'QRIS') {
+        rekeningBalance += Math.round(Number(p.amount || 0))
       }
-      rekeningBalance += totalPaid
-    }
-  })
+    })
 
-  ;(fundMovements || []).forEach(mv => {
-    if (!mv || mv.deleted) return
-    const amt = Math.round(Number(mv.amount || 0))
-    if (!Number.isFinite(amt) || amt <= 0) return
+    ;(digitalProducts || []).forEach(d => {
+      if (!d || d.deleted) return
+      const sellPrice = Math.round(Number(d.sellPrice || 0))
+      const costPrice = Math.max(0, Math.round(Number(d.costPrice || 0)))
+      if (d.paymentMethod === 'QRIS') {
+        rekeningBalance += sellPrice
+      }
+      const costSrc = d.costSource || 'PIHAK_KETIGA'
+      if (costSrc === 'REKENING') {
+        rekeningBalance -= costPrice
+      } else if (costSrc === 'KAS') {
+        kasBalance -= costPrice
+      } else if (costSrc !== 'LUAR' && costSrc !== 'DANA_LUAR') {
+        pihakKetigaBalance -= costPrice
+      }
+    })
 
-    if (mv.toAccount === 'KAS') kasBalance += amt
-    else if (mv.toAccount === 'REKENING') rekeningBalance += amt
-    else if (mv.toAccount === 'TABUNGAN') tabunganBalance += amt
+    ;(expenses || []).forEach(e => {
+      if (!e || e.deleted) return
+      const amt = Math.round(Number(e.amount || 0))
+      if (e.source === 'NON_TUNAI') {
+        rekeningBalance -= amt
+      } else if (e.source === 'KAS') {
+        kasBalance -= amt
+      }
+    })
 
-    if (mv.fromAccount === 'KAS') kasBalance -= amt
-    else if (mv.fromAccount === 'REKENING') rekeningBalance -= amt
-    else if (mv.fromAccount === 'TABUNGAN') tabunganBalance -= amt
-  })
+    ;(cashServices || []).forEach(svc => {
+      if (!svc || svc.deleted) return
+      const amount = Math.round(Number(svc.amount || 0))
+      const adminFee = Math.max(0, Math.round(Number(svc.adminFee || 0)))
+      const totalPaid = amount + adminFee
+      const usesKas = svc.cashSource === 'KAS'
+
+      if (svc.type === 'TRANSFER') {
+        if (usesKas) {
+          kasBalance += totalPaid
+        }
+        rekeningBalance -= amount
+      } else {
+        // TARIK_TUNAI
+        if (usesKas) {
+          kasBalance -= amount
+        }
+        rekeningBalance += totalPaid
+      }
+    })
+
+    ;(fundMovements || []).forEach(mv => {
+      if (!mv || mv.deleted) return
+      const amt = Math.round(Number(mv.amount || 0))
+      if (!Number.isFinite(amt) || amt <= 0) return
+
+      if (mv.toAccount === 'KAS') kasBalance += amt
+      else if (mv.toAccount === 'REKENING') rekeningBalance += amt
+      else if (mv.toAccount === 'TABUNGAN') tabunganBalance += amt
+      else if (mv.toAccount === 'PIHAK_KETIGA' || mv.toAccount === 'SALDO_AGEN') pihakKetigaBalance += amt
+
+      if (mv.fromAccount === 'KAS') kasBalance -= amt
+      else if (mv.fromAccount === 'REKENING') rekeningBalance -= amt
+      else if (mv.fromAccount === 'TABUNGAN') tabunganBalance -= amt
+      else if (mv.fromAccount === 'PIHAK_KETIGA' || mv.fromAccount === 'SALDO_AGEN') pihakKetigaBalance -= amt
+    })
+  }
 
   const laciBalance = Math.round(Number(liveDrawerBalance || 0))
   const totalReceivables = (customers || [])
     .filter(c => c && !c.deleted)
     .reduce((sum, c) => sum + Math.max(0, Math.round(Number(c.totalDebt || 0))), 0)
 
-  const totalLiquidAssets = laciBalance + kasBalance + rekeningBalance + tabunganBalance
+  const totalLiquidAssets = laciBalance + kasBalance + rekeningBalance + tabunganBalance + pihakKetigaBalance
   const totalNetWealth = totalLiquidAssets + totalReceivables
 
   return {
@@ -138,6 +172,7 @@ export function computeFinanceBalances({
     kasBalance,
     rekeningBalance,
     tabunganBalance,
+    pihakKetigaBalance,
     totalLiquidAssets,
     totalReceivables,
     totalNetWealth
@@ -183,7 +218,7 @@ export function computePeriodFinanceSummary({
     })
     periodMovements = (fundMovements || []).filter(m => !m?.deleted && recordBelongsToShift(m, activeShift, 'createdAt'))
   } else {
-    const fTx = (transactions || []).filter(t => (t?.createdAt || 0) >= cutoffTs)
+    const fTx = (transactions || []).filter(t => !t?.deleted && (t?.createdAt || 0) >= cutoffTs)
     const fPays = (debtPayments || []).filter(p => (p?.paymentDate || 0) >= cutoffTs)
     const fExps = (expenses || []).filter(e => !e?.deleted && (e?.createdAt || 0) >= cutoffTs)
     const fSvcs = (cashServices || []).filter(s => !s?.deleted && (s?.createdAt || 0) >= cutoffTs)
@@ -203,6 +238,7 @@ export function computePeriodFinanceSummary({
   let withdrawnFromTabungan = 0
   let movedToKas = 0
   let withdrawnFromKas = 0
+  let addedToPihakKetiga = 0
 
   periodMovements.forEach(m => {
     const amt = Math.round(Number(m.amount || 0))
@@ -211,6 +247,7 @@ export function computePeriodFinanceSummary({
     if (m.fromAccount === 'TABUNGAN') withdrawnFromTabungan += amt
     if (m.toAccount === 'KAS') movedToKas += amt
     if (m.fromAccount === 'KAS') withdrawnFromKas += amt
+    if (m.toAccount === 'PIHAK_KETIGA' || m.toAccount === 'SALDO_AGEN') addedToPihakKetiga += amt
   })
 
   return {
@@ -223,6 +260,7 @@ export function computePeriodFinanceSummary({
     cashServiceAdminProfit: periodStats.todayCashServiceAdminProfit || 0,
     digitalProfit: periodStats.todayDigitalProfit || 0,
     expensesTotal: periodStats.todayExpensesTotal || 0,
+    expensesKas: periodStats.todayExpensesKas || 0,
     operationalExpenses: periodStats.todayOperationalExpenses || 0,
     priveTotal: periodStats.todayPriveTotal || 0,
     netProfit: periodStats.todayProfit || 0,
@@ -230,6 +268,7 @@ export function computePeriodFinanceSummary({
     withdrawnFromTabungan,
     movedToKas,
     withdrawnFromKas,
+    addedToPihakKetiga,
     movementCount: periodMovements.length
   }
 }
