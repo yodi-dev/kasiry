@@ -577,4 +577,61 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(kasiry.products.value).toHaveLength(300)
     expect(kasiry.products.value.every(p => p.sellPrice === 0)).toBe(true)
   })
+
+  it('records Tarik Tunai (guarded by Laci cash) and Transfer / Top-Up with Shift, Backup JSON, & soft-delete support', async () => {
+    // Tolak Tarik Tunai bila saldo laci Rp 0 / tidak mencukupi
+    await expect(
+      kasiry.recordCashService({
+        type: 'TARIK_TUNAI',
+        amount: 50000,
+        adminFee: 5000,
+        channel: 'QRIS',
+        availableDrawerCash: 20000
+      })
+    ).rejects.toThrow(/tidak mencukupi/)
+
+    // Buka Shift modal awal 200.000 agar laci cukup
+    const shift = await kasiry.openShift({ cashierName: 'Yodi', openingCash: 200000 })
+
+    // 1. Tarik Tunai 50.000 + admin 5.000 (Laci keluar 50.000, QRIS masuk 55.000)
+    const tt = await kasiry.recordCashService({
+      type: 'TARIK_TUNAI',
+      amount: 50000,
+      adminFee: 5000,
+      channel: 'QRIS',
+      customerName: 'Bu Sari',
+      availableDrawerCash: 200000
+    })
+    expect(tt.serviceNumber).toMatch(/^TT-/)
+    expect(tt.totalPaid).toBe(55000)
+    expect(tt.shiftId).toBe(shift.id)
+
+    // 2. Transfer / Top-Up 100.000 + admin 5.000 (Laci masuk 105.000)
+    const tf = await kasiry.recordCashService({
+      type: 'TRANSFER',
+      amount: 100000,
+      adminFee: 5000,
+      channel: 'BRI',
+      customerName: 'Pak Budi'
+    })
+    expect(tf.serviceNumber).toMatch(/^TF-/)
+    expect(tf.totalPaid).toBe(105000)
+    expect(kasiry.cashServices.value).toHaveLength(2)
+
+    // Payload backup & tutup shift menyertakan cashServices
+    const payload = await kasiry.getFullDatabasePayload()
+    expect(payload.data.cashServices).toHaveLength(2)
+    expect(kasiry.inspectBackupJSON(payload).cashServiceCount).toBe(2)
+
+    // Tutup shift -> expected cash = 200.000 - 50.000 + 105.000 = 255.000
+    const closed = await kasiry.closeShift({ shiftId: shift.id, actualCash: 255000 })
+    expect(closed.expectedCash).toBe(255000)
+    expect(closed.cashDifference).toBe(0)
+    expect(closed.summary.todayCashServiceAdminProfit).toBe(10000)
+
+    // Soft-delete layanan
+    const deleted = await kasiry.deleteCashService(tt.id)
+    expect(deleted).toBe(true)
+    expect(kasiry.cashServices.value).toHaveLength(1)
+  })
 })

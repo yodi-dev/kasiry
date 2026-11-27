@@ -18,7 +18,13 @@ export function recordBelongsToShift(record, shift, tsKey = 'createdAt') {
  * Mesin agregasi keuangan inti yang dipakai bersama oleh Laporan Harian / Shift Aktif
  * maupun pratinjau Tutup Buku Shift.
  */
-function aggregateRecords(periodTx = [], periodDebtPays = [], periodExpenses = [], openingCash = 0) {
+function aggregateRecords(
+  periodTx = [],
+  periodDebtPays = [],
+  periodExpenses = [],
+  openingCash = 0,
+  periodCashServices = []
+) {
   let cashSales = 0
   let qrisSales = 0
   let profit = 0
@@ -89,6 +95,46 @@ function aggregateRecords(periodTx = [], periodDebtPays = [], periodExpenses = [
     }
   })
 
+  let todayCashWithdrawalTotal = 0
+  let todayCashWithdrawalCount = 0
+  let todayCashTransferTotal = 0
+  let todayCashTransferCount = 0
+  let todayCashServiceIn = 0
+  let todayCashServiceOut = 0
+  let todayNonCashServiceIn = 0
+  let todayNonCashServiceOut = 0
+  let todayCashServiceAdminProfit = 0
+  let todayCashServiceCount = 0
+
+  ;(periodCashServices || []).forEach(svc => {
+    if (!svc || svc.deleted) return
+    const amount = Math.round(Number(svc.amount || 0))
+    const adminFee = Math.max(0, Math.round(Number(svc.adminFee || 0)))
+    if (!Number.isFinite(amount) || amount <= 0) return
+
+    const totalPaid = amount + adminFee
+    const usesLaci = !svc.cashSource || svc.cashSource === 'LACI'
+    todayCashServiceCount += 1
+    todayCashServiceAdminProfit += adminFee
+
+    if (svc.type === 'TRANSFER') {
+      todayCashTransferTotal += amount
+      todayCashTransferCount += 1
+      if (usesLaci) {
+        todayCashServiceIn += totalPaid
+      }
+      todayNonCashServiceOut += amount
+    } else {
+      // TARIK_TUNAI
+      todayCashWithdrawalTotal += amount
+      todayCashWithdrawalCount += 1
+      if (usesLaci) {
+        todayCashServiceOut += amount
+      }
+      todayNonCashServiceIn += totalPaid
+    }
+  })
+
   const topProducts = Object.values(productCountMap)
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 5)
@@ -97,7 +143,9 @@ function aggregateRecords(periodTx = [], periodDebtPays = [], periodExpenses = [
   const todayQrisTotal = qrisSales + todayDebtPaidQris
   const todayGrossProfit = Math.round(profit)
   const cleanOpening = Math.max(0, Number(openingCash || 0))
-  const todayNetCashDrawer = todayCashDrawer - todayExpensesCash
+  const todayNonCashServiceNet = todayNonCashServiceIn - todayNonCashServiceOut
+  const todayNetCashDrawer =
+    todayCashDrawer - todayExpensesCash + todayCashServiceIn - todayCashServiceOut
 
   return {
     openingCash: cleanOpening,
@@ -115,11 +163,22 @@ function aggregateRecords(periodTx = [], periodDebtPays = [], periodExpenses = [
     todayOperationalExpenses,
     todayPriveTotal,
     todayExpenseCount,
+    todayCashWithdrawalTotal,
+    todayCashWithdrawalCount,
+    todayCashTransferTotal,
+    todayCashTransferCount,
+    todayCashServiceIn,
+    todayCashServiceOut,
+    todayNonCashServiceIn,
+    todayNonCashServiceOut,
+    todayNonCashServiceNet,
+    todayCashServiceAdminProfit,
+    todayCashServiceCount,
     todayNetCashDrawer,
     expectedCashDrawer: cleanOpening + todayNetCashDrawer,
-    todayNetQris: todayQrisTotal - todayExpensesNonCash,
+    todayNetQris: todayQrisTotal - todayExpensesNonCash + todayNonCashServiceNet,
     todayGrossProfit,
-    todayProfit: todayGrossProfit - todayOperationalExpenses,
+    todayProfit: todayGrossProfit + todayCashServiceAdminProfit - todayOperationalExpenses,
     transactionCount: periodTx.length,
     todayNewDebt: debt,
     topProducts
@@ -144,6 +203,7 @@ export function computeDailyStats(
   const expenses = Array.isArray(expensesOrNow) ? expensesOrNow : []
   let nowTs = Date.now()
   let activeShift = null
+  let cashServices = []
 
   if (typeof expensesOrNow === 'number') {
     nowTs = expensesOrNow
@@ -152,16 +212,19 @@ export function computeDailyStats(
   } else if (maybeNowOrOptions && typeof maybeNowOrOptions === 'object') {
     nowTs = Number(maybeNowOrOptions.nowTs || Date.now())
     activeShift = maybeNowOrOptions.activeShift || null
+    cashServices = Array.isArray(maybeNowOrOptions.cashServices) ? maybeNowOrOptions.cashServices : []
   }
 
   let periodTx
   let periodPays
   let periodExpenses
+  let periodCashServices
 
   if (activeShift && activeShift.status === 'OPEN') {
     periodTx = (transactions || []).filter(t => recordBelongsToShift(t, activeShift, 'createdAt'))
     periodPays = (debtPayments || []).filter(p => recordBelongsToShift(p, activeShift, 'paymentDate'))
     periodExpenses = (expenses || []).filter(e => !e?.deleted && recordBelongsToShift(e, activeShift, 'createdAt'))
+    periodCashServices = cashServices.filter(s => !s?.deleted && recordBelongsToShift(s, activeShift, 'createdAt'))
   } else {
     const startOfDay = new Date(nowTs)
     startOfDay.setHours(0, 0, 0, 0)
@@ -170,9 +233,16 @@ export function computeDailyStats(
     periodTx = (transactions || []).filter(t => (t?.createdAt || 0) >= todayTimestamp)
     periodPays = (debtPayments || []).filter(p => (p?.paymentDate || 0) >= todayTimestamp)
     periodExpenses = (expenses || []).filter(e => !e?.deleted && (e?.createdAt || 0) >= todayTimestamp)
+    periodCashServices = cashServices.filter(s => !s?.deleted && (s?.createdAt || 0) >= todayTimestamp)
   }
 
-  const agg = aggregateRecords(periodTx, periodPays, periodExpenses, activeShift?.openingCash || 0)
+  const agg = aggregateRecords(
+    periodTx,
+    periodPays,
+    periodExpenses,
+    activeShift?.openingCash || 0,
+    periodCashServices
+  )
 
   return {
     ...agg,
@@ -192,14 +262,16 @@ export function computeShiftClosingPreview({
   transactions = [],
   debtPayments = [],
   expenses = [],
+  cashServices = [],
   actualCash = 0
 } = {}) {
   if (!shift) return null
   const periodTx = (transactions || []).filter(t => recordBelongsToShift(t, shift, 'createdAt'))
   const periodPays = (debtPayments || []).filter(p => recordBelongsToShift(p, shift, 'paymentDate'))
   const periodExpenses = (expenses || []).filter(e => !e?.deleted && recordBelongsToShift(e, shift, 'createdAt'))
+  const periodCashServices = (cashServices || []).filter(s => !s?.deleted && recordBelongsToShift(s, shift, 'createdAt'))
 
-  const stats = aggregateRecords(periodTx, periodPays, periodExpenses, shift.openingCash || 0)
+  const stats = aggregateRecords(periodTx, periodPays, periodExpenses, shift.openingCash || 0, periodCashServices)
   const cleanActualCash = Math.round(Number(actualCash || 0))
   const expectedCash = stats.expectedCashDrawer
   const cashDifference = cleanActualCash - expectedCash
@@ -238,6 +310,9 @@ export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
   const openingCash = Number(shift.openingCash || s.openingCash || 0)
   const cashSales = Number(s.todayCashSales || 0)
   const debtPaidCash = Number(s.todayDebtPaidCash || 0)
+  const cashServiceIn = Number(s.todayCashServiceIn || 0)
+  const cashServiceOut = Number(s.todayCashServiceOut || 0)
+  const cashServiceAdminProfit = Number(s.todayCashServiceAdminProfit || 0)
   const expensesCash = Number(s.todayExpensesCash || 0)
   const qrisTotal = Number(s.todayQrisTotal || 0)
   const newDebt = Number(s.todayNewDebt || 0)
@@ -262,6 +337,12 @@ export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
   if (debtPaidCash > 0) {
     text += `🧾 Pelunasan Bon (Tunai): Rp ${debtPaidCash.toLocaleString('id-ID')}\n`
   }
+  if (cashServiceIn > 0) {
+    text += `📲 Transfer/Top-Up Masuk Laci: +Rp ${cashServiceIn.toLocaleString('id-ID')}\n`
+  }
+  if (cashServiceOut > 0) {
+    text += `🏧 Tarik Tunai Dari Laci: -Rp ${cashServiceOut.toLocaleString('id-ID')}\n`
+  }
   if (expensesCash > 0) {
     text += `💸 Kas Keluar Dari Laci: -Rp ${expensesCash.toLocaleString('id-ID')}\n`
   }
@@ -271,6 +352,9 @@ export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
   text += `--------------------------------\n`
   if (qrisTotal > 0) {
     text += `📱 QRIS (Non-Tunai): Rp ${qrisTotal.toLocaleString('id-ID')}\n`
+  }
+  if (cashServiceAdminProfit > 0) {
+    text += `💳 Jasa Admin Tarik/Transfer: +Rp ${cashServiceAdminProfit.toLocaleString('id-ID')}\n`
   }
   if (newDebt > 0) {
     text += `📋 Bon / Utang Baru: Rp ${newDebt.toLocaleString('id-ID')}\n`

@@ -423,4 +423,41 @@ describe('useThermalPrinter Composable (Bluetooth, WebUSB, Web Serial & Fallback
     expect(portClose).toHaveBeenCalled()
     expect(connectionType.value).toBe('none')
   })
+
+  it('formats Tarik Tunai and Transfer / Top-Up receipts cleanly in ESC/POS and HTML without falling back to debt', () => {
+    const ttReceipt = {
+      invoiceNumber: 'TT-9001',
+      time: '14:10',
+      paymentMethod: 'TARIK TUNAI',
+      totalAmount: 105000,
+      cashGiven: 100000,
+      changeAmount: 0,
+      customer: { name: 'Bu Sari' },
+      serviceMeta: { type: 'TARIK_TUNAI', amount: 100000, adminFee: 5000, totalPaid: 105000, channel: 'QRIS' },
+      items: [
+        { id: 1, name: 'Tarik Tunai (QRIS)', qty: 1, sellPrice: 100000 },
+        { id: 2, name: 'Biaya Admin Jasa', qty: 1, sellPrice: 5000 }
+      ]
+    }
+    const ttEsc = decodeAscii(buildReceiptEscPosBytes(ttReceipt, { name: 'Warung Kasiry', phone: '' }))
+    expect(ttEsc).toContain('SELESAI (LACI)')
+    expect(ttEsc).not.toContain('DICATAT DI BUKU UTANG')
+
+    const tfReceipt = {
+      invoiceNumber: 'TF-9002',
+      time: '14:20',
+      paymentMethod: 'TRANSFER / TOP-UP',
+      totalAmount: 55000,
+      cashGiven: 55000,
+      changeAmount: 0,
+      serviceMeta: { type: 'TRANSFER', amount: 50000, adminFee: 5000, totalPaid: 55000, channel: 'BRI' },
+      items: [
+        { id: 1, name: 'Transfer / Top-Up (BRI)', qty: 1, sellPrice: 50000 },
+        { id: 2, name: 'Biaya Admin Jasa', qty: 1, sellPrice: 5000 }
+      ]
+    }
+    const tfHtml = buildReceiptPrintHtml(tfReceipt, { name: 'Warung Kasiry', phone: '' })
+    expect(tfHtml).toContain('SELESAI (TRANSFER)')
+    expect(tfHtml).not.toContain('DICATAT DI BUKU UTANG')
+  })
 })

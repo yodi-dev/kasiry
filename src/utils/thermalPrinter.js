@@ -148,6 +148,16 @@ export function buildReceiptEscPosBytes(receiptData, storeProfile = {}, options 
     pushLine(formatTwoColumnLine('Kembali', formatRp(receiptData.changeAmount), cols))
   } else if (receiptData.paymentMethod === 'QRIS') {
     pushLine(formatTwoColumnLine('Status', 'LUNAS (QRIS)', cols))
+  } else if (receiptData.paymentMethod === 'TARIK TUNAI' || receiptData.serviceMeta?.type === 'TARIK_TUNAI') {
+    const svcAmt = receiptData.serviceMeta?.amount ?? receiptData.cashGiven ?? receiptData.totalAmount
+    pushLine(formatTwoColumnLine('Via QRIS/Tf', formatRp(receiptData.totalAmount), cols))
+    pushLine(formatTwoColumnLine('Uang Tunai', formatRp(svcAmt), cols))
+    pushLine(formatTwoColumnLine('Status', 'SELESAI (LACI)', cols))
+  } else if (receiptData.paymentMethod === 'TRANSFER / TOP-UP' || receiptData.serviceMeta?.type === 'TRANSFER') {
+    const svcAmt = receiptData.serviceMeta?.amount ?? receiptData.totalAmount
+    pushLine(formatTwoColumnLine('Bayar Tunai', formatRp(receiptData.cashGiven ?? receiptData.totalAmount), cols))
+    pushLine(formatTwoColumnLine('Kirim Saldo', formatRp(svcAmt), cols))
+    pushLine(formatTwoColumnLine('Status', 'SELESAI (NON-TUNAI)', cols))
   } else {
     pushLine(formatTwoColumnLine('Status', 'DICATAT DI BUKU UTANG', cols))
   }
@@ -319,6 +329,18 @@ export function buildReceiptPrintHtml(receiptData, storeProfile = {}, options = 
   } else if (receiptData.paymentMethod === 'QRIS') {
     paymentDetailsHtml = `
       <div class="row"><span>Status</span><span class="bold">LUNAS (QRIS)</span></div>`
+  } else if (receiptData.paymentMethod === 'TARIK TUNAI' || receiptData.serviceMeta?.type === 'TARIK_TUNAI') {
+    const svcAmt = receiptData.serviceMeta?.amount ?? receiptData.cashGiven ?? receiptData.totalAmount
+    paymentDetailsHtml = `
+      <div class="row"><span>Transfer Masuk</span><span>${escapeHtml(formatRp(receiptData.totalAmount))}</span></div>
+      <div class="row bold"><span>Uang Tunai Diserahkan</span><span>${escapeHtml(formatRp(svcAmt))}</span></div>
+      <div class="row"><span>Status</span><span class="bold">SELESAI (TARIK TUNAI)</span></div>`
+  } else if (receiptData.paymentMethod === 'TRANSFER / TOP-UP' || receiptData.serviceMeta?.type === 'TRANSFER') {
+    const svcAmt = receiptData.serviceMeta?.amount ?? receiptData.totalAmount
+    paymentDetailsHtml = `
+      <div class="row"><span>Bayar Tunai</span><span>${escapeHtml(formatRp(receiptData.cashGiven ?? receiptData.totalAmount))}</span></div>
+      <div class="row bold"><span>Nominal Dikirim</span><span>${escapeHtml(formatRp(svcAmt))}</span></div>
+      <div class="row"><span>Status</span><span class="bold">SELESAI (TRANSFER)</span></div>`
   } else {
     paymentDetailsHtml = `
       <div class="row"><span>Status</span><span class="bold">DICATAT DI BUKU UTANG</span></div>`

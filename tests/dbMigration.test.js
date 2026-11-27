@@ -1,8 +1,8 @@
 import Dexie from 'dexie'
 import { describe, it, expect } from 'vitest'
 
-describe('KasiryDB v1 -> v5 IndexedDB Schema Migration', () => {
-  it('upgrades existing v1 database seamlessly to v5, removes transactionItems, and creates expenses, shifts, & restocks tables', async () => {
+describe('KasiryDB v1 -> v6 IndexedDB Schema Migration', () => {
+  it('upgrades existing v1 database seamlessly to v6, removes transactionItems, and creates expenses, shifts, restocks, & cashServices tables', async () => {
     // 1. Buat database legacy v1 yang masih memiliki tabel transactionItems
     const legacyDb = new Dexie('KasiryDB')
     legacyDb.version(1).stores({
@@ -34,15 +34,16 @@ describe('KasiryDB v1 -> v5 IndexedDB Schema Migration', () => {
     })
     legacyDb.close()
 
-    // 2. Buka memakai instance v5 resmi aplikasi
+    // 2. Buka memakai instance v6 resmi aplikasi
     const { db } = await import('../src/db/index')
     await db.open()
 
-    expect(db.verno).toBe(5)
+    expect(db.verno).toBe(6)
     expect(db.tables.some(t => t.name === 'transactionItems')).toBe(false)
     expect(db.tables.some(t => t.name === 'expenses')).toBe(true)
     expect(db.tables.some(t => t.name === 'shifts')).toBe(true)
     expect(db.tables.some(t => t.name === 'restocks')).toBe(true)
+    expect(db.tables.some(t => t.name === 'cashServices')).toBe(true)
 
     // Data existing tetap selamat 100%
     const existingProd = await db.products.get(101)

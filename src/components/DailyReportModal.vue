@@ -12,7 +12,8 @@ import {
   Calendar,
   Wallet,
   Plus,
-  Trash2
+  Trash2,
+  ArrowLeftRight
 } from '@lucide/vue'
 import { getExpenseCategoryMeta, getExpenseSourceMeta } from '../utils/expenseConstants'
 import { recordBelongsToShift, formatShiftWhatsAppText } from '../utils/dailyStats'
@@ -68,7 +69,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'downloadExcel', 'openExpense', 'deleteExpense', 'openShift'])
+const emit = defineEmits(['close', 'downloadExcel', 'openExpense', 'openCashService', 'deleteExpense', 'openShift'])
 
 // Active Tab: 'summary' | 'expenses' | 'history'
 const activeTab = ref('summary')
@@ -174,6 +175,9 @@ const generateWhatsAppText = () => {
   const expensesCash = props.stats.todayExpensesCash || 0
   const expensesNonCash = props.stats.todayExpensesNonCash || 0
   const expensesTotal = props.stats.todayExpensesTotal ?? (expensesCash + expensesNonCash)
+  const cashServiceIn = props.stats.todayCashServiceIn || 0
+  const cashServiceOut = props.stats.todayCashServiceOut || 0
+  const cashServiceAdminProfit = props.stats.todayCashServiceAdminProfit || 0
   const priveTotal = props.stats.todayPriveTotal || 0
 
   let text = `*📊 LAPORAN KASIR ${props.storeName.toUpperCase()}*\n`
@@ -193,6 +197,18 @@ const generateWhatsAppText = () => {
   if ((props.stats.todayDebtPaid || 0) > 0) {
     text += `   • Termasuk Pelunasan Bon: Rp ${props.stats.todayDebtPaid.toLocaleString('id-ID')}\n`
   }
+  if (cashServiceIn > 0 || cashServiceOut > 0) {
+    text += `🏧 *Layanan Tarik Tunai & Transfer:*\n`
+    if (cashServiceIn > 0) {
+      text += `   • Transfer/Top-Up Masuk Laci: +Rp ${cashServiceIn.toLocaleString('id-ID')}\n`
+    }
+    if (cashServiceOut > 0) {
+      text += `   • Tarik Tunai Keluar Laci: -Rp ${cashServiceOut.toLocaleString('id-ID')}\n`
+    }
+    if (cashServiceAdminProfit > 0) {
+      text += `   • Jasa Admin Layanan: +Rp ${cashServiceAdminProfit.toLocaleString('id-ID')}\n`
+    }
+  }
   if (expensesTotal > 0) {
     text += `💸 *Total Kas Keluar:* Rp ${expensesTotal.toLocaleString('id-ID')}\n`
     if (expensesCash > 0) {
@@ -204,6 +220,8 @@ const generateWhatsAppText = () => {
     if (priveTotal > 0) {
       text += `   • Tarik / Setor Owner: Rp ${priveTotal.toLocaleString('id-ID')} (tidak kurangi untung)\n`
     }
+  }
+  if (expensesTotal > 0 || cashServiceIn > 0 || cashServiceOut > 0) {
     text += `💰 *Sisa Tunai Fisik Laci:* Rp ${netCashDrawer.value.toLocaleString('id-ID')}\n`
   }
   text += `📈 *Perkiraan Untung Bersih:* Rp ${(props.stats.todayProfit || 0).toLocaleString('id-ID')}\n`
@@ -379,9 +397,9 @@ const confirmDeleteExpense = (id) => {
                 Rp {{ ((stats.todaySales || 0) + (stats.todayDebtPaid || 0)).toLocaleString('id-ID') }}
               </p>
               <p class="text-[11px] text-slate-500 font-medium mt-1 leading-snug break-words">
-                <template v-if="(stats.todayExpensesCash || 0) > 0">
+                <template v-if="(stats.todayExpensesCash || 0) > 0 || (stats.todayCashServiceIn || 0) > 0 || (stats.todayCashServiceOut || 0) > 0">
                   Sisa Laci: Rp {{ netCashDrawer.toLocaleString('id-ID') }}
-                  (Masuk Rp {{ grossCashDrawer.toLocaleString('id-ID') }})
+                  (Jual/Bon Rp {{ grossCashDrawer.toLocaleString('id-ID') }})
                 </template>
                 <template v-else>
                   Laci Tunai: Rp {{ grossCashDrawer.toLocaleString('id-ID') }}
@@ -398,8 +416,10 @@ const confirmDeleteExpense = (id) => {
                 Rp {{ (stats.todayProfit || 0).toLocaleString('id-ID') }}
               </p>
               <p class="text-[11px] text-slate-500 font-medium mt-1 leading-snug">
-                <template v-if="(stats.todayOperationalExpenses || 0) > 0">
-                  Laba jual Rp {{ (stats.todayGrossProfit || 0).toLocaleString('id-ID') }} - Biaya Rp {{ stats.todayOperationalExpenses.toLocaleString('id-ID') }}
+                <template v-if="(stats.todayOperationalExpenses || 0) > 0 || (stats.todayCashServiceAdminProfit || 0) > 0">
+                  Laba jual Rp {{ (stats.todayGrossProfit || 0).toLocaleString('id-ID') }}
+                  <span v-if="(stats.todayCashServiceAdminProfit || 0) > 0"> + Admin Rp {{ stats.todayCashServiceAdminProfit.toLocaleString('id-ID') }}</span>
+                  <span v-if="(stats.todayOperationalExpenses || 0) > 0"> - Biaya Rp {{ stats.todayOperationalExpenses.toLocaleString('id-ID') }}</span>
                 </template>
                 <template v-else>
                   Estimasi selisih modal
@@ -454,6 +474,36 @@ const confirmDeleteExpense = (id) => {
             >
               <Plus class="w-3.5 h-3.5 text-amber-400" />
               <span>Catat Keluar</span>
+            </button>
+          </div>
+
+          <!-- Strip Ringkas Layanan Tarik Tunai & Transfer -->
+          <div class="p-3.5 rounded-2xl bg-sky-50/75 border border-sky-200/80 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <ArrowLeftRight class="w-4 h-4 text-[#0284c7] shrink-0" />
+                <span class="text-xs font-bold text-[#0a193d]">
+                  Tarik Tunai &amp; Transfer ({{ stats.todayCashServiceCount || 0 }}x)
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                <template v-if="(stats.todayCashServiceCount || 0) > 0">
+                  Tarik Laci: -Rp {{ (stats.todayCashServiceOut || 0).toLocaleString('id-ID') }}
+                  • Tf Masuk: +Rp {{ (stats.todayCashServiceIn || 0).toLocaleString('id-ID') }}
+                  • Admin: <strong class="text-emerald-700">+Rp {{ (stats.todayCashServiceAdminProfit || 0).toLocaleString('id-ID') }}</strong>
+                </template>
+                <template v-else>
+                  Catat tarik tunai &amp; transfer/top-up agar sisa uang laci tetap cocok.
+                </template>
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="emit('openCashService')"
+              class="h-9 px-3 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95 shadow-2xs"
+            >
+              <Plus class="w-3.5 h-3.5 text-sky-400" />
+              <span>Catat Layanan</span>
             </button>
           </div>
 

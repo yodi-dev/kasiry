@@ -11,7 +11,8 @@ import {
   PackagePlus,
   Users,
   Wallet,
-  Clock
+  Clock,
+  ArrowLeftRight
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -32,6 +33,10 @@ const props = defineProps({
     default: 0
   },
   todayExpenseCount: {
+    type: Number,
+    default: 0
+  },
+  todayCashServiceCount: {
     type: Number,
     default: 0
   },
@@ -57,6 +62,7 @@ const emit = defineEmits([
   'openDebtBook',
   'openDailyReport',
   'openExpense',
+  'openCashService',
   'openRestock',
   'openShift',
   'openSettings',
@@ -217,6 +223,15 @@ const quickNavItems = computed(() => [
     badgeClass: 'bg-amber-100 text-amber-800'
   },
   {
+    event: 'openCashService',
+    label: 'Tarik & Tf',
+    shortLabel: 'Tarik',
+    icon: ArrowLeftRight,
+    iconColor: 'text-sky-600 group-hover:text-sky-300',
+    badge: props.todayCashServiceCount,
+    badgeClass: 'bg-sky-100 text-sky-700'
+  },
+  {
     event: 'openDailyReport',
     label: 'Laporan',
     shortLabel: 'Laporan',
@@ -249,6 +264,14 @@ const drawerGroups = computed(() => [
         iconBg: 'bg-amber-50 text-amber-700 border-amber-100',
         badge: props.todayExpenseCount,
         badgeClass: 'bg-amber-100 text-amber-800'
+      },
+      {
+        event: 'openCashService',
+        label: 'Tarik Tunai & Transfer',
+        icon: ArrowLeftRight,
+        iconBg: 'bg-sky-50 text-[#0284c7] border-sky-100',
+        badge: props.todayCashServiceCount,
+        badgeClass: 'bg-sky-100 text-sky-700'
       },
       {
         event: 'openDebtBook',

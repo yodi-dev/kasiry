@@ -6,6 +6,24 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.16.0] - 2026-11-27 (Backlog Fase 2 #1: Fitur Tarik Tunai & Transfer / Top-Up)
+
+### Added
+- **Layanan Tarik Tunai & Transfer / Top-Up (`src/components/CashServiceModal.vue`, `src/db/index.js` schema `v6`):**
+  - Menambahkan tabel IndexedDB **`cashServices`** (`++id, serviceNumber, createdAt, type, cashSource, shiftId, updatedAt, deleted`) dengan migrasi otomatis `v1 -> v6`.
+  - Modal terdedikasi `CashServiceModal.vue` (`Tarik Tunai` vs `Transfer / Top-Up` dengan tab `Catat Layanan` & `Riwayat`), preset nominal `50rb`–`1jt`, preset biaya admin `Rp 0`–`10rb`, pilihan channel (`QRIS`, `BRI`, `BCA`, `Mandiri`, `BNI`, `DANA`, `GoPay`, `ShopeePay`, `Lainnya`), nama pelanggan, catatan, serta ringkasan **Cara A** (`Total Dibayar = Nominal Pokok + Biaya Admin`).
+  - **Hard Guard Saldo Laci:** Untuk `TARIK_TUNAI` (`cashSource: 'LACI'`), memblokir transaksi di UI & `recordCashService` apabila nominal pokok melebihi uang tunai yang tersedia di laci (`availableDrawerCash <= 0` atau `amount > availableDrawerCash`).
+- **Navigasi & Struk Thermal (`TopBar.vue`, `thermalPrinter.js`, `ReceiptModal.vue`):**
+  - Menambahkan tombol 1-klik **`Tarik & Tf`** di TopBar Desktop dan menu **`Tarik Tunai & Transfer`** di grup **Keuangan & Kasir** Mobile Drawer lengkap dengan badge jumlah transaksi periode berjalan.
+  - Memperbarui encoder ESC/POS, HTML print `iframe`, preview `ReceiptModal.vue`, & format share WhatsApp agar nota `TARIK TUNAI` & `TRANSFER / TOP-UP` tercetak lengkap (`SELESAI (TARIK TUNAI)` / `SELESAI (TRANSFER)`) tanpa salah jatuh ke status Buku Utang.
+- **Rekonsiliasi Keuangan, Shift, Laporan, Excel 8-Sheet & Google Sync (`dailyStats.js`, `useKasiryDB.js`, `useGoogleSync.js`, `excelExport.js`, `DailyReportModal.vue`, `ShiftModal.vue`):**
+  - Mengintegrasikan `cashServices` ke `aggregateRecords`, `computeDailyStats`, `computeShiftClosingPreview`, dan `formatShiftWhatsAppText`:
+    - `TARIK_TUNAI`: Laci `-amount`, Non-Tunai/QRIS `+(amount + adminFee)`, Untung Jasa Admin `+adminFee`.
+    - `TRANSFER`: Laci `+(amount + adminFee)`, Non-Tunai/QRIS `-amount`, Untung Jasa Admin `+adminFee`.
+  - Menambahkan sheet ke-8 **`Tarik Tunai & Transfer`** + indikator Tarik Tunai/Transfer & Jasa Admin di Sheet 1 (`Ringkasan Kas`) `excelExport.js`, serta dukungan `openShift` adopsi otomatis, `closeShift`, `appendCashServiceToSheet`, two-way merge Google Drive, JSON Backup/Restore, & Arsip Tahunan.
+
+---
+
 ## [2.15.5] - 2026-11-27 (Modul 1 UI Polish: Perluasan Grid Terlaris Desktop ke 24 Produk & Ranking Dinamis)
 
 ### Changed

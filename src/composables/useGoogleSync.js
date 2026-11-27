@@ -591,6 +591,37 @@ export function useGoogleSync() {
     }, storeName)
   }
 
+  // Catat Layanan Tarik Tunai / Transfer ke Google Sheets melalui pipeline antrean yang sama
+  const appendCashServiceToSheet = async ({
+    serviceNumber,
+    createdAt = Date.now(),
+    type = 'TARIK_TUNAI',
+    amount = 0,
+    adminFee = 0,
+    channel = 'QRIS / Transfer',
+    customerName = '',
+    note = ''
+  } = {}, storeName = 'Toko') => {
+    const isTransfer = type === 'TRANSFER'
+    const numericAmount = Math.round(Number(amount || 0))
+    const cleanAdmin = Math.max(0, Math.round(Number(adminFee || 0)))
+    const totalPaid = numericAmount + cleanAdmin
+    const methodLabel = isTransfer ? 'TRANSFER / TOP-UP' : 'TARIK TUNAI'
+    const baseText = `${isTransfer ? 'Transfer/Top-Up' : 'Tarik Tunai'} (${channel}) • Pokok Rp ${numericAmount.toLocaleString('id-ID')} • Admin +Rp ${cleanAdmin.toLocaleString('id-ID')} • Total Rp ${totalPaid.toLocaleString('id-ID')}`
+    const fullText = note ? `${baseText} • ${note}` : baseText
+
+    return appendTransactionToSheet({
+      invoiceNumber: serviceNumber || `${isTransfer ? 'TF' : 'TT'}-${String(createdAt).slice(-6)}`,
+      createdAt,
+      paymentMethod: methodLabel,
+      customerName: customerName || 'Pelanggan Umum',
+      totalAmount: numericAmount,
+      cashGiven: totalPaid,
+      changeAmount: cleanAdmin,
+      itemsText: fullText
+    }, storeName)
+  }
+
   // ==============================================================
   // ENGINE TWO-WAY SYNC MULTI-DEVICE (Berdasarkan Timestamp updatedAt)
   // ==============================================================
@@ -762,6 +793,24 @@ export function useGoogleSync() {
       const mergedRestocks = Array.from(restockMap.values())
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 
+      // 9. Merge Layanan Tarik Tunai & Transfer (berdasarkan serviceNumber atau id, LWW per updatedAt & hormati cutoff arsip)
+      const cashServiceMap = new Map()
+      ;(lData.cashServices || []).forEach(svc => {
+        if (archiveCutoff > 0 && toTimestamp(svc.createdAt) < archiveCutoff) return
+        const key = svc.serviceNumber || svc.id
+        cashServiceMap.set(key, svc)
+      })
+      ;(rData.cashServices || []).forEach(rsvc => {
+        if (archiveCutoff > 0 && toTimestamp(rsvc.createdAt) < archiveCutoff) return
+        const key = rsvc.serviceNumber || rsvc.id
+        const lsvc = cashServiceMap.get(key)
+        if (!lsvc || (rsvc.updatedAt || 0) > (lsvc.updatedAt || 0)) {
+          cashServiceMap.set(key, rsvc)
+        }
+      })
+      const mergedCashServices = Array.from(cashServiceMap.values())
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+
       const mergedPayload = {
         app: 'Kasiry POS',
         version: '2.4',
@@ -774,6 +823,7 @@ export function useGoogleSync() {
           debtPayments: mergedDebtPayments,
           expenses: mergedExpenses,
           restocks: mergedRestocks,
+          cashServices: mergedCashServices,
           shifts: mergedShifts,
           settings: mergedSettings
         }
@@ -886,6 +936,7 @@ export function useGoogleSync() {
     appendDebtPaymentToSheet,
     appendExpenseToSheet,
     appendRestockToSheet,
+    appendCashServiceToSheet,
     appendShiftEventToSheet,
     ensureSpreadsheet
   }

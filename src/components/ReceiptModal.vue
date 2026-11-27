@@ -77,7 +77,11 @@ const shareToWhatsApp = () => {
     ? `Tunai: Rp ${r.cashGiven.toLocaleString('id-ID')}\nKembali: Rp ${r.changeAmount.toLocaleString('id-ID')}`
     : r.paymentMethod === 'QRIS'
       ? `Metode: QRIS (Lunas Non-Tunai)`
-      : `Status: DICATAT DI BUKU UTANG (BON)\nPelanggan: ${r.customer?.name || '-'}`
+      : (r.paymentMethod === 'TARIK TUNAI' || r.serviceMeta?.type === 'TARIK_TUNAI')
+        ? `Via QRIS/Transfer: Rp ${r.totalAmount.toLocaleString('id-ID')}\nUang Tunai Diserahkan: Rp ${Number(r.serviceMeta?.amount ?? r.cashGiven ?? r.totalAmount).toLocaleString('id-ID')}\nStatus: SELESAI (Tarik Tunai)`
+        : (r.paymentMethod === 'TRANSFER / TOP-UP' || r.serviceMeta?.type === 'TRANSFER')
+          ? `Bayar Tunai: Rp ${Number(r.cashGiven ?? r.totalAmount).toLocaleString('id-ID')}\nNominal Dikirim: Rp ${Number(r.serviceMeta?.amount ?? r.totalAmount).toLocaleString('id-ID')}\nStatus: SELESAI (Transfer / Top-Up)`
+          : `Status: DICATAT DI BUKU UTANG (BON)\nPelanggan: ${r.customer?.name || '-'}`
 
   const cleanPhone = (store?.phone || '').trim()
   const cleanFooter = (printerSettings.value?.footerText || '').trim() || 'Matur nuwun atas kunjungannya!'
@@ -268,6 +272,36 @@ const shareToWhatsApp = () => {
             <div class="flex justify-between font-semibold text-[#0284c7] text-xs">
               <span>STATUS:</span>
               <span>LUNAS (NON-TUNAI)</span>
+            </div>
+          </template>
+
+          <template v-else-if="receiptData.paymentMethod === 'TARIK TUNAI' || receiptData.serviceMeta?.type === 'TARIK_TUNAI'">
+            <div class="flex justify-between text-slate-600">
+              <span>Transfer / QRIS Masuk:</span>
+              <span>Rp {{ receiptData.totalAmount.toLocaleString('id-ID') }}</span>
+            </div>
+            <div class="flex justify-between font-semibold text-emerald-700 text-xs">
+              <span>Uang Tunai Diserahkan:</span>
+              <span>Rp {{ (receiptData.serviceMeta?.amount ?? receiptData.cashGiven ?? receiptData.totalAmount).toLocaleString('id-ID') }}</span>
+            </div>
+            <div class="flex justify-between font-semibold text-[#0284c7] text-xs">
+              <span>STATUS:</span>
+              <span>SELESAI (TARIK TUNAI)</span>
+            </div>
+          </template>
+
+          <template v-else-if="receiptData.paymentMethod === 'TRANSFER / TOP-UP' || receiptData.serviceMeta?.type === 'TRANSFER'">
+            <div class="flex justify-between text-slate-600">
+              <span>Bayar Tunai:</span>
+              <span>Rp {{ (receiptData.cashGiven ?? receiptData.totalAmount).toLocaleString('id-ID') }}</span>
+            </div>
+            <div class="flex justify-between font-semibold text-[#0284c7] text-xs">
+              <span>Nominal Dikirim:</span>
+              <span>Rp {{ (receiptData.serviceMeta?.amount ?? receiptData.totalAmount).toLocaleString('id-ID') }}</span>
+            </div>
+            <div class="flex justify-between font-semibold text-emerald-700 text-xs">
+              <span>STATUS:</span>
+              <span>SELESAI (TRANSFER)</span>
             </div>
           </template>
 

@@ -36,6 +36,11 @@ export class KasiryDatabase extends Dexie {
       restocks: '++id, restockNumber, createdAt, source, supplierName, updatedAt, deleted'
     })
 
+    // Schema Version 6: Tabel cashServices untuk layanan tarik tunai & transfer / top-up
+    this.version(6).stores({
+      cashServices: '++id, serviceNumber, createdAt, type, cashSource, shiftId, updatedAt, deleted'
+    })
+
     this.products = this.table('products')
     this.transactions = this.table('transactions')
     this.customers = this.table('customers')
@@ -43,6 +48,7 @@ export class KasiryDatabase extends Dexie {
     this.expenses = this.table('expenses')
     this.shifts = this.table('shifts')
     this.restocks = this.table('restocks')
+    this.cashServices = this.table('cashServices')
     this.settings = this.table('settings')
   }
 }

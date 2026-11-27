@@ -82,6 +82,7 @@ const ReceiptModal = lazyModal(loadReceiptModal)
 const DebtBookModal = lazyModal(() => import('./components/DebtBookModal.vue'))
 const DailyReportModal = lazyModal(() => import('./components/DailyReportModal.vue'))
 const ExpenseModal = lazyModal(() => import('./components/ExpenseModal.vue'))
+const CashServiceModal = lazyModal(() => import('./components/CashServiceModal.vue'))
 const RestockModal = lazyModal(() => import('./components/RestockModal.vue'))
 const ShiftModal = lazyModal(() => import('./components/ShiftModal.vue'))
 const SettingsModal = lazyModal(() => import('./components/SettingsModal.vue'))
@@ -130,6 +131,7 @@ const {
   debtPayments,
   expenses,
   restocks,
+  cashServices,
   shifts,
   activeShift,
   isActiveShiftStale,
@@ -155,6 +157,8 @@ const {
   deleteExpense,
   recordRestock,
   deleteRestock,
+  recordCashService,
+  deleteCashService,
   openShift,
   closeShift,
   recordTransaction,
@@ -192,6 +196,7 @@ const {
   appendDebtPaymentToSheet,
   appendExpenseToSheet,
   appendRestockToSheet,
+  appendCashServiceToSheet,
   appendShiftEventToSheet,
   ensureSpreadsheet
 } = useGoogleSync()
@@ -237,6 +242,7 @@ const isLazyInventoryOpen = ref(false)
 const isDebtBookOpen = ref(false)
 const isDailyReportOpen = ref(false)
 const isExpenseOpen = ref(false)
+const isCashServiceOpen = ref(false)
 const isRestockOpen = ref(false)
 const isShiftOpen = ref(false)
 const isShiftAutoPrompt = ref(false)
@@ -257,6 +263,7 @@ const isAnyModalOpen = computed(() => {
     isDebtBookOpen.value ||
     isDailyReportOpen.value ||
     isExpenseOpen.value ||
+    isCashServiceOpen.value ||
     isRestockOpen.value ||
     isShiftOpen.value ||
     isSettingsOpen.value ||
@@ -276,7 +283,8 @@ const unpaidDebtCount = computed(() => {
 // Computed Laporan Kasir Real-time dalam lingkup Shift Aktif (atau hari ini jika belum buka shift)
 const stats = computed(() =>
   computeDailyStats(transactions.value, debtPayments.value, expenses.value, {
-    activeShift: activeShift.value
+    activeShift: activeShift.value,
+    cashServices: cashServices.value
   })
 )
 
@@ -689,6 +697,90 @@ const handleDeleteRestock = async (restockId) => {
   }
 }
 
+const buildCashServiceReceiptData = (svc) => {
+  const isTransfer = svc.type === 'TRANSFER'
+  const amount = Math.round(Number(svc.amount || 0))
+  const adminFee = Math.max(0, Math.round(Number(svc.adminFee || 0)))
+  const totalPaid = Number(svc.totalPaid ?? (amount + adminFee))
+  const channel = svc.channel || 'QRIS / Transfer'
+  const items = [
+    {
+      id: svc.id,
+      name: `${isTransfer ? 'Transfer / Top-Up' : 'Tarik Tunai'} (${channel})`,
+      qty: 1,
+      sellPrice: amount
+    }
+  ]
+  if (adminFee > 0) {
+    items.push({
+      id: `${svc.id}-admin`,
+      name: 'Biaya Admin Jasa',
+      qty: 1,
+      sellPrice: adminFee
+    })
+  }
+  return {
+    invoiceNumber: svc.serviceNumber || '-',
+    time: svc.createdAt
+      ? new Date(svc.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      : new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+    paymentMethod: isTransfer ? 'TRANSFER / TOP-UP' : 'TARIK TUNAI',
+    totalAmount: totalPaid,
+    cashGiven: isTransfer ? totalPaid : amount,
+    changeAmount: 0,
+    customer: svc.customerName ? { name: svc.customerName } : null,
+    serviceMeta: {
+      type: svc.type,
+      amount,
+      adminFee,
+      totalPaid,
+      channel
+    },
+    items
+  }
+}
+
+// Record & Hapus Layanan Tarik Tunai / Transfer (IndexedDB + Google Sheets + Struk Thermal & Auto-Backup)
+const handleRecordCashService = async (payload) => {
+  const availableDrawerCash = stats.value.isShiftScoped
+    ? Number(stats.value.expectedCashDrawer ?? 0)
+    : Number(stats.value.todayNetCashDrawer ?? 0)
+
+  try {
+    const saved = await recordCashService({
+      ...payload,
+      availableDrawerCash
+    })
+    if (saved) {
+      playBeepSound('success')
+      appendCashServiceToSheet(saved, storeProfile.value?.name)
+      triggerCloudAutoBackup(true)
+      if (payload?.openReceipt) {
+        receiptData.value = buildCashServiceReceiptData(saved)
+        isCashServiceOpen.value = false
+        isReceiptOpen.value = true
+      }
+    }
+  } catch (err) {
+    playBeepSound('warning')
+    alert(err.message)
+  }
+}
+
+const handleDeleteCashService = async (serviceId) => {
+  const ok = await deleteCashService(serviceId)
+  if (ok) {
+    triggerCloudAutoBackup(true)
+  }
+}
+
+const handleOpenCashServiceReceipt = (svc) => {
+  if (!svc) return
+  receiptData.value = buildCashServiceReceiptData(svc)
+  isCashServiceOpen.value = false
+  isReceiptOpen.value = true
+}
+
 // Buka & Tutup Shift Kasir
 const openShiftModalManual = () => {
   completedShiftSummary.value = null
@@ -859,6 +951,7 @@ const handleDownloadExcel = async () => {
       debtPayments: allDebtPayments,
       expenses: allExpenses,
       restocks: allRestocks,
+      cashServices: allCashServices,
       shifts: allShifts
     } = await getAllTransactionsForExport()
     await exportKasiryExcel({
@@ -869,6 +962,7 @@ const handleDownloadExcel = async () => {
       debtPayments: allDebtPayments,
       expenses: allExpenses,
       restocks: allRestocks,
+      cashServices: allCashServices,
       shifts: allShifts
     })
     playBeepSound('success')
@@ -990,6 +1084,7 @@ const modalFlagKeys = [
   'debtBook',
   'dailyReport',
   'expense',
+  'cashService',
   'restock',
   'shift',
   'settings',
@@ -1004,6 +1099,7 @@ const activatedModals = reactive({
   debtBook: false,
   dailyReport: false,
   expense: false,
+  cashService: false,
   restock: false,
   shift: false,
   settings: false,
@@ -1020,6 +1116,7 @@ watch(
     isDebtBookOpen,
     isDailyReportOpen,
     isExpenseOpen,
+    isCashServiceOpen,
     isRestockOpen,
     isShiftOpen,
     isSettingsOpen,
@@ -1124,6 +1221,7 @@ onUnmounted(() => {
       :totalDebtCount="unpaidDebtCount"
       :todayTxCount="stats.transactionCount"
       :todayExpenseCount="stats.todayExpenseCount"
+      :todayCashServiceCount="stats.todayCashServiceCount"
       :activeShift="activeShift"
       :isActiveShiftStale="isActiveShiftStale"
       :isGoogleConnected="isGoogleConnected"
@@ -1131,6 +1229,7 @@ onUnmounted(() => {
       @openDebtBook="isDebtBookOpen = true"
       @openDailyReport="isDailyReportOpen = true"
       @openExpense="isExpenseOpen = true"
+      @openCashService="isCashServiceOpen = true"
       @openRestock="isRestockOpen = true"
       @openShift="openShiftModalManual"
       @openSettings="isSettingsOpen = true"
@@ -1321,6 +1420,7 @@ onUnmounted(() => {
       @close="isDailyReportOpen = false"
       @downloadExcel="handleDownloadExcel"
       @openExpense="isDailyReportOpen = false; isExpenseOpen = true"
+      @openCashService="isDailyReportOpen = false; isCashServiceOpen = true"
       @openShift="isDailyReportOpen = false; openShiftModalManual()"
       @deleteExpense="handleDeleteExpense"
     />
@@ -1335,6 +1435,19 @@ onUnmounted(() => {
       @close="isExpenseOpen = false"
       @recordExpense="handleRecordExpense"
       @deleteExpense="handleDeleteExpense"
+    />
+
+    <!-- Modal Layanan Tarik Tunai & Transfer / Top-Up -->
+    <CashServiceModal
+      v-if="activatedModals.cashService || isCashServiceOpen"
+      :isOpen="isCashServiceOpen"
+      :cashServices="cashServices"
+      :activeShift="activeShift"
+      :stats="stats"
+      @close="isCashServiceOpen = false"
+      @recordCashService="handleRecordCashService"
+      @deleteCashService="handleDeleteCashService"
+      @openReceipt="handleOpenCashServiceReceipt"
     />
 
     <!-- Modal Kulakan / Belanja Stok & Manajemen Stok Lunak -->
@@ -1363,6 +1476,7 @@ onUnmounted(() => {
       :transactions="transactions"
       :debtPayments="debtPayments"
       :expenses="expenses"
+      :cashServices="cashServices"
       :storeName="storeProfile.name"
       :isAutoPrompt="isShiftAutoPrompt"
       @close="isShiftOpen = false; completedShiftSummary = null"

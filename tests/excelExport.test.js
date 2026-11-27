@@ -125,6 +125,23 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
           note: 'Nota pagi',
           deleted: false
         }
+      ],
+      cashServices: [
+        {
+          id: 31,
+          serviceNumber: 'TT-301',
+          createdAt: Date.now(),
+          type: 'TARIK_TUNAI',
+          channel: 'QRIS',
+          cashSource: 'LACI',
+          customerName: 'Bu Sari',
+          amount: 50000,
+          adminFee: 5000,
+          totalPaid: 55000,
+          shiftCode: 'SHF-901',
+          note: 'QRIS lancar',
+          deleted: false
+        }
       ]
     })
 
@@ -140,12 +157,13 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
       'Buku Utang Pelanggan',
       'Pengeluaran Kas',
       'Riwayat Shift',
-      'Riwayat Kulakan'
+      'Riwayat Kulakan',
+      'Tarik Tunai & Transfer'
     ])
 
     const summaryRows = XLSX.utils.sheet_to_json(workbook.Sheets['Ringkasan Kas'], { header: 1 })
     const summaryMap = Object.fromEntries(summaryRows.filter(r => r.length >= 2))
-    expect(summaryMap['Total Uang Tunai di Laci']).toBe(32000)
+    expect(summaryMap['Total Uang Tunai di Laci (Penjualan + Bon)']).toBe(32000)
     expect(summaryMap['Total Penerimaan QRIS (Non-Tunai)']).toBe(30000)
     expect(summaryMap['Total Uang Masuk Kas (Keseluruhan)']).toBe(62000)
     expect(summaryMap['Pengeluaran Dari Laci (Tunai)']).toBe(7000)
@@ -183,5 +201,12 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(restockRows[0]['Supplier / Agen']).toBe('Agen Sembako Jaya')
     expect(restockRows[0]['Total Modal (Rp)']).toBe(130000)
     expect(restockRows[0]['Rincian Barang']).toContain('Minyakita 1L x10')
+
+    const cashServiceRows = XLSX.utils.sheet_to_json(workbook.Sheets['Tarik Tunai & Transfer'])
+    expect(cashServiceRows).toHaveLength(1)
+    expect(cashServiceRows[0]['No. Nota']).toBe('TT-301')
+    expect(cashServiceRows[0]['Nominal Pokok (Rp)']).toBe(50000)
+    expect(cashServiceRows[0]['Biaya Admin (Rp)']).toBe(5000)
+    expect(cashServiceRows[0]['Total Dibayar (Rp)']).toBe(55000)
   })
 })

@@ -16,6 +16,7 @@ import CustomerManagementModal from '../src/components/CustomerManagementModal.v
 import LazyInventoryModal from '../src/components/LazyInventoryModal.vue'
 import ProductManagementModal from '../src/components/ProductManagementModal.vue'
 import SettingsModal from '../src/components/SettingsModal.vue'
+import CashServiceModal from '../src/components/CashServiceModal.vue'
 
 const sampleCustomers = [
   { id: 1, name: 'Umum', phone: '', totalDebt: 0, updatedAt: 1000 },
@@ -863,5 +864,95 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await nextTick()
     await settingsReset.findAll('button').find(b => b.text().includes('Ya, Atur Ulang Sekarang')).trigger('click')
     expect(settingsReset.emitted('resetStoreData')?.[0]).toEqual(['empty'])
+  })
+
+  it('guards insufficient drawer cash in CashServiceModal, emits Cara A Tarik Tunai & Transfer, and opens from TopBar', async () => {
+    const topBar = mount(TopBar, {
+      props: {
+        storeName: 'Warung Kasiry',
+        todayCashServiceCount: 3
+      }
+    })
+    const navBtn = topBar.findAll('button').find(b => b.text().includes('Tarik'))
+    expect(navBtn).toBeTruthy()
+    await navBtn.trigger('click')
+    expect(topBar.emitted('openCashService')).toBeTruthy()
+
+    const modal = mount(CashServiceModal, {
+      props: {
+        isOpen: true,
+        cashServices: [],
+        activeShift: { id: 1, shiftCode: 'SHF-CS', openingCash: 100000 },
+        stats: {
+          isShiftScoped: true,
+          openingCash: 100000,
+          todayNetCashDrawer: 0,
+          expectedCashDrawer: 100000,
+          todayCashServiceAdminProfit: 0
+        }
+      }
+    })
+
+    // Tarik Tunai 200rb melebihi saldo laci 100rb -> warning & tombol disabled
+    const preset200 = modal.findAll('button').find(b => b.text().trim() === '200rb')
+    await preset200.trigger('click')
+    await nextTick()
+    expect(modal.text()).toContain('Uang tunai di laci tidak cukup')
+    const saveTarikBtn = modal.findAll('button').find(b => b.text().includes('Simpan Tarik Tunai'))
+    expect(saveTarikBtn.attributes('disabled')).toBeDefined()
+
+    // Pilih 50rb (cukup di laci 100rb) -> admin default 5000 -> Cara A Total = 55.000
+    const preset50 = modal.findAll('button').find(b => b.text().trim() === '50rb')
+    await preset50.trigger('click')
+    await nextTick()
+    expect(modal.text()).toContain('Rp 55.000')
+    expect(saveTarikBtn.attributes('disabled')).toBeUndefined()
+    await modal.find('form').trigger('submit')
+    expect(modal.emitted('recordCashService')?.[0]?.[0]).toMatchObject({
+      type: 'TARIK_TUNAI',
+      amount: 50000,
+      adminFee: 5000,
+      cashSource: 'LACI'
+    })
+
+    // Switch ke Transfer / Top-Up (Laci Masuk) -> 100rb + 5rb tidak diblokir laci
+    const transferTab = modal.findAll('button').find(b => b.text().includes('Transfer / Top-Up'))
+    await transferTab.trigger('click')
+    await nextTick()
+    const preset100 = modal.findAll('button').find(b => b.text().trim() === '100rb')
+    await preset100.trigger('click')
+    await nextTick()
+    const saveTransferBtn = modal.findAll('button').find(b => b.text().includes('Simpan Transfer / Top-Up'))
+    expect(saveTransferBtn.attributes('disabled')).toBeUndefined()
+    await modal.find('form').trigger('submit')
+    expect(modal.emitted('recordCashService')?.[1]?.[0]).toMatchObject({
+      type: 'TRANSFER',
+      amount: 100000,
+      adminFee: 5000,
+      cashSource: 'LACI'
+    })
+
+    // ReceiptModal merender struk TARIK TUNAI dengan status SELESAI (bukan Buku Utang)
+    const serviceReceipt = mount(ReceiptModal, {
+      props: {
+        isOpen: true,
+        storeProfile: { name: 'Warung Kasiry', phone: '' },
+        receiptData: {
+          invoiceNumber: 'TT-555',
+          time: '15:00',
+          paymentMethod: 'TARIK TUNAI',
+          totalAmount: 55000,
+          cashGiven: 50000,
+          changeAmount: 0,
+          serviceMeta: { type: 'TARIK_TUNAI', amount: 50000, adminFee: 5000, totalPaid: 55000, channel: 'QRIS' },
+          items: [
+            { id: 1, name: 'Tarik Tunai (QRIS)', qty: 1, sellPrice: 50000 },
+            { id: 2, name: 'Biaya Admin Jasa', qty: 1, sellPrice: 5000 }
+          ]
+        }
+      }
+    })
+    expect(serviceReceipt.text()).toContain('SELESAI (TARIK TUNAI)')
+    expect(serviceReceipt.text()).not.toContain('DICATAT DI BUKU UTANG')
   })
 })

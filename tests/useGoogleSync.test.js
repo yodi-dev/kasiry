@@ -196,6 +196,10 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
           { id: 88, restockNumber: 'KLK-OLD', createdAt: 1500000, totalCost: 20000, updatedAt: 1500000 },
           { id: 89, restockNumber: 'KLK-SYNC', createdAt: 2650000, totalCost: 85000, supplierName: 'Agen Baru', updatedAt: 9500 }
         ],
+        cashServices: [
+          { id: 90, serviceNumber: 'TT-OLD', createdAt: 1500000, type: 'TARIK_TUNAI', amount: 50000, adminFee: 5000, updatedAt: 1500000 },
+          { id: 91, serviceNumber: 'TF-SYNC', createdAt: 2680000, type: 'TRANSFER', amount: 100000, adminFee: 5000, channel: 'BRI', updatedAt: 9600 }
+        ],
         shifts: [
           { id: 80, shiftCode: 'SHF-OLD-CLOSED', status: 'CLOSED', openedAt: 1500000, updatedAt: 1500000 },
           { id: 81, shiftCode: 'SHF-SYNC', status: 'CLOSED', openedAt: 2500000, actualCash: 300000, updatedAt: 9000 }
@@ -238,6 +242,9 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
         restocks: [
           { id: 89, restockNumber: 'KLK-SYNC', createdAt: 2650000, totalCost: 80000, supplierName: 'Agen Lama', updatedAt: 4000 }
         ],
+        cashServices: [
+          { id: 91, serviceNumber: 'TF-SYNC', createdAt: 2680000, type: 'TRANSFER', amount: 100000, adminFee: 3000, channel: 'DANA', updatedAt: 4500 }
+        ],
         shifts: [
           { id: 81, shiftCode: 'SHF-SYNC', status: 'OPEN', openedAt: 2500000, updatedAt: 5000 }
         ],
@@ -270,6 +277,9 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(appliedPayload.data.restocks).toHaveLength(1)
     expect(appliedPayload.data.restocks[0].restockNumber).toBe('KLK-SYNC')
     expect(appliedPayload.data.restocks[0].supplierName).toBe('Agen Baru')
+    expect(appliedPayload.data.cashServices).toHaveLength(1)
+    expect(appliedPayload.data.cashServices[0].serviceNumber).toBe('TF-SYNC')
+    expect(appliedPayload.data.cashServices[0].channel).toBe('BRI')
     expect(appliedPayload.data.shifts).toHaveLength(1)
     expect(appliedPayload.data.shifts[0].shiftCode).toBe('SHF-SYNC')
     expect(appliedPayload.data.shifts[0].status).toBe('CLOSED')

@@ -222,4 +222,96 @@ describe('computeDailyStats (Separation of Cash Drawer, QRIS Non-Cash, and Bon)'
     expect(stats.todayOperationalExpenses).toBe(5000) // hanya biaya ops; kulakan non-biaya
     expect(stats.todayProfit).toBe(25000) // 30.000 laba kotor - 5.000 ops
   })
+
+  it('reconciles Tarik Tunai (Laci out / QRIS in) and Transfer (Laci in / Non-cash out) with Cara A admin profit', () => {
+    const now = Date.now()
+    const shift = { id: 7, shiftCode: 'SHF-CS1', status: 'OPEN', openingCash: 200000, openedAt: now - 10000 }
+    const transactions = [
+      {
+        invoiceNumber: 'KSR-CS1',
+        createdAt: now,
+        shiftId: 7,
+        paymentMethod: 'TUNAI',
+        totalAmount: 100000,
+        items: [{ name: 'Gula', sellPrice: 100000, buyPrice: 90000, qty: 1 }] // laba kotor 10.000
+      }
+    ]
+    const cashServices = [
+      {
+        id: 1,
+        serviceNumber: 'TT-101',
+        createdAt: now,
+        shiftId: 7,
+        type: 'TARIK_TUNAI',
+        cashSource: 'LACI',
+        amount: 50000,
+        adminFee: 5000,
+        totalPaid: 55000,
+        deleted: false
+      },
+      {
+        id: 2,
+        serviceNumber: 'TF-102',
+        createdAt: now,
+        shiftId: 7,
+        type: 'TRANSFER',
+        cashSource: 'LACI',
+        amount: 100000,
+        adminFee: 5000,
+        totalPaid: 105000,
+        deleted: false
+      },
+      {
+        id: 3,
+        serviceNumber: 'TT-DEL',
+        createdAt: now,
+        shiftId: 7,
+        type: 'TARIK_TUNAI',
+        cashSource: 'LACI',
+        amount: 500000,
+        adminFee: 10000,
+        totalPaid: 510000,
+        deleted: true
+      }
+    ]
+
+    const stats = computeDailyStats(transactions, [], [], { activeShift: shift, nowTs: now, cashServices })
+    expect(stats.todayCashWithdrawalTotal).toBe(50000)
+    expect(stats.todayCashTransferTotal).toBe(100000)
+    expect(stats.todayCashServiceOut).toBe(50000)
+    expect(stats.todayCashServiceIn).toBe(105000)
+    expect(stats.todayCashServiceAdminProfit).toBe(10000)
+    expect(stats.todayCashServiceCount).toBe(2)
+    // Net laci = 100.000 jual + 105.000 transfer masuk - 50.000 tarik tunai = 155.000
+    expect(stats.todayNetCashDrawer).toBe(155000)
+    expect(stats.expectedCashDrawer).toBe(355000)
+    // Non-tunai net = +55.000 (tarik tunai masuk QRIS) - 100.000 (transfer keluar) = -45.000
+    expect(stats.todayNonCashServiceNet).toBe(-45000)
+    expect(stats.todayNetQris).toBe(-45000)
+    // Profit = 10.000 barang + 10.000 admin = 20.000
+    expect(stats.todayProfit).toBe(20000)
+
+    const preview = computeShiftClosingPreview({
+      shift: { ...shift, closedAt: now + 5000 },
+      transactions,
+      debtPayments: [],
+      expenses: [],
+      cashServices,
+      actualCash: 355000
+    })
+    expect(preview.expectedCash).toBe(355000)
+    expect(preview.cashDifference).toBe(0)
+
+    const waText = formatShiftWhatsAppText({
+      ...shift,
+      closedAt: now + 5000,
+      expectedCash: preview.expectedCash,
+      actualCash: 355000,
+      cashDifference: 0,
+      summary: preview
+    }, 'Warung Kasiry')
+    expect(waText).toContain('Transfer/Top-Up Masuk Laci: +Rp 105.000')
+    expect(waText).toContain('Tarik Tunai Dari Laci: -Rp 50.000')
+    expect(waText).toContain('Jasa Admin Tarik/Transfer: +Rp 10.000')
+  })
 })

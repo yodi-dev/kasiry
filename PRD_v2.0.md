@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry POS
 
-**Versi Dokumen:** 2.15 (QRIS, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, 300 Katalog Bersih & Printer Thermal Bluetooth/USB/Serial)  
+**Versi Dokumen:** 2.16 (QRIS, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, Layanan Tarik Tunai & Transfer, 300 Katalog Bersih & Printer Thermal Bluetooth/USB/Serial)  
 **Status:** Production-Ready & Terverifikasi Build/Unit-Integration Test  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
 **Identitas Toko Bawaan:** Warung Kasiry (Generik siap pakai — profil disesuaikan pemilik warung di Pengaturan)  
@@ -16,6 +16,8 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
+| **v2.16.0** | 27 November 2026 | **Backlog Fase 2 #1 (Layanan Tarik Tunai & Transfer / Top-Up):** Modal `CashServiceModal.vue` (`Tarik Tunai` keluar laci vs `Transfer / Top-Up` masuk laci dg skema biaya admin Cara A + guard saldo laci ketat), skema Dexie `v6` `cashServices`, cetak struk `ReceiptModal.vue` & ESC/POS, tombol `Tarik & Tf` di `TopBar.vue`, rekonsiliasi Shift/Laporan/WA, Excel 8 sheet (`Tarik Tunai & Transfer`), JSON Backup/Arsip, & Google Sync. |
+| **v2.15.3–v2.15.5** | 27 November 2026 | **Custom Domain, OAuth Non-Sensitive & Grid Terlaris 24 Produk:** Migrasi `https://kasiry.awanbeo.my.id`, penghapusan scope sensitif (`drive.file` saja), perluasan `frequentProducts` desktop ke 24 item beranking pemakaian, serta perbaikan UI/verifikasi Google Auth Platform. |
 | **v2.15.1–v2.15.2** | 27 November 2026 | **Branding `Kasiry by Awanbeo`, Tautan Portofolio & PWA Auto-Reload:** Penyeragaman footer **`Kasiry by Awanbeo`** + tautan `https://awanbeo.my.id` di struk fisik/HTML/preview, WhatsApp nota/laporan/shift, footer desktop, & SEO `index.html`, serta reload otomatis saat Service Worker memperbarui cache lama (`src/main.js`). |
 | **v2.15.0** | 27 November 2026 | **Dukungan Printer USB/OTG (`WebUSB`), Port Serial (`Web Serial`) & Cetak Browser Iframe Terisolasi:** Ekspansi `useThermalPrinter.js` & `thermalPrinter.js` dengan `WebUSB` + `Web Serial` (auto-reconnect di `App.vue`, panduan Android OTG vs Windows `WinUSB`/`POS-58`), cetak HTML `iframe` terisolasi `58mm`/`80mm` bebas backdrop modal, serta tombol **`BT`** / **`USB`** / **`Serial`** di `SettingsModal` & `ReceiptModal`. |
 | **v2.14.0** | 27 November 2026 | **Roadmap #7 (Printer Thermal Bluetooth ESC/POS) + Hotfix Harga Keranjang:** Encoder ESC/POS murni (`thermalPrinter.js`), composable Web Bluetooth (`useThermalPrinter.js`) dg fallback `window.print()`, tab **`Printer`** di `SettingsModal.vue` (`58mm`/`80mm`, *auto-print*, catatan bawah struk, *Tes Cetak*), pembaruan `ReceiptModal.vue` (hide `WA:` kosong, `.thermal-80mm`, `Cetak BT`), serta perbaikan penguncian tier saat simpan Grosir/Agen di mode nota `Ecer`. |
@@ -99,10 +101,11 @@ flowchart TD
 - **Utang / Bon:** Akun `"Umum"` otomatis diblokir baik di UI (`PaymentModal.vue`) maupun di lapisan database (`useKasiryDB.js`) agar utang selalu terikat ke pelanggan nyata. Pencarian nama atau daftar pelanggan baru berlangsung instan tanpa formulir panjang.
 - **Manajemen Pelanggan (`CustomerManagementModal.vue`) & Buku Utang (`DebtBookModal.vue`):** Dilengkapi riwayat belanja penuh per pelanggan lewat query indeks on-demand (`getCustomerTransactions`), cicilan utang dengan pembatasan nominal lunas vs uang kembalian (`Math.min(amount, currentDebt)`), serta tombol pengingat WhatsApp sopan.
 
-### 4.4 Laporan Shift/Harian, Buka-Tutup Shift, Kas Keluar, Excel 6-Sheet & Arsip Data Tahunan
-- **Buka & Tutup Shift (`ShiftModal.vue`):** Mengelompokkan operasional 1 hari buka warung dalam 1 sesi shift fleksibel (mendukung tutup lewat tengah malam), auto-isi modal awal & pengingat shift kemarin yang lupa ditutup, serta rekonsiliasi fisik laci (`Modal Awal + Tunai Masuk - Kas Keluar Laci`) lengkap dengan pesan tutup buku WhatsApp.
+### 4.4 Laporan Shift/Harian, Buka-Tutup Shift, Kas Keluar, Tarik Tunai/Transfer, Excel 8-Sheet & Arsip Data Tahunan
+- **Buka & Tutup Shift (`ShiftModal.vue`):** Mengelompokkan operasional 1 hari buka warung dalam 1 sesi shift fleksibel (mendukung tutup lewat tengah malam), auto-isi modal awal & pengingat shift kemarin yang lupa ditutup, serta rekonsiliasi fisik laci (`Modal Awal + Tunai Masuk - Kas Keluar Laci + Transfer Masuk Laci - Tarik Tunai Laci`) lengkap dengan pesan tutup buku WhatsApp.
+- **Layanan Tarik Tunai & Transfer / Top-Up (`CashServiceModal.vue`):** Mencatat layanan tarik tunai (QRIS/transfer masuk, uang fisik keluar dari laci) maupun transfer/top-up (tunai masuk laci, saldo dikirim) menggunakan perhitungan biaya admin **Cara A** (`Total Dibayar = Pokok + Admin`), penjagaan saldo tunai laci (`availableDrawerCash`), cetak struk bukti thermal/WA, & rekonsiliasi laba jasa admin.
 - **Catatan Kas Keluar (`ExpenseModal.vue`):** Mencatat pengeluaran kas harian dengan preset kategori (`Operasional`, `Makan & Transport`, `Tarik / Setor Owner`, `Lainnya`), sumber dana `Tunai (Dari Laci)` vs `Non-Tunai (QRIS / Rek)`, KPI real-time Sisa Tunai Laci, dan isolasi kategori `prive` agar tarik kas owner tidak mengurangi estimasi untung jualan.
-- **Laporan Kasir (`DailyReportModal.vue`):** Otomatis memakai lingkup **Shift Aktif** (atau hari kalender jika belum buka shift), menampilkan Uang Masuk Kas (Tunai & QRIS), Total Kas Keluar + Sisa Laci Bersih, Perkiraan Untung Bersih, Bon Baru, Top 5 Barang Terlaris, tab Kas Keluar, tab Riwayat Transaksi, tab Riwayat Shift tutup buku, kirim rekap WhatsApp, serta ekspor **Excel 7 sheet** (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`, `Riwayat Shift`, `Riwayat Kulakan`) via dynamic `import('xlsx')`.
+- **Laporan Kasir (`DailyReportModal.vue`):** Otomatis memakai lingkup **Shift Aktif** (atau hari kalender jika belum buka shift), menampilkan Uang Masuk Kas (Tunai & QRIS), Tarik Tunai/Transfer & Admin, Total Kas Keluar + Sisa Laci Bersih, Perkiraan Untung Bersih, Bon Baru, Top 5 Barang Terlaris, tab Kas Keluar, tab Riwayat Transaksi, tab Riwayat Shift tutup buku, kirim rekap WhatsApp, serta ekspor **Excel 8 sheet** (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`, `Riwayat Shift`, `Riwayat Kulakan`, `Tarik Tunai & Transfer`) via dynamic `import('xlsx')`.
 - **Skalabilitas & Arsip Data Tahunan (`SettingsModal.vue`):**
   - Memori runtime (`useKasiryDB.js`) memakai `shallowRef([])`, hanya memuat **90 hari terakhir** ke UI Kasa harian (`ACTIVE_HISTORY_DAYS = 90`), serta melakukan pembaruan state parsial setelah checkout & CRUD.
   - Fitur **Kesehatan & Arsip Data Tahunan** menyediakan pilihan retensi `> 3 Bulan`, `> 6 Bulan`, dan `> 1 Tahun` yang otomatis mengunduh file `Arsip_<NamaToko>_sd_<Tanggal>.json` (+ mengunggah salinan arsip ke Google Drive bila terhubung & online), menyimpan `archiveState.cutoffAt`, lalu membersihkan baris lama di IndexedDB tanpa mengubah produk maupun `totalDebt` pelanggan.
@@ -115,7 +118,7 @@ flowchart TD
 
 ---
 
-## 5. Model Data Lokal (Dexie.js `KasiryDB` v5)
+## 5. Model Data Lokal (Dexie.js `KasiryDB` v6)
 
 ```javascript
 // src/db/index.js — KasiryDatabase
@@ -147,8 +150,13 @@ db.version(4).stores({
 db.version(5).stores({
   restocks: '++id, restockNumber, createdAt, source, supplierName, updatedAt, deleted'
 })
+
+// Migrasi v6: layanan tarik tunai & transfer / top-up
+db.version(6).stores({
+  cashServices: '++id, serviceNumber, createdAt, type, cashSource, shiftId, updatedAt, deleted'
+})
 ```
-*Catatan `settings` keys:* `storeProfile`, `categories`, `archiveState` (`{ cutoffAt }`), `lastOpeningCash`. Format backup JSON eksternal mempertahankan `version: '2.4'` (kompatibel lintas versi dengan node opsional `expenses`, `restocks`, & `shifts`).
+*Catatan `settings` keys:* `storeProfile`, `categories`, `archiveState` (`{ cutoffAt }`), `lastOpeningCash`. Format backup JSON eksternal mempertahankan `version: '2.4'` (kompatibel lintas versi dengan node opsional `expenses`, `restocks`, `cashServices`, & `shifts`).
 
 ---
 

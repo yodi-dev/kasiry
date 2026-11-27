@@ -8,10 +8,10 @@
 ## Fitur Utama
 
 - **Nol Hambatan Login (*Zero Login Wall*):** Buka aplikasi web langsung siap melayani transaksi pembeli tanpa wajib membuat akun atau koneksi server.
-- **100% Offline-First PWA:** Seluruh produk, keranjang, transaksi, kas keluar, kulakan, shift kasir, dan piutang pelanggan disimpan lokal di IndexedDB (`Dexie.js` v5) lengkap dengan `navigator.storage.persist()` dan Service Worker Workbox (`vite-plugin-pwa`).
+- **100% Offline-First PWA:** Seluruh produk, keranjang, transaksi, kas keluar, kulakan, tarik tunai/transfer, shift kasir, dan piutang pelanggan disimpan lokal di IndexedDB (`Dexie.js` v6) lengkap dengan `navigator.storage.persist()` dan Service Worker Workbox (`vite-plugin-pwa`).
 - **Tata Letak Responsif Dual-Mode:**
   - **Mobile (`< 768px`):** Alur ergonomi terbalik (*Glance Zone* keranjang di atas + tombol cepat di tengah + *Floating Bottom Console* di jangkauan jempol bawah), bebas footer agar layar transaksi lega, penguncian soft-keyboard HP hingga input benar-benar disentuh, serta Drawer terseksi (*Keuangan & Kasir*, *Stok & Pelanggan*, *Sistem*).
-  - **Tablet & Desktop (`md+` / `lg+`):** *Bento POS Workstation* 2-kolom dengan TopBar kompak (`Chip Shift` | `Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Laporan`, `⚙️`), filter kategori pill, input pencarian inline berfokus otomatis, serta pintasan keyboard `/` (Cari) dan `F2` (Pembayaran).
+  - **Tablet & Desktop (`md+` / `lg+`):** *Bento POS Workstation* 2-kolom dengan TopBar kompak (`Chip Shift` | `Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Tarik & Tf`, `Laporan`, `⚙️`), filter kategori pill, input pencarian inline berfokus otomatis, serta pintasan keyboard `/` (Cari) dan `F2` (Pembayaran).
 - **300 Katalog Awal Warung Indonesia, Harga Cepat & Kebersihan Barang Pasif:** Saat pertama dibuka, Kasiry sudah menyediakan 300 nama barang populer warung (termuat malas agar booting ringan, harga `Rp 0`, akun `'Umum'` bersih `0` utang, profil default `Warung Kasiry`) lengkap dengan isi harga cepat per baris di `Kelola Barang`, auto-buka editor harga bila item `Rp 0` diklik di kasa, filter **Belum Harga / Belum Terjual / Sepi ≥30 Hr** + **Hapus Massal**, serta tombol **Mulai Toko Kosong** di Pengaturan.
 - **Hardware Barcode Scanner (HID) & Kamera Hybrid:** Mendukung scanner USB/Bluetooth OTG secara global sekaligus kamera depan/belakang browser menggunakan kombinasi `BarcodeDetector` native + `@zxing/library`, lengkap dengan zoom, lampu kilat (*torch*), dan panduan jarak fokus.
 - **Lazy Inventory + Kategori Dinamis:** Scan barcode barang yang belum terdaftar akan membuka modal input kilat — kini sekaligus bisa menambah kategori baru secara inline dan langsung memasukkan barang ke keranjang.
@@ -23,7 +23,8 @@
   - **Utang / Bon:** Cari atau daftarkan pelanggan baru secara cepat (akun `"Umum"` otomatis diblokir agar tidak mencatat piutang), catat cicilan atau pelunasan Tunai/QRIS dengan kembalian presisi, dan kirim pengingat tagihan via WhatsApp.
 - **Sistem Buka & Tutup Shift (Tutup Buku Harian):** 1 shift mewakili 1 hari operasional toko dengan jam buka/tutup fleksibel (termasuk lewat tengah malam), auto-isi modal awal terakhir, adopsi transaksi hari itu yang belum masuk shift, hitung uang fisik laci vs sistem (`Modal Awal + Tunai Masuk - Kas Keluar Laci`) beserta selisih kas, riwayat tutup shift, dan kirim laporan tutup buku ke WhatsApp.
 - **Catatan Kas Keluar / Pengeluaran Harian:** Catat pengeluaran operasional (`Operasional`, `Makan & Transport`, `Lainnya`), `Kulakan Stok`, maupun `Tarik / Setor Owner` (`prive` — mengurangi saldo laci tanpa membuat estimasi laba jualan terlihat rugi) dari laci tunai atau sumber non-tunai.
-- **Laporan Harian/Shift & Ekspor Excel 7-Sheet:** Ringkasan lingkup shift aktif atau hari ini (uang masuk laci & QRIS, kas keluar, sisa/seharusnya laci, perkiraan untung bersih, top 5 terlaris, riwayat harian & riwayat tutup shift), kirim ringkasan via WhatsApp, serta unduh file `.xlsx` 7 sheet (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`, `Riwayat Shift`, `Riwayat Kulakan`) dengan SheetJS dinamis.
+- **Layanan Tarik Tunai & Transfer / Top-Up (`CashServiceModal.vue`):** Mencatat layanan tarik tunai (QRIS/transfer masuk, uang fisik keluar dari laci) maupun transfer/top-up (tunai masuk laci, saldo dikirim) dengan perhitungan biaya admin **Cara A** (`Total Dibayar = Pokok + Admin`), penjagaan ketat agar tarik tunai tidak melebihi sisa tunai di laci, cetak struk bukti thermal/WA, serta rekonsiliasi otomatis ke Shift & Untung Jasa Admin.
+- **Laporan Harian/Shift & Ekspor Excel 8-Sheet:** Ringkasan lingkup shift aktif atau hari ini (uang masuk laci & QRIS, kas keluar, tarik tunai/transfer & laba admin, sisa/seharusnya laci, perkiraan untung bersih, top 5 terlaris, riwayat harian & riwayat tutup shift), kirim ringkasan via WhatsApp, serta unduh file `.xlsx` 8 sheet (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`, `Riwayat Shift`, `Riwayat Kulakan`, `Tarik Tunai & Transfer`) dengan SheetJS dinamis.
 - **Cetak Struk Thermal Universal (Bluetooth BLE, USB/OTG, Serial COM & Browser Iframe):** Terhubung langsung ESC/POS ke printer thermal `58mm` (32 kolom) maupun `80mm` (48 kolom) melalui **Web Bluetooth**, **WebUSB** (HP/Tablet Android OTG & PC WinUSB), atau **Web Serial COM** dengan reconnect otomatis, tab **Printer** di Pengaturan (*ukuran kertas*, *catatan bawah struk kustom*, *cetak otomatis setelah bayar*, & *Tes Cetak Printer*), serta fallback bersih via hidden `<iframe>` `@page` `58mm`/`80mm` ke printer Windows/OS biasa.
 - **Cloud Sync $0 (Google Drive & Sheets) + Arsip Tahunan:**
   - Login Google Identity Services (GIS) 1-klik, penulisan transaksi, pelunasan bon, kas keluar, nota kulakan, dan aktivitas buka/tutup shift realtime ke Google Sheets (dengan antrean otomatis saat offline), serta *two-way merge* cadangan Google Drive berbasis timestamp `updatedAt`.
@@ -35,7 +36,7 @@
 
 - **Frontend:** Vue 3.5 (`<script setup>`) + Vite 8 (Rolldown Code Splitting)
 - **Styling:** Tailwind CSS v4 (*Modern Ethereal Glassmorphism*, Midnight Navy `#0a193d` & Azure Sky `#0284c7`)
-- **Database Lokal:** Dexie 4 (IndexedDB schema v5 dengan migrasi otomatis)
+- **Database Lokal:** Dexie 4 (IndexedDB schema v6 dengan migrasi otomatis)
 - **Barcode & Ekspor:** `@zxing/library` (lazy chunk) + SheetJS `xlsx` (dynamic `import('xlsx')`) + `@lucide/vue`
 - **PWA:** `vite-plugin-pwa` + Workbox (`generateSW`, offline precache seluruh chunk aplikasi & aset statis)
 - **Automated Testing:** Vitest + `fake-indexeddb` + `@vue/test-utils` (`happy-dom`)
@@ -48,16 +49,16 @@
 kasiryy/
 ├── public/                 # Aset PWA, OG preview, robots/sitemap, privacy.html & terms.html (OAuth)
 ├── src/
-│   ├── components/         # 17 komponen aktif UI Kasa & 12 modal (lazy-loaded via defineAsyncComponent)
+│   ├── components/         # 18 komponen aktif UI Kasa & 13 modal (lazy-loaded via defineAsyncComponent)
 │   ├── composables/        # useKasiryDB.js, useGoogleSync.js, useHardwareScanner.js, useThermalPrinter.js
-│   ├── db/                 # KasiryDatabase schema v5 & 300 starter katalog warung (lazy seedData)
+│   ├── db/                 # KasiryDatabase schema v6 & 300 starter katalog warung (lazy seedData)
 │   ├── utils/              # customerStats.js, dailyStats.js, expenseConstants.js, pricing.js, productUsage.js, thermalPrinter.js, excelExport.js, sound.js
 │   ├── App.vue             # Orkestrator Kasa, prewarm jalur checkout, auto-print, & state global
 │   └── style.css           # Tailwind CSS v4, Bento container queries & content-visibility
-├── tests/                  # 10 suite test Vitest (42 skenario: DB, migrasi, pricing, printer BT/USB/Serial, usage, sync, stats, Excel, UI)
+├── tests/                  # 10 suite test Vitest (47 skenario: DB, migrasi v1->v6, pricing, printer BT/USB/Serial, tarik/transfer, usage, sync, stats, Excel, UI)
 ├── CHANGELOG.md            # Riwayat rilis SemVer (Keep a Changelog)
 ├── DESIGN_SYSTEM.md        # Panduan visual & token warna/komponen
-├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.15.2)
+├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.16.0)
 ├── SITEMAP.md              # Alur interaksi & arsitektur komponen
 └── vite.config.js          # Rolldown vendor splitting & PWA Workbox configuration
 ```

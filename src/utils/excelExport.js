@@ -23,6 +23,7 @@ export async function exportKasiryExcel({
   debtPayments = [],
   expenses = [],
   restocks = [],
+  cashServices = [],
   shifts = []
 }) {
   const XLSX = await import('xlsx')
@@ -45,7 +46,10 @@ export async function exportKasiryExcel({
   const qrisTotal = stats.todayQrisTotal ?? (qrisSales + debtPaidQris)
   const expensesCash = stats.todayExpensesCash ?? 0
   const expensesNonCash = stats.todayExpensesNonCash ?? 0
-  const netCashDrawer = stats.todayNetCashDrawer ?? (cashDrawerTotal - expensesCash)
+  const cashServiceIn = stats.todayCashServiceIn ?? 0
+  const cashServiceOut = stats.todayCashServiceOut ?? 0
+  const cashServiceAdminProfit = stats.todayCashServiceAdminProfit ?? 0
+  const netCashDrawer = stats.todayNetCashDrawer ?? (cashDrawerTotal - expensesCash + cashServiceIn - cashServiceOut)
 
   const summaryData = [
     ['LAPORAN KASIR & PENJUALAN'],
@@ -60,7 +64,10 @@ export async function exportKasiryExcel({
     ['Penjualan QRIS (Non-Tunai)', qrisSales],
     ['Pelunasan Utang - Tunai', debtPaidCash],
     ['Pelunasan Utang - QRIS', debtPaidQris],
-    ['Total Uang Tunai di Laci', cashDrawerTotal],
+    ['Transfer / Top-Up Masuk Laci (Pokok + Admin)', cashServiceIn],
+    ['Tarik Tunai Keluar Dari Laci (Pokok)', cashServiceOut],
+    ['Jasa Admin Tarik Tunai & Transfer', cashServiceAdminProfit],
+    ['Total Uang Tunai di Laci (Penjualan + Bon)', cashDrawerTotal],
     ['Total Penerimaan QRIS (Non-Tunai)', qrisTotal],
     ['Total Uang Masuk Kas (Keseluruhan)', cashDrawerTotal + qrisTotal],
     ['Pengeluaran Dari Laci (Tunai)', expensesCash],
@@ -397,6 +404,55 @@ export async function exportKasiryExcel({
     { wch: 28 }
   ]
   XLSX.utils.book_append_sheet(wb, wsRestock, 'Riwayat Kulakan')
+
+  // ==========================================
+  // SHEET 8: LAYANAN TARIK TUNAI & TRANSFER
+  // ==========================================
+  const cashServiceHeader = [
+    'No',
+    'No. Nota',
+    'Tanggal & Jam',
+    'Jenis Layanan',
+    'Channel / Bank / E-Wallet',
+    'Sumber Uang Fisik',
+    'Pelanggan',
+    'Nominal Pokok (Rp)',
+    'Biaya Admin (Rp)',
+    'Total Dibayar (Rp)',
+    'Kode Shift',
+    'Catatan'
+  ]
+  const activeServices = (cashServices || []).filter(s => s && !s.deleted)
+  const cashServiceRows = activeServices.map((s, idx) => [
+    idx + 1,
+    s.serviceNumber || `#${s.id || ''}`,
+    formatShiftDate(s.createdAt),
+    s.type === 'TRANSFER' ? 'Transfer / Top-Up (Laci Masuk)' : 'Tarik Tunai (Laci Keluar)',
+    s.channel || 'QRIS / Transfer',
+    s.cashSource === 'KAS' ? 'Uang Kas' : 'Laci Kasir',
+    s.customerName || 'Pelanggan Umum',
+    Number(s.amount || 0),
+    Number(s.adminFee || 0),
+    Number(s.totalPaid ?? (Number(s.amount || 0) + Number(s.adminFee || 0))),
+    s.shiftCode || '-',
+    s.note || '-'
+  ])
+  const wsCashService = XLSX.utils.aoa_to_sheet([cashServiceHeader, ...cashServiceRows])
+  wsCashService['!cols'] = [
+    { wch: 6 },
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 28 },
+    { wch: 22 },
+    { wch: 16 },
+    { wch: 20 },
+    { wch: 18 },
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 28 }
+  ]
+  XLSX.utils.book_append_sheet(wb, wsCashService, 'Tarik Tunai & Transfer')
 
   // Eksekusi download file .xlsx
   const fileDate = new Date().toISOString().slice(0, 10)

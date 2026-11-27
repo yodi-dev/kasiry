@@ -54,6 +54,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  cashServices: {
+    type: Array,
+    default: () => []
+  },
   storeName: {
     type: String,
     default: 'Warung Kasiry'
@@ -119,6 +123,7 @@ const closingPreview = computed(() => {
     transactions: props.transactions,
     debtPayments: props.debtPayments,
     expenses: props.expenses,
+    cashServices: props.cashServices,
     actualCash: hasActualCashEntered.value ? parsedActualCash.value : 0
   })
 })
@@ -335,14 +340,14 @@ const shareClosedShiftToWA = () => {
             <div class="min-w-0 p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/70">
               <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Tunai Masuk Laci</span>
               <p class="text-base sm:text-lg font-bold font-mono text-emerald-800 mt-0.5 break-words">
-                +Rp {{ closingPreview.todayCashDrawer.toLocaleString('id-ID') }}
+                +Rp {{ ((closingPreview.todayCashDrawer || 0) + (closingPreview.todayCashServiceIn || 0)).toLocaleString('id-ID') }}
               </p>
             </div>
 
             <div class="min-w-0 p-3 rounded-2xl bg-amber-50/75 border border-amber-200/75">
               <span class="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">Kas Keluar Laci</span>
               <p class="text-base sm:text-lg font-bold font-mono text-rose-700 mt-0.5 break-words">
-                -Rp {{ closingPreview.todayExpensesCash.toLocaleString('id-ID') }}
+                -Rp {{ ((closingPreview.todayExpensesCash || 0) + (closingPreview.todayCashServiceOut || 0)).toLocaleString('id-ID') }}
               </p>
             </div>
 
@@ -359,6 +364,10 @@ const shareClosedShiftToWA = () => {
             <span>QRIS: <strong class="font-mono text-[#0284c7]">Rp {{ closingPreview.todayQrisTotal.toLocaleString('id-ID') }}</strong></span>
             <span>•</span>
             <span>Bon Baru: <strong class="font-mono text-rose-700">Rp {{ closingPreview.todayNewDebt.toLocaleString('id-ID') }}</strong></span>
+            <template v-if="(closingPreview.todayCashServiceAdminProfit || 0) > 0">
+              <span>•</span>
+              <span>Admin Tarik/Tf: <strong class="font-mono text-[#0284c7]">+Rp {{ closingPreview.todayCashServiceAdminProfit.toLocaleString('id-ID') }}</strong></span>
+            </template>
             <span>•</span>
             <span>Untung: <strong class="font-mono text-emerald-700">Rp {{ closingPreview.todayProfit.toLocaleString('id-ID') }}</strong></span>
             <span>•</span>
@@ -461,11 +470,11 @@ const shareClosedShiftToWA = () => {
             </div>
             <div class="flex justify-between">
               <span class="text-slate-500">Tunai Masuk Laci:</span>
-              <span class="font-mono font-bold text-emerald-700">+Rp {{ (completedShift.summary?.todayCashDrawer || 0).toLocaleString('id-ID') }}</span>
+              <span class="font-mono font-bold text-emerald-700">+Rp {{ ((completedShift.summary?.todayCashDrawer || 0) + (completedShift.summary?.todayCashServiceIn || 0)).toLocaleString('id-ID') }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-slate-500">Kas Keluar Laci:</span>
-              <span class="font-mono font-bold text-rose-700">-Rp {{ (completedShift.summary?.todayExpensesCash || 0).toLocaleString('id-ID') }}</span>
+              <span class="font-mono font-bold text-rose-700">-Rp {{ ((completedShift.summary?.todayExpensesCash || 0) + (completedShift.summary?.todayCashServiceOut || 0)).toLocaleString('id-ID') }}</span>
             </div>
             <div class="flex justify-between pt-1.5 border-t border-slate-200">
               <span class="font-semibold text-slate-700">Seharusnya di Laci:</span>
