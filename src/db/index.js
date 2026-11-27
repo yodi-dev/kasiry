@@ -22,10 +22,16 @@ export class KasiryDatabase extends Dexie {
       transactionItems: null
     })
 
+    // Schema Version 3: Tabel expenses untuk pencatatan kas keluar / pengeluaran harian
+    this.version(3).stores({
+      expenses: '++id, expenseNumber, createdAt, category, source, updatedAt, deleted'
+    })
+
     this.products = this.table('products')
     this.transactions = this.table('transactions')
     this.customers = this.table('customers')
     this.debtPayments = this.table('debtPayments')
+    this.expenses = this.table('expenses')
     this.settings = this.table('settings')
   }
 }

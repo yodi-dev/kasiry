@@ -8,18 +8,20 @@
 ## Fitur Utama
 
 - **Nol Hambatan Login (*Zero Login Wall*):** Buka aplikasi web langsung siap melayani transaksi pembeli tanpa wajib membuat akun atau koneksi server.
-- **100% Offline-First PWA:** Seluruh produk, keranjang, transaksi, dan piutang pelanggan disimpan lokal di IndexedDB (`Dexie.js` v2) lengkap dengan `navigator.storage.persist()` dan Service Worker Workbox (`vite-plugin-pwa`).
+- **100% Offline-First PWA:** Seluruh produk, keranjang, transaksi, kas keluar, dan piutang pelanggan disimpan lokal di IndexedDB (`Dexie.js` v3) lengkap dengan `navigator.storage.persist()` dan Service Worker Workbox (`vite-plugin-pwa`).
 - **Tata Letak Responsif Dual-Mode:**
-  - **Mobile (`< 768px`):** Alur ergonomi terbalik (*Glance Zone* keranjang di atas + tombol cepat di tengah + *Floating Bottom Console* di jangkauan jempol bawah), bebas footer agar layar transaksi lega, serta penguncian soft-keyboard HP hingga input benar-benar disentuh.
-  - **Tablet & Desktop (`md+` / `lg+`):** *Bento POS Workstation* 2-kolom dengan filter kategori pill, input pencarian inline berfokus otomatis, serta pintasan keyboard `/` (Cari) dan `F2` (Pembayaran).
+  - **Mobile (`< 768px`):** Alur ergonomi terbalik (*Glance Zone* keranjang di atas + tombol cepat di tengah + *Floating Bottom Console* di jangkauan jempol bawah), bebas footer agar layar transaksi lega, penguncian soft-keyboard HP hingga input benar-benar disentuh, serta Drawer terseksi (*Keuangan & Kasir*, *Stok & Pelanggan*, *Sistem*).
+  - **Tablet & Desktop (`md+` / `lg+`):** *Bento POS Workstation* 2-kolom dengan TopBar kompak (`Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Laporan`, `⚙️`), filter kategori pill, input pencarian inline berfokus otomatis, serta pintasan keyboard `/` (Cari) dan `F2` (Pembayaran).
 - **Hardware Barcode Scanner (HID) & Kamera Hybrid:** Mendukung scanner USB/Bluetooth OTG secara global sekaligus kamera depan/belakang browser menggunakan kombinasi `BarcodeDetector` native + `@zxing/library`, lengkap dengan zoom, lampu kilat (*torch*), dan panduan jarak fokus.
 - **Lazy Inventory + Kategori Dinamis:** Scan barcode barang yang belum terdaftar akan membuka modal input kilat — kini sekaligus bisa menambah kategori baru secara inline dan langsung memasukkan barang ke keranjang.
-- **Pembayaran Cerdas & Manajemen Pelanggan:**
+- **Pembayaran Cerdas (Tunai, QRIS, & Utang) + Manajemen Pelanggan:**
   - **Tunai:** Pelanggan default **"Umum"**, nominal cepat & pembulatan ke atas otomatis, hitung kembalian real-time, serta daftar pelanggan diurutkan berdasarkan loyalitas ($O(N)$ `buildCustomerStatsMap`).
-  - **Utang / Bon:** Cari atau daftarkan pelanggan baru secara cepat (akun `"Umum"` otomatis diblokir agar tidak mencatat piutang), catat cicilan atau pelunasan pecahan besar dengan kembalian presisi, dan kirim pengingat tagihan via WhatsApp.
-- **Laporan Harian & Ekspor Excel Multi-Sheet:** Ringkasan uang masuk, perkiraan untung bersih, top 5 terlaris, riwayat transaksi harian, kirim ringkasan via WhatsApp, serta unduh file `.xlsx` multi-sheet (SheetJS dimuat dinamis agar bundle awal tetap ramping).
+  - **QRIS:** Pembayaran non-tunai uang pas otomatis (`QRS-...`) terpisah bersih dari uang tunai laci.
+  - **Utang / Bon:** Cari atau daftarkan pelanggan baru secara cepat (akun `"Umum"` otomatis diblokir agar tidak mencatat piutang), catat cicilan atau pelunasan Tunai/QRIS dengan kembalian presisi, dan kirim pengingat tagihan via WhatsApp.
+- **Catatan Kas Keluar / Pengeluaran Harian:** Catat pengeluaran operasional (`Operasional`, `Makan & Transport`, `Lainnya`) maupun `Tarik / Setor Owner` (`prive` — mengurangi saldo laci tanpa membuat estimasi laba jualan terlihat rugi) dari laci tunai atau sumber non-tunai.
+- **Laporan Harian & Ekspor Excel 5-Sheet:** Ringkasan uang masuk laci & QRIS, kas keluar, sisa fisik laci, perkiraan untung bersih, top 5 terlaris, riwayat harian, kirim ringkasan via WhatsApp, serta unduh file `.xlsx` 5 sheet (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`) dengan SheetJS dinamis.
 - **Cloud Sync $0 (Google Drive & Sheets) + Arsip Tahunan:**
-  - Login Google Identity Services (GIS) 1-klik, penulisan transaksi & pelunasan bon realtime ke Google Sheets (dengan antrean otomatis saat offline), dan *two-way merge* cadangan Google Drive berbasis timestamp `updatedAt`.
+  - Login Google Identity Services (GIS) 1-klik, penulisan transaksi, pelunasan bon, dan kas keluar realtime ke Google Sheets (dengan antrean otomatis saat offline), serta *two-way merge* cadangan Google Drive berbasis timestamp `updatedAt`.
   - **Skalabilitas Multi-Tahun:** Memori Kasa aktif menjaga jendela 90 hari di `shallowRef`, *batching* upload Drive otomatis saat transaksi besar, serta alat **Kesehatan & Arsip Data Tahunan** (`> 3 Bulan`, `> 6 Bulan`, `> 1 Tahun`) yang mengunduh arsip JSON (+ salinan ke Google Drive) sebelum meringankan memori HP tanpa menghapus barang maupun total saldo utang pelanggan.
 
 ---
@@ -28,10 +30,10 @@
 
 - **Frontend:** Vue 3.5 (`<script setup>`) + Vite 8 (Rolldown Code Splitting)
 - **Styling:** Tailwind CSS v4 (*Modern Ethereal Glassmorphism*, Midnight Navy `#0a193d` & Azure Sky `#0284c7`)
-- **Database Lokal:** Dexie 4 (IndexedDB schema v2 dengan migrasi otomatis)
+- **Database Lokal:** Dexie 4 (IndexedDB schema v3 dengan migrasi otomatis)
 - **Barcode & Ekspor:** `@zxing/library` (lazy chunk) + SheetJS `xlsx` (dynamic `import('xlsx')`) + `@lucide/vue`
 - **PWA:** `vite-plugin-pwa` + Workbox (`generateSW`, offline precache seluruh chunk aplikasi & aset statis)
-- **Automated Testing:** Vitest + `fake-indexeddb`
+- **Automated Testing:** Vitest + `fake-indexeddb` + `@vue/test-utils` (`happy-dom`)
 
 ---
 
@@ -41,16 +43,16 @@
 kasiryy/
 ├── public/                 # Aset PWA, OG preview, robots/sitemap, privacy.html & terms.html (OAuth)
 ├── src/
-│   ├── components/         # 14 komponen aktif UI Kasa & 9 modal (lazy-loaded via defineAsyncComponent)
+│   ├── components/         # 15 komponen aktif UI Kasa & 10 modal (lazy-loaded via defineAsyncComponent)
 │   ├── composables/        # useKasiryDB.js, useGoogleSync.js, useHardwareScanner.js
-│   ├── db/                 # KasiryDatabase schema v2 & 38 seed produk + 5 seed pelanggan awal
-│   ├── utils/              # customerStats.js O(N), excelExport.js (async SheetJS), sound.js
+│   ├── db/                 # KasiryDatabase schema v3 & seed produk/pelanggan awal
+│   ├── utils/              # customerStats.js, dailyStats.js, expenseConstants.js, excelExport.js, sound.js
 │   ├── App.vue             # Orkestrator Kasa, prewarm jalur checkout, & state global
 │   └── style.css           # Tailwind CSS v4, Bento container queries & content-visibility
-├── tests/                  # Suite test Vitest (DB, migrasi v1->v2, cloud sync, O(N) stats, Excel)
+├── tests/                  # 7 suite test Vitest (DB, migrasi v1->v3, cloud sync, dailyStats, Excel, UI)
 ├── CHANGELOG.md            # Riwayat rilis SemVer (Keep a Changelog)
 ├── DESIGN_SYSTEM.md        # Panduan visual & token warna/komponen
-├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.7)
+├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.9)
 ├── SITEMAP.md              # Alur interaksi & arsitektur komponen
 └── vite.config.js          # Rolldown vendor splitting & PWA Workbox configuration
 ```

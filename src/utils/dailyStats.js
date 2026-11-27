@@ -1,13 +1,27 @@
+import { getExpenseCategoryMeta } from './expenseConstants'
+
 /**
  * Hitung ringkasan kas harian kasir secara real-time dengan memisahkan arus kas fisik (Tunai Laci),
- * non-tunai (QRIS), dan piutang baru (Utang / Bon).
+ * non-tunai (QRIS), piutang baru (Utang / Bon), serta pengeluaran kas keluar harian.
+ *
+ * Tetap kompatibel dengan pemanggilan lama 3 argumen `(transactions, debtPayments, nowTs)`
+ * maupun pemanggilan baru `(transactions, debtPayments, expenses, nowTs)`.
  *
  * @param {Array} transactions
  * @param {Array} debtPayments
- * @param {number} [nowTs]
+ * @param {Array|number} [expensesOrNow]
+ * @param {number} [maybeNowTs]
  * @returns {Object}
  */
-export function computeDailyStats(transactions = [], debtPayments = [], nowTs = Date.now()) {
+export function computeDailyStats(
+  transactions = [],
+  debtPayments = [],
+  expensesOrNow = [],
+  maybeNowTs = Date.now()
+) {
+  const expenses = Array.isArray(expensesOrNow) ? expensesOrNow : []
+  const nowTs = typeof expensesOrNow === 'number' ? expensesOrNow : maybeNowTs
+
   const startOfDay = new Date(nowTs)
   startOfDay.setHours(0, 0, 0, 0)
   const todayTimestamp = startOfDay.getTime()
@@ -58,9 +72,41 @@ export function computeDailyStats(transactions = [], debtPayments = [], nowTs = 
     }
   })
 
+  let todayExpensesCash = 0
+  let todayExpensesNonCash = 0
+  let todayOperationalExpenses = 0
+  let todayPriveTotal = 0
+  let todayExpenseCount = 0
+
+  ;(expenses || []).forEach(exp => {
+    if (!exp || exp.deleted) return
+    if ((exp.createdAt || 0) < todayTimestamp) return
+    const amt = Number(exp.amount || 0)
+    if (!Number.isFinite(amt) || amt <= 0) return
+
+    todayExpenseCount += 1
+    if (exp.source === 'NON_TUNAI') {
+      todayExpensesNonCash += amt
+    } else {
+      todayExpensesCash += amt
+    }
+
+    const meta = getExpenseCategoryMeta(exp.category)
+    if (exp.category === 'prive') {
+      todayPriveTotal += amt
+    }
+    if (meta.affectsProfit) {
+      todayOperationalExpenses += amt
+    }
+  })
+
   const topProducts = Object.values(productCountMap)
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 5)
+
+  const todayCashDrawer = cashSales + todayDebtPaidCash
+  const todayQrisTotal = qrisSales + todayDebtPaidQris
+  const todayGrossProfit = Math.round(profit)
 
   return {
     todaySales: cashSales + qrisSales,
@@ -69,9 +115,18 @@ export function computeDailyStats(transactions = [], debtPayments = [], nowTs = 
     todayDebtPaid: todayDebtPaidCash + todayDebtPaidQris,
     todayDebtPaidCash,
     todayDebtPaidQris,
-    todayCashDrawer: cashSales + todayDebtPaidCash,
-    todayQrisTotal: qrisSales + todayDebtPaidQris,
-    todayProfit: Math.round(profit),
+    todayCashDrawer,
+    todayQrisTotal,
+    todayExpensesCash,
+    todayExpensesNonCash,
+    todayExpensesTotal: todayExpensesCash + todayExpensesNonCash,
+    todayOperationalExpenses,
+    todayPriveTotal,
+    todayExpenseCount,
+    todayNetCashDrawer: todayCashDrawer - todayExpensesCash,
+    todayNetQris: todayQrisTotal - todayExpensesNonCash,
+    todayGrossProfit,
+    todayProfit: todayGrossProfit - todayOperationalExpenses,
     transactionCount: todayTx.length,
     todayNewDebt: debt,
     topProducts

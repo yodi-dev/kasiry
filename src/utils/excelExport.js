@@ -1,3 +1,5 @@
+import { getExpenseCategoryMeta, getExpenseSourceMeta } from './expenseConstants'
+
 /**
  * Ekspor data warung ke file Microsoft Excel (.xlsx) rapi dengan multi-sheet
  * Memuat modul SheetJS secara dinamis agar tidak membebani waktu muat awal kasa,
@@ -9,13 +11,15 @@
  * @param {Array} options.transactions Daftar transaksi
  * @param {Array} options.customers Daftar pelanggan buku utang
  * @param {Array} options.debtPayments Riwayat pelunasan utang
+ * @param {Array} options.expenses Riwayat kas keluar / pengeluaran
  */
 export async function exportKasiryExcel({
   storeProfile = { name: 'Habiba Store', owner: 'Habiba', phone: '081234567890' },
   stats = {},
   transactions = [],
   customers = [],
-  debtPayments = []
+  debtPayments = [],
+  expenses = []
 }) {
   const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
@@ -35,6 +39,9 @@ export async function exportKasiryExcel({
   const debtPaidQris = stats.todayDebtPaidQris ?? 0
   const cashDrawerTotal = stats.todayCashDrawer ?? (cashSales + debtPaidCash)
   const qrisTotal = stats.todayQrisTotal ?? (qrisSales + debtPaidQris)
+  const expensesCash = stats.todayExpensesCash ?? 0
+  const expensesNonCash = stats.todayExpensesNonCash ?? 0
+  const netCashDrawer = stats.todayNetCashDrawer ?? (cashDrawerTotal - expensesCash)
 
   const summaryData = [
     ['LAPORAN KASIR & PENJUALAN'],
@@ -52,6 +59,11 @@ export async function exportKasiryExcel({
     ['Total Uang Tunai di Laci', cashDrawerTotal],
     ['Total Penerimaan QRIS (Non-Tunai)', qrisTotal],
     ['Total Uang Masuk Kas (Keseluruhan)', cashDrawerTotal + qrisTotal],
+    ['Pengeluaran Dari Laci (Tunai)', expensesCash],
+    ['Pengeluaran Non-Tunai', expensesNonCash],
+    ['Biaya Operasional Hari Ini', stats.todayOperationalExpenses || 0],
+    ['Tarik / Setor Owner Hari Ini', stats.todayPriveTotal || 0],
+    ['Sisa Tunai Fisik di Laci (Bersih)', netCashDrawer],
     ['Estimasi Untung Bersih', stats.todayProfit || 0],
     ['Bon / Utang Baru Tercatat', stats.todayNewDebt || 0],
     ['Total Transaksi / Struk', `${stats.transactionCount || 0} Kali`],
@@ -205,6 +217,56 @@ export async function exportKasiryExcel({
     { wch: 16 }
   ]
   XLSX.utils.book_append_sheet(wb, wsDebt, 'Buku Utang Pelanggan')
+
+  // ==========================================
+  // SHEET 5: PENGELUARAN KAS
+  // ==========================================
+  const expenseHeader = [
+    'No',
+    'Waktu',
+    'No. Catatan',
+    'Kategori',
+    'Sumber Uang',
+    'Status Biaya',
+    'Nominal (Rp)',
+    'Keterangan'
+  ]
+  const activeExpenses = (expenses || []).filter(e => e && !e.deleted)
+  const expenseRows = activeExpenses.map((e, idx) => {
+    const meta = getExpenseCategoryMeta(e.category)
+    const src = getExpenseSourceMeta(e.source)
+    const expDate = e.createdAt
+      ? new Date(e.createdAt).toLocaleString('id-ID', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : '-'
+    return [
+      idx + 1,
+      expDate,
+      e.expenseNumber || '-',
+      meta.label,
+      src.label,
+      meta.affectsProfit ? 'Biaya Operasional' : 'Non-Biaya (Tarik Owner/Stok)',
+      e.amount || 0,
+      e.note || '-'
+    ]
+  })
+  const wsExpense = XLSX.utils.aoa_to_sheet([expenseHeader, ...expenseRows])
+  wsExpense['!cols'] = [
+    { wch: 6 },
+    { wch: 18 },
+    { wch: 15 },
+    { wch: 20 },
+    { wch: 22 },
+    { wch: 26 },
+    { wch: 16 },
+    { wch: 36 }
+  ]
+  XLSX.utils.book_append_sheet(wb, wsExpense, 'Pengeluaran Kas')
 
   // Eksekusi download file .xlsx
   const fileDate = new Date().toISOString().slice(0, 10)

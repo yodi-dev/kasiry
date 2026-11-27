@@ -286,6 +286,7 @@ const onFileSelected = (event) => {
       const activeProds = Array.isArray(d.products) ? d.products.filter(p => !p.deleted) : []
       const activeCusts = Array.isArray(d.customers) ? d.customers.filter(c => !c.deleted) : []
       const txList = Array.isArray(d.transactions) ? d.transactions : []
+      const activeExpenses = Array.isArray(d.expenses) ? d.expenses.filter(e => !e.deleted) : []
 
       pendingImportPreview.value = {
         fileName: file.name,
@@ -302,6 +303,7 @@ const onFileSelected = (event) => {
         productCount: activeProds.length,
         customerCount: activeCusts.length,
         transactionCount: txList.length,
+        expenseCount: activeExpenses.length,
         content
       }
     } catch (err) {
@@ -745,7 +747,7 @@ const cancelImport = () => {
                 <div class="flex justify-between">
                   <span class="text-slate-500">Isi Data:</span>
                   <span class="font-bold text-[#0284c7]">
-                    {{ pendingImportPreview.productCount }} barang • {{ pendingImportPreview.customerCount }} pelanggan • {{ pendingImportPreview.transactionCount }} struk
+                    {{ pendingImportPreview.productCount }} barang • {{ pendingImportPreview.customerCount }} pelanggan • {{ pendingImportPreview.transactionCount }} struk<template v-if="pendingImportPreview.expenseCount > 0"> • {{ pendingImportPreview.expenseCount }} kas keluar</template>
                   </span>
                 </div>
               </div>

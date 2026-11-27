@@ -39,7 +39,7 @@ Memisahkan kolom struk checkout dan panel katalog + pencarian inline secara berd
 
 ```text
 +-------------------------------------------------------------------------------------------+
-| TOP BAR: Command Dock (Nama Toko, Menu Cepat Buku Utang / Laporan / Barang / Pelanggan)   |
+| TOP BAR: Command Dock (`Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Laporan`, `⚙️ Setelan`)   |
 +-----------------------------------+-------------------------------------------------------+
 | KOLOM KIRI (5/12 md, 4/12 lg)     | KOLOM KANAN (7/12 md, 8/12 lg)                        |
 | CartSection.vue                   | FrequentProductsSection.vue                           |
@@ -88,7 +88,7 @@ stateDiagram-v2
 
 ```text
 App.vue (Orchestrator Kasa, Prewarm Checkout Chunks & Cloud Sync)
-├── TopBar.vue (Header toko, badge jumlah piutang & transaksi hari ini, indikator Google, Slide-Over Drawer)
+├── TopBar.vue (Desktop: `Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Laporan`, `⚙️`; HP: Drawer 3 seksi)
 │
 ├── Workspace Kasa Utama (Eager Load — Tampil Instan di Frame Pertama):
 │   ├── CartSection.vue (Struk belanjaan, stepper qty, subtotal, kosongkan & tombol bayar desktop)
@@ -96,15 +96,16 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks & Cloud Sync)
 │   ├── BarcodeInputBar.vue (Floating di mobile dengan touch keyboard lock; Inline autofocus di desktop)
 │   └── StickyBottomBar.vue (Bar total & tombol Pembayaran khusus mobile saat cart > 0)
 │
-└── 9 Modal Dialog (Lazy Loaded via defineAsyncComponent + watcher { immediate: true }):
-    ├── PaymentModal.vue (Prewarmed: Tunai cerdas vs Utang/Bon + dropdown loyalitas O(N))
+└── 10 Modal Dialog (Lazy Loaded via defineAsyncComponent + watcher { immediate: true }):
+    ├── PaymentModal.vue (Prewarmed: Tunai, QRIS uang pas, & Utang/Bon + dropdown loyalitas O(N))
     ├── LazyInventoryModal.vue (Prewarmed: Input kilat barcode baru + tambah kategori inline)
-    ├── ReceiptModal.vue (Prewarmed: Pratinjau struk thermal 58mm/80mm + Cetak + Kirim WA)
+    ├── ReceiptModal.vue (Prewarmed: Pratinjau struk thermal 58mm + Cetak terisolasi + Kirim WA)
     ├── CameraScannerModal.vue (Lazy + vendor-zxing: Hybrid BarcodeDetector & ZXing + Switch Kamera/Flash/Zoom)
     ├── ProductManagementModal.vue (Kelola Barang CRUD + Manajemen Kategori Dinamis)
     ├── CustomerManagementModal.vue (Daftar Pelanggan loyalitas O(N), Profil & Riwayat penuh per ID via Dexie)
-    ├── DebtBookModal.vue (Buku Utang Digital, Cicilan/Pelunasan presisi kembalian, Pengingat WA, Riwayat Bon)
-    ├── DailyReportModal.vue (Ringkasan Kas, Top 5, Riwayat Harian, WA Report & Excel dinamis via vendor-xlsx)
+    ├── DebtBookModal.vue (Buku Utang Digital, Pelunasan Tunai/QRIS presisi kembalian, Pengingat WA, Riwayat Bon)
+    ├── ExpenseModal.vue (Catatan Kas Keluar: Kategori cepat, Dari Laci vs Non-Tunai, KPI sisa laci & hapus 2-tap)
+    ├── DailyReportModal.vue (Ringkasan Kas, Kas Keluar, Top 5, Riwayat Harian, WA Report & Excel 5-sheet via vendor-xlsx)
     └── SettingsModal.vue (Profil Toko + Versi App, Google Drive/Sheets Sync, Backup JSON + Preview, Arsip Tahunan)
 ```
 

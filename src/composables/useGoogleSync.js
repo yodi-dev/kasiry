@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { getExpenseCategoryMeta } from '../utils/expenseConstants'
 
 const DEFAULT_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
@@ -519,6 +520,23 @@ export function useGoogleSync() {
     }, storeName)
   }
 
+  // Catat Pengeluaran / Kas Keluar Harian ke Google Sheets melalui pipeline antrean yang sama
+  const appendExpenseToSheet = async ({ expenseNumber, createdAt = Date.now(), category = 'operasional', source = 'TUNAI_LACI', amount = 0, note = '' } = {}, storeName = 'Toko') => {
+    const meta = getExpenseCategoryMeta(category)
+    const isNonCash = source === 'NON_TUNAI'
+    const numericAmount = Math.abs(Number(amount || 0))
+    return appendTransactionToSheet({
+      invoiceNumber: expenseNumber || `KLR-${String(createdAt).slice(-6)}`,
+      createdAt,
+      paymentMethod: isNonCash ? 'KAS KELUAR (NON-TUNAI)' : 'KAS KELUAR (TUNAI)',
+      customerName: meta.label,
+      totalAmount: -numericAmount,
+      cashGiven: 0,
+      changeAmount: 0,
+      itemsText: note ? `${meta.label}: ${note}` : meta.label
+    }, storeName)
+  }
+
   // ==============================================================
   // ENGINE TWO-WAY SYNC MULTI-DEVICE (Berdasarkan Timestamp updatedAt)
   // ==============================================================
@@ -636,6 +654,24 @@ export function useGoogleSync() {
       })
       const mergedDebtPayments = Array.from(payMap.values())
 
+      // 6. Merge Pengeluaran / Kas Keluar (berdasarkan expenseNumber atau id, LWW per updatedAt & hormati cutoff arsip)
+      const expMap = new Map()
+      ;(lData.expenses || []).forEach(exp => {
+        if (archiveCutoff > 0 && toTimestamp(exp.createdAt) < archiveCutoff) return
+        const key = exp.expenseNumber || exp.id
+        expMap.set(key, exp)
+      })
+      ;(rData.expenses || []).forEach(re => {
+        if (archiveCutoff > 0 && toTimestamp(re.createdAt) < archiveCutoff) return
+        const key = re.expenseNumber || re.id
+        const le = expMap.get(key)
+        if (!le || (re.updatedAt || 0) > (le.updatedAt || 0)) {
+          expMap.set(key, re)
+        }
+      })
+      const mergedExpenses = Array.from(expMap.values())
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+
       const mergedPayload = {
         app: 'Kasiry POS',
         version: '2.4',
@@ -646,6 +682,7 @@ export function useGoogleSync() {
           customers: mergedCustomers,
           transactions: mergedTransactions,
           debtPayments: mergedDebtPayments,
+          expenses: mergedExpenses,
           settings: mergedSettings
         }
       }
@@ -755,6 +792,7 @@ export function useGoogleSync() {
     flushPendingSheetQueue,
     appendTransactionToSheet,
     appendDebtPaymentToSheet,
+    appendExpenseToSheet,
     ensureSpreadsheet
   }
 }

@@ -81,6 +81,7 @@ const ReceiptModal = lazyModal(loadReceiptModal)
 // Fitur sekunder & berat (@zxing camera scanner, admin CRUD, backup, laporan) hanya diunduh saat dibuka
 const DebtBookModal = lazyModal(() => import('./components/DebtBookModal.vue'))
 const DailyReportModal = lazyModal(() => import('./components/DailyReportModal.vue'))
+const ExpenseModal = lazyModal(() => import('./components/ExpenseModal.vue'))
 const SettingsModal = lazyModal(() => import('./components/SettingsModal.vue'))
 const CameraScannerModal = lazyModal(() => import('./components/CameraScannerModal.vue'))
 const ProductManagementModal = lazyModal(() => import('./components/ProductManagementModal.vue'))
@@ -101,6 +102,7 @@ const {
   customers,
   transactions,
   debtPayments,
+  expenses,
   totalTransactionCount,
   olderTransactionCount,
   storeProfile,
@@ -114,6 +116,8 @@ const {
   saveCustomer,
   deleteCustomer,
   recordDebtPayment,
+  recordExpense,
+  deleteExpense,
   recordTransaction,
   saveStoreProfile,
   getFullDatabasePayload,
@@ -147,6 +151,7 @@ const {
   flushPendingSheetQueue,
   appendTransactionToSheet,
   appendDebtPaymentToSheet,
+  appendExpenseToSheet,
   ensureSpreadsheet
 } = useGoogleSync()
 
@@ -187,6 +192,7 @@ const isPaymentOpen = ref(false)
 const isLazyInventoryOpen = ref(false)
 const isDebtBookOpen = ref(false)
 const isDailyReportOpen = ref(false)
+const isExpenseOpen = ref(false)
 const isSettingsOpen = ref(false)
 const isReceiptOpen = ref(false)
 const isCameraOpen = ref(false)
@@ -202,6 +208,7 @@ const isAnyModalOpen = computed(() => {
     isCustomerManageOpen.value ||
     isDebtBookOpen.value ||
     isDailyReportOpen.value ||
+    isExpenseOpen.value ||
     isSettingsOpen.value ||
     isCameraOpen.value ||
     isLazyInventoryOpen.value ||
@@ -216,8 +223,8 @@ const unpaidDebtCount = computed(() => {
   ).length
 })
 
-// Computed Laporan Kasir Real-time dari Transaksi Hari Ini (Tunai Laci vs QRIS Non-Tunai vs Bon)
-const stats = computed(() => computeDailyStats(transactions.value, debtPayments.value))
+// Computed Laporan Kasir Real-time dari Transaksi, Pelunasan, & Pengeluaran Hari Ini
+const stats = computed(() => computeDailyStats(transactions.value, debtPayments.value, expenses.value))
 
 // Computed Filtered Products for Search
 const searchResults = computed(() => {
@@ -454,6 +461,23 @@ const handleRecordDebtPayment = async ({ customerId, amount, paymentMethod = 'TU
   }
 }
 
+// Record & Hapus Pengeluaran / Kas Keluar (IndexedDB + Google Sheets & Auto-Backup)
+const handleRecordExpense = async (payload) => {
+  const saved = await recordExpense(payload)
+  if (saved) {
+    playBeepSound('success')
+    appendExpenseToSheet(saved, storeProfile.value?.name)
+    triggerCloudAutoBackup(true)
+  }
+}
+
+const handleDeleteExpense = async (expenseId) => {
+  const ok = await deleteExpense(expenseId)
+  if (ok) {
+    triggerCloudAutoBackup(true)
+  }
+}
+
 // Handler Scan Barcode (Hardware Scanner maupun Kamera)
 const handleBarcodeScan = (code) => {
   isCameraOpen.value = false
@@ -576,13 +600,18 @@ const handleDownloadExcel = async () => {
   if (isExportingExcel.value) return
   isExportingExcel.value = true
   try {
-    const { transactions: allTransactions, debtPayments: allDebtPayments } = await getAllTransactionsForExport()
+    const {
+      transactions: allTransactions,
+      debtPayments: allDebtPayments,
+      expenses: allExpenses
+    } = await getAllTransactionsForExport()
     await exportKasiryExcel({
       storeProfile: storeProfile.value,
       stats: stats.value,
       transactions: allTransactions,
       customers: customers.value,
-      debtPayments: allDebtPayments
+      debtPayments: allDebtPayments,
+      expenses: allExpenses
     })
     playBeepSound('success')
   } catch (err) {
@@ -680,6 +709,7 @@ const modalFlagKeys = [
   'customerManage',
   'debtBook',
   'dailyReport',
+  'expense',
   'settings',
   'camera',
   'lazyInventory',
@@ -691,6 +721,7 @@ const activatedModals = reactive({
   customerManage: false,
   debtBook: false,
   dailyReport: false,
+  expense: false,
   settings: false,
   camera: false,
   lazyInventory: false,
@@ -704,6 +735,7 @@ watch(
     isCustomerManageOpen,
     isDebtBookOpen,
     isDailyReportOpen,
+    isExpenseOpen,
     isSettingsOpen,
     isCameraOpen,
     isLazyInventoryOpen,
@@ -792,10 +824,12 @@ onUnmounted(() => {
       :isOnline="isOnline"
       :totalDebtCount="unpaidDebtCount"
       :todayTxCount="stats.transactionCount"
+      :todayExpenseCount="stats.todayExpenseCount"
       :isGoogleConnected="isGoogleConnected"
       :googleUser="googleUser"
       @openDebtBook="isDebtBookOpen = true"
       @openDailyReport="isDailyReportOpen = true"
+      @openExpense="isExpenseOpen = true"
       @openSettings="isSettingsOpen = true"
       @openCamera="isCameraOpen = true"
       @openProductManage="isProductManageOpen = true"
@@ -955,10 +989,24 @@ onUnmounted(() => {
       :isOpen="isDailyReportOpen"
       :stats="stats"
       :transactions="transactions"
+      :expenses="expenses"
       :storeName="storeProfile.name"
       :isExporting="isExportingExcel"
       @close="isDailyReportOpen = false"
       @downloadExcel="handleDownloadExcel"
+      @openExpense="isDailyReportOpen = false; isExpenseOpen = true"
+      @deleteExpense="handleDeleteExpense"
+    />
+
+    <!-- Modal Catatan Kas Keluar / Pengeluaran Harian -->
+    <ExpenseModal
+      v-if="activatedModals.expense || isExpenseOpen"
+      :isOpen="isExpenseOpen"
+      :expenses="expenses"
+      :stats="stats"
+      @close="isExpenseOpen = false"
+      @recordExpense="handleRecordExpense"
+      @deleteExpense="handleDeleteExpense"
     />
 
     <!-- Modal Pengaturan & Integrasi Google -->

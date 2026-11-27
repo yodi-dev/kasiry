@@ -20,7 +20,7 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
-  it('lazily imports xlsx and creates valid 4-sheet workbook including historical transactions, QRIS summary, and debts', async () => {
+  it('lazily imports xlsx and creates valid 5-sheet workbook including QRIS, expenses, and debts', async () => {
     const fileName = await exportKasiryExcel({
       storeProfile: { name: 'Habiba Store', owner: 'Habiba', phone: '081234567890' },
       stats: {
@@ -32,7 +32,12 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
         todayDebtPaidQris: 0,
         todayCashDrawer: 32000,
         todayQrisTotal: 30000,
-        todayProfit: 9000,
+        todayExpensesCash: 7000,
+        todayExpensesNonCash: 0,
+        todayOperationalExpenses: 7000,
+        todayPriveTotal: 0,
+        todayNetCashDrawer: 25000,
+        todayProfit: 2000,
         todayNewDebt: 15000,
         transactionCount: 3
       },
@@ -70,7 +75,19 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
         { id: 1, name: 'Umum', phone: '', totalDebt: 0 },
         { id: 2, name: 'Bu Tejo', phone: '081234567891', totalDebt: 15000, lastDate: 'Hari ini' }
       ],
-      debtPayments: []
+      debtPayments: [],
+      expenses: [
+        {
+          id: 1,
+          expenseNumber: 'KLR-101',
+          createdAt: Date.now(),
+          category: 'operasional',
+          source: 'TUNAI_LACI',
+          amount: 7000,
+          note: 'Beli kresek',
+          deleted: false
+        }
+      ]
     })
 
     expect(fileName).toMatch(/^Laporan_Habiba_Store_\d{4}-\d{2}-\d{2}\.xlsx$/)
@@ -82,7 +99,8 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
       'Ringkasan Kas',
       'Daftar Transaksi',
       'Barang Terjual',
-      'Buku Utang Pelanggan'
+      'Buku Utang Pelanggan',
+      'Pengeluaran Kas'
     ])
 
     const summaryRows = XLSX.utils.sheet_to_json(workbook.Sheets['Ringkasan Kas'], { header: 1 })
@@ -90,6 +108,8 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(summaryMap['Total Uang Tunai di Laci']).toBe(32000)
     expect(summaryMap['Total Penerimaan QRIS (Non-Tunai)']).toBe(30000)
     expect(summaryMap['Total Uang Masuk Kas (Keseluruhan)']).toBe(62000)
+    expect(summaryMap['Pengeluaran Dari Laci (Tunai)']).toBe(7000)
+    expect(summaryMap['Sisa Tunai Fisik di Laci (Bersih)']).toBe(25000)
 
     const txRows = XLSX.utils.sheet_to_json(workbook.Sheets['Daftar Transaksi'])
     expect(txRows).toHaveLength(3)
@@ -101,5 +121,11 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(debtRows).toHaveLength(1)
     expect(debtRows[0]['Nama Pelanggan']).toBe('Bu Tejo')
     expect(debtRows[0]['Sisa Bon / Utang (Rp)']).toBe(15000)
+
+    const expRows = XLSX.utils.sheet_to_json(workbook.Sheets['Pengeluaran Kas'])
+    expect(expRows).toHaveLength(1)
+    expect(expRows[0]['No. Catatan']).toBe('KLR-101')
+    expect(expRows[0]['Nominal (Rp)']).toBe(7000)
+    expect(expRows[0]['Keterangan']).toBe('Beli kresek')
   })
 })

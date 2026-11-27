@@ -6,6 +6,25 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.9.0] - 2026-11-27 (Roadmap #2: Pengeluaran Harian & Reorganisasi Menu Kompak)
+
+### Added
+- **Catatan Kas Keluar / Pengeluaran Per Hari (`src/components/ExpenseModal.vue` & `src/utils/expenseConstants.js`):**
+  - 4 kategori cepat (`Operasional`, `Makan & Transport`, `Tarik / Setor Owner`, `Lainnya` — siap menampung `Kulakan Stok` pada tahap berikutnya), 2 pilihan sumber uang (`Tunai (Dari Laci)` vs `Non-Tunai (QRIS / Rek)`), tombol nominal cepat (`5rb`–`100rb`), keterangan opsional, KPI real-time **Sisa Tunai Laci**, serta daftar keluar hari ini dengan konfirmasi hapus 2-tap aman.
+  - Aturan akuntansi terpisah: pengeluaran **Tunai Laci** memotong **Sisa Tunai Laci**, biaya operasional mengurangi **Untung Bersih (Laba)**, sementara kategori **`prive` (Tarik / Setor Owner)** mengurangi saldo laci tanpa membuat estimasi untung jualan terlihat rugi.
+- **Migrasi Skema IndexedDB v3 (`src/db/index.js`):** Penambahan tabel `expenses` (`++id, expenseNumber, createdAt, category, source, updatedAt, deleted`) dengan dukungan penuh `recordExpense`, `deleteExpense`, `getFullDatabasePayload`, `importBackupJSON` (LWW + soft-delete), `inspectBackupJSON`, dan `archiveOldTransactions`.
+- **Integrasi Laporan, Excel 5 Sheet & Google Sync:**
+  - `DailyReportModal.vue` kini menampilkan strip **Kas Keluar Hari Ini** + tombol cepat **+ Catat Keluar**, rincian **Sisa Laci** vs **Untung Bersih**, tab baru **Kas Keluar**, serta ringkasan pengeluaran otomatis pada pesan laporan **WhatsApp**.
+  - `src/utils/excelExport.js` menambahkan rincian pengeluaran & sisa bersih laci pada sheet **Ringkasan Kas** serta sheet ke-5 **`Pengeluaran Kas`**.
+  - `src/composables/useGoogleSync.js` menambahkan `appendExpenseToSheet` (`KAS KELUAR (TUNAI)` / `KAS KELUAR (NON-TUNAI)` bernominal negatif ke Google Sheets dengan antrean offline) serta *two-way merge* `expenses` ke Google Drive.
+
+### Changed
+- **Reorganisasi Navigasi Kompak (`src/components/TopBar.vue`):**
+  - **Tablet & Desktop (`md+`/`lg+`):** Dirampingkan menjadi **`Stok & Data ▾`** (dropdown *Kelola Barang* & *Data Pelanggan*, siap untuk *Kulakan Stok*), **`Buku Utang`**, **`Kas Keluar`** (1-klik), **`Laporan`**, dan tombol ikon **`Pengaturan`** agar lega di layar tablet maupun desktop.
+  - **Drawer HP (`md:hidden`):** Tetap 1-tap per menu yang dikelompokkan rapi ke dalam seksi **Keuangan & Kasir**, **Stok & Pelanggan**, dan **Sistem**.
+
+---
+
 ## [2.8.3] - 2026-11-26 (Hotfix Tampilan Kartu QRIS & KPI Strip PaymentModal)
 
 ### Fixed

@@ -240,4 +240,62 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     await kasiry.importBackupJSON(archiveRes.archivePayload, 'merge', { honorArchiveCutoff: false })
     expect(kasiry.totalTransactionCount.value).toBe(2)
   })
+
+  it('records, soft-deletes, exports, merges, and archives expenses seamlessly', async () => {
+    const exp1 = await kasiry.recordExpense({
+      amount: 19000,
+      category: 'operasional',
+      source: 'TUNAI_LACI',
+      note: 'Isi galon & kresek'
+    })
+    const exp2 = await kasiry.recordExpense({
+      amount: 50000,
+      category: 'prive',
+      source: 'NON_TUNAI',
+      note: 'Setor owner'
+    })
+
+    expect(exp1.expenseNumber).toMatch(/^KLR-/)
+    expect(kasiry.expenses.value).toHaveLength(2)
+    expect(kasiry.totalExpenseCount.value).toBe(2)
+
+    // Input <= 0 atau tidak valid ditolak
+    expect(await kasiry.recordExpense({ amount: 0 })).toBeUndefined()
+    expect(await kasiry.recordExpense({ amount: -1000 })).toBeUndefined()
+
+    // Soft-delete pengeluaran kedua
+    const deleted = await kasiry.deleteExpense(exp2.id)
+    expect(deleted).toBe(true)
+    expect(kasiry.expenses.value).toHaveLength(1)
+    expect(kasiry.totalExpenseCount.value).toBe(1)
+
+    // Backup payload memuat daftar expenses & inspectBackupJSON mendeteksi jumlah aktif
+    const payload = await kasiry.getFullDatabasePayload()
+    expect(payload.data.expenses).toHaveLength(2)
+    const inspected = kasiry.inspectBackupJSON(payload)
+    expect(inspected.expenseCount).toBe(1)
+
+    // Merge remote delete dengan updatedAt lebih baru tetap dihormati
+    await kasiry.importBackupJSON({
+      data: {
+        expenses: [{ ...exp1, deleted: true, updatedAt: exp1.updatedAt + 5000 }]
+      }
+    }, 'merge')
+    expect(kasiry.expenses.value).toHaveLength(0)
+
+    // Arsip pengeluaran lama > 180 hari bersih tanpa mengganggu data barang
+    const oldTs = Date.now() - 200 * 24 * 60 * 60 * 1000
+    await kasiry.recordExpense({
+      amount: 12000,
+      category: 'transport',
+      source: 'TUNAI_LACI',
+      note: 'Bensin lama',
+      createdAt: oldTs
+    })
+    const archiveSummary = await kasiry.getArchivableSummary(180)
+    expect(archiveSummary.expenseCount).toBe(1)
+    const archiveRes = await kasiry.archiveOldTransactions(180)
+    expect(archiveRes.archivedExpenseCount).toBe(1)
+    expect(kasiry.totalExpenseCount.value).toBe(0)
+  })
 })

@@ -6,6 +6,8 @@ import PaymentModal from '../src/components/PaymentModal.vue'
 import DebtBookModal from '../src/components/DebtBookModal.vue'
 import ReceiptModal from '../src/components/ReceiptModal.vue'
 import DailyReportModal from '../src/components/DailyReportModal.vue'
+import ExpenseModal from '../src/components/ExpenseModal.vue'
+import TopBar from '../src/components/TopBar.vue'
 import CustomerManagementModal from '../src/components/CustomerManagementModal.vue'
 import LazyInventoryModal from '../src/components/LazyInventoryModal.vue'
 import ProductManagementModal from '../src/components/ProductManagementModal.vue'
@@ -258,5 +260,121 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     })
     expect(custModal.text()).toContain('Bu Tejo')
     expect(custModal.text()).toContain('2x belanja')
+  })
+
+  it('handles TopBar compact dropdown/actions and ExpenseModal / DailyReport expense flows cleanly', async () => {
+    const topBar = mount(TopBar, {
+      props: {
+        storeName: 'Habiba Store',
+        totalDebtCount: 2,
+        todayTxCount: 5,
+        todayExpenseCount: 1
+      }
+    })
+
+    // Dropdown Stok & Data pada desktop/tablet membuka pilihan Barang & Pelanggan
+    const stokDropdownBtn = topBar.find('button[title="Kelola Barang & Data Pelanggan"]')
+    await stokDropdownBtn.trigger('click')
+    await nextTick()
+    expect(topBar.text()).toContain('Kelola Barang')
+    expect(topBar.text()).toContain('Data Pelanggan')
+
+    const manageBarangBtn = topBar.findAll('button[role="menuitem"]').find(b => b.text().includes('Kelola Barang'))
+    await manageBarangBtn.trigger('click')
+    expect(topBar.emitted('openProductManage')).toHaveLength(1)
+
+    // Tombol Kas Keluar 1-klik tetap berada di bar utama TopBar
+    const kasKeluarBtn = topBar.find('button[title="Kas Keluar"]')
+    await kasKeluarBtn.trigger('click')
+    expect(topBar.emitted('openExpense')).toHaveLength(1)
+
+    // Mobile drawer menampilkan grup rapi tanpa dropdown
+    await topBar.find('button[aria-label="Buka Menu"]').trigger('click')
+    await nextTick()
+    expect(topBar.text()).toContain('Keuangan & Kasir')
+    expect(topBar.text()).toContain('Stok & Pelanggan')
+
+    // ExpenseModal: submit kas keluar baru + tampilkan daftar + konfirmasi hapus 2-tap
+    const sampleExpenses = [
+      {
+        id: 501,
+        expenseNumber: 'KLR-101',
+        createdAt: Date.now(),
+        category: 'operasional',
+        source: 'TUNAI_LACI',
+        amount: 19000,
+        note: 'Beli galon',
+        deleted: false
+      }
+    ]
+    const expenseModal = mount(ExpenseModal, {
+      props: {
+        isOpen: true,
+        expenses: sampleExpenses,
+        stats: {
+          todayCashDrawer: 100000,
+          todayNetCashDrawer: 81000,
+          todayExpensesCash: 19000,
+          todayExpensesNonCash: 0,
+          todayExpensesTotal: 19000
+        }
+      }
+    })
+    expect(expenseModal.text()).toContain('Sisa Tunai Laci')
+    expect(expenseModal.text()).toContain('Rp 81.000')
+    expect(expenseModal.text()).toContain('KLR-101')
+
+    await expenseModal.findAll('button').find(b => b.text().includes('Tarik / Setor Owner')).trigger('click')
+    await expenseModal.findAll('button').find(b => b.text().trim() === 'Non-Tunai (QRIS / Rek)').trigger('click')
+    await expenseModal.findAll('button').find(b => b.text().trim() === '50rb').trigger('click')
+    await expenseModal.find('input[placeholder*="galon"]').setValue('Setor ke rekening')
+    await expenseModal.find('form').trigger('submit.prevent')
+
+    expect(expenseModal.emitted('recordExpense')?.[0]?.[0]).toEqual({
+      amount: 50000,
+      category: 'prive',
+      source: 'NON_TUNAI',
+      note: 'Setor ke rekening'
+    })
+
+    // Hapus 2-langkah di ExpenseModal
+    await expenseModal.find('button[aria-label="Hapus KLR-101"]').trigger('click')
+    await nextTick()
+    await expenseModal.findAll('button').find(b => b.text().trim() === 'Ya, Hapus').trigger('click')
+    expect(expenseModal.emitted('deleteExpense')?.[0]).toEqual([501])
+
+    // DailyReportModal menampilkan tab Kas Keluar & memicu openExpense
+    const reportWithExpenses = mount(DailyReportModal, {
+      props: {
+        isOpen: true,
+        storeName: 'Habiba Store',
+        transactions: sampleTransactions,
+        expenses: sampleExpenses,
+        stats: {
+          todaySales: 55000,
+          todayCashSales: 25000,
+          todayQrisSales: 30000,
+          todayDebtPaid: 0,
+          todayCashDrawer: 25000,
+          todayExpensesCash: 19000,
+          todayExpensesNonCash: 0,
+          todayExpensesTotal: 19000,
+          todayOperationalExpenses: 19000,
+          todayNetCashDrawer: 6000,
+          todayGrossProfit: 8000,
+          todayQrisTotal: 30000,
+          todayProfit: -11000,
+          todayNewDebt: 20000,
+          transactionCount: 3,
+          topProducts: []
+        }
+      }
+    })
+    expect(reportWithExpenses.text()).toContain('Sisa Laci: Rp 6.000')
+    await reportWithExpenses.findAll('button').find(b => b.text().includes('Kas Keluar (1)')).trigger('click')
+    await nextTick()
+    expect(reportWithExpenses.text()).toContain('Beli galon')
+    await reportWithExpenses.findAll('button').find(b => b.text().includes('Catat Kas Keluar')).trigger('click')
+    expect(reportWithExpenses.emitted('openExpense')).toHaveLength(1)
   })
 })

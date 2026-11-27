@@ -64,4 +64,52 @@ describe('computeDailyStats (Separation of Cash Drawer, QRIS Non-Cash, and Bon)'
     expect(stats.todayProfit).toBe(12000)
     expect(stats.topProducts[0]).toEqual({ name: 'Minyak', qty: 2, subtotal: 30000 })
   })
+
+  it('deducts cash drawer expenses cleanly and isolates prive from operating profit', () => {
+    const now = Date.now()
+    const yesterday = now - 24 * 60 * 60 * 1000
+
+    const transactions = [
+      {
+        invoiceNumber: 'KSR-1',
+        createdAt: now,
+        paymentMethod: 'TUNAI',
+        totalAmount: 100000,
+        items: [{ name: 'Beras', sellPrice: 100000, buyPrice: 80000, qty: 1 }] // laba kotor 20.000
+      },
+      {
+        invoiceNumber: 'QRS-1',
+        createdAt: now,
+        paymentMethod: 'QRIS',
+        totalAmount: 50000,
+        items: [{ name: 'Minyak', sellPrice: 50000, buyPrice: 40000, qty: 1 }] // laba kotor 10.000
+      }
+    ]
+
+    const expenses = [
+      { id: 1, expenseNumber: 'KLR-1', createdAt: now, amount: 5000, category: 'operasional', source: 'TUNAI_LACI', deleted: false },
+      { id: 2, expenseNumber: 'KLR-2', createdAt: now, amount: 25000, category: 'prive', source: 'TUNAI_LACI', deleted: false },
+      { id: 3, expenseNumber: 'KLR-3', createdAt: now, amount: 10000, category: 'transport', source: 'NON_TUNAI', deleted: false },
+      { id: 4, expenseNumber: 'KLR-DEL', createdAt: now, amount: 99000, category: 'operasional', source: 'TUNAI_LACI', deleted: true },
+      { id: 5, expenseNumber: 'KLR-OLD', createdAt: yesterday, amount: 88000, category: 'operasional', source: 'TUNAI_LACI', deleted: false }
+    ]
+
+    const stats = computeDailyStats(transactions, [], expenses, now)
+
+    expect(stats.todayExpenseCount).toBe(3)
+    expect(stats.todayExpensesCash).toBe(30000) // 5.000 ops + 25.000 prive
+    expect(stats.todayExpensesNonCash).toBe(10000)
+    expect(stats.todayExpensesTotal).toBe(40000)
+    expect(stats.todayPriveTotal).toBe(25000)
+    expect(stats.todayOperationalExpenses).toBe(15000) // 5.000 ops + 10.000 transport
+
+    // Laci tunai = 100.000 - 30.000 = 70.000; Non-tunai = 50.000 - 10.000 = 40.000
+    expect(stats.todayCashDrawer).toBe(100000)
+    expect(stats.todayNetCashDrawer).toBe(70000)
+    expect(stats.todayNetQris).toBe(40000)
+
+    // Laba kotor 30.000 - biaya ops 15.000 = 15.000 (prive 25.000 tidak memotong untung jualan)
+    expect(stats.todayGrossProfit).toBe(30000)
+    expect(stats.todayProfit).toBe(15000)
+  })
 })
