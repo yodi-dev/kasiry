@@ -67,6 +67,7 @@ describe('ESC/POS Thermal Printer Formatter & Encoder', () => {
     expect(text58).toContain('Tunai')
     expect(text58).toContain('Kembali')
     expect(text58).toContain('Barang yg dibeli tidak bisa')
+    expect(text58).toContain('Kasiry by Awanbeo')
 
     const html58 = buildReceiptPrintHtml(
       sampleReceipt,
@@ -78,6 +79,7 @@ describe('ESC/POS Thermal Printer Formatter & Encoder', () => {
     expect(html58).toContain('Warung &lt;Kasiry&gt;')
     expect(html58).not.toContain('WA:')
     expect(html58).toContain('Makasih!')
+    expect(html58).toContain('Kasiry by Awanbeo')
 
     const bytes80Qris = buildReceiptEscPosBytes(
       { ...sampleReceipt, paymentMethod: 'QRIS' },
@@ -105,11 +107,14 @@ describe('ESC/POS Thermal Printer Formatter & Encoder', () => {
     expect(decoded).toContain('WARUNG TES')
     expect(decoded).toContain('80mm (48 kol)')
     expect(decoded).toContain('Mantap!')
+    expect(decoded).toContain('Printer Thermal Terhubung OK!')
+    expect(decoded).toContain('Kasiry by Awanbeo')
 
     const testHtml = buildTestPrintHtml({ name: 'Warung Tes' }, { paperWidth: '80mm', footerText: 'Mantap!' })
     expect(testHtml).toContain('size: 80mm auto;')
     expect(testHtml).toContain('TES CETAK KASIRY POS')
     expect(testHtml).toContain('80mm (48 kol)')
+    expect(testHtml).toContain('Kasiry by Awanbeo')
 
     const samplePayload = new Uint8Array(190).fill(0x41)
     const chunks80 = splitIntoBleChunks(samplePayload, 80)

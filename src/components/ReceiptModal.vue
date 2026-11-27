@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { X, Printer, Bluetooth, Usb, Cable, Check, ArrowRight, Share2, CheckCircle, AlertCircle } from '@lucide/vue'
 import { useThermalPrinter } from '../composables/useThermalPrinter'
+import { RECEIPT_BRAND_FOOTER } from '../utils/thermalPrinter'
 
 const props = defineProps({
   isOpen: {
@@ -280,7 +281,7 @@ const shareToWhatsApp = () => {
         <!-- Footer Struk -->
         <div class="text-center pt-2 text-[10px] text-slate-500 space-y-0.5">
           <p v-if="printerSettings.footerText" class="font-medium">{{ printerSettings.footerText }}</p>
-          <p>Kasiry</p>
+          <p>{{ RECEIPT_BRAND_FOOTER }}</p>
         </div>
       </div>
 

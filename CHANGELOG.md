@@ -6,6 +6,14 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.15.1] - 2026-11-27 (Branding Keterangan Bawah Struk: Kasiry by Awanbeo)
+
+### Changed
+- **Branding Footer Struk & Tes Cetak (`src/utils/thermalPrinter.js`, `src/components/ReceiptModal.vue`):**
+  - Menstandarkan teks keterangan paling bawah pada preview struk, cetak termal ESC/POS (`Bluetooth`/`USB`/`Serial`), cetak HTML `iframe`, maupun tes cetak melalui satu konstanta `RECEIPT_BRAND_FOOTER` menjadi **`Kasiry by Awanbeo`** (sekaligus memperbarui teks tes cetak menjadi `'Printer Thermal Terhubung OK!'` agar akurat untuk koneksi Bluetooth maupun USB/Serial).
+
+---
+
 ## [2.15.0] - 2026-11-27 (Dukungan Printer Thermal USB/OTG & Serial COM + Cetak Iframe Terisolasi)
 
 ### Added & Improved

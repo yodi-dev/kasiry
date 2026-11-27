@@ -7,6 +7,8 @@ export const PRINTER_DEFAULT_SETTINGS = {
   printerName: ''
 }
 
+export const RECEIPT_BRAND_FOOTER = 'Kasiry by Awanbeo'
+
 export function getColumnsForPaper(paperWidth = '58mm') {
   return paperWidth === '80mm' ? 48 : 32
 }
@@ -158,7 +160,7 @@ export function buildReceiptEscPosBytes(receiptData, storeProfile = {}, options 
       pushLine(fLine)
     }
   }
-  pushLine('Kasiry POS')
+  pushLine(RECEIPT_BRAND_FOOTER)
   buf.push(LF, LF, LF)
 
   return new Uint8Array(buf)
@@ -193,12 +195,13 @@ export function buildTestPrintEscPosBytes(storeProfile = {}, options = {}) {
   pushLine(formatTwoColumnLine('Waktu Tes', nowStr, cols))
   pushLine(dash)
   pushBytes(CMD_ALIGN_CENTER)
-  pushLine('Printer Bluetooth Terhubung OK!')
+  pushLine('Printer Thermal Terhubung OK!')
   if (options.footerText) {
     for (const fLine of formatWrapText(options.footerText, cols)) {
       pushLine(fLine)
     }
   }
+  pushLine(RECEIPT_BRAND_FOOTER)
   buf.push(LF, LF, LF)
 
   return new Uint8Array(buf)
@@ -350,7 +353,7 @@ export function buildReceiptPrintHtml(receiptData, storeProfile = {}, options = 
     <hr class="divider" />
     <div class="center muted">
       ${footerText ? `<div>${escapeHtml(footerText)}</div>` : ''}
-      <div>Kasiry POS</div>
+      <div>${escapeHtml(RECEIPT_BRAND_FOOTER)}</div>
     </div>`
 
   return wrapStandaloneThermalDocument({
@@ -384,6 +387,7 @@ export function buildTestPrintHtml(storeProfile = {}, options = {}) {
     <div class="center">
       <p class="bold" style="margin:4px 0;">Layout Cetak Struk Siap!</p>
       ${footerText ? `<p class="muted">${escapeHtml(footerText)}</p>` : ''}
+      <p class="muted">${escapeHtml(RECEIPT_BRAND_FOOTER)}</p>
     </div>`
 
   return wrapStandaloneThermalDocument({

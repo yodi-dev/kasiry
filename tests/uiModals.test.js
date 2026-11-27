@@ -827,6 +827,7 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     })
     expect(receiptNoPhone80.text()).not.toContain('WA:')
     expect(receiptNoPhone80.text()).toContain('Buka 06.00 - 22.00')
+    expect(receiptNoPhone80.text()).toContain('Kasiry by Awanbeo')
     expect(receiptNoPhone80.html()).toContain('thermal-80mm')
 
     // Pulihkan preferensi printer default agar tidak memengaruhi skenario lain
