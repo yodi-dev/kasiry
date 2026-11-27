@@ -129,4 +129,36 @@ describe('Multi-Price Pricing Engine (Ecer / Grosir / Agen / Auto-Qty / Manual)'
     const asAgen = repriceCartItems(asGrosir, updatedCatalog, 'agen', { forceFollowNota: true })
     expect(asAgen[0]).toMatchObject({ sellPrice: 19500, appliedTier: 'agen' })
   })
+
+  it('keeps cart item on Ecer when saving Grosir/Agen catalog price while Harga Nota is Ecer, then applies saved tier on switch', () => {
+    const baseProduct = { id: 30, name: 'Beras 5kg', sellPrice: 70000, baseSellPrice: 70000, wholesalePrice: 0, wholesaleMinQty: 0, agentPrice: 0 }
+
+    // Tambah barang saat Harga Nota = 'ecer'
+    let cart = [buildPricedCartItem({ ...baseProduct, qty: 1 }, 'ecer')]
+    expect(cart[0].sellPrice).toBe(70000)
+    expect(cart[0].appliedTier).toBe('ecer')
+
+    // User klik "Jadi Grosir" di keranjang saat Nota masih 'ecer':
+    // Katalog terupdate (wholesalePrice: 67000), item keranjang tetap memakai nextMode = 'auto'
+    const catalogAfterSave = [{ ...baseProduct, wholesalePrice: 67000, agentPrice: 65000 }]
+    cart = [
+      buildPricedCartItem(
+        { ...cart[0], wholesalePrice: 67000, agentPrice: 65000, priceMode: 'auto', customPrice: null },
+        'ecer'
+      )
+    ]
+    // Harga di keranjang TETAP Ecer (70.000), tidak tertimpa 67.000
+    expect(cart[0].sellPrice).toBe(70000)
+    expect(cart[0].appliedTier).toBe('ecer')
+
+    // Saat Nota diganti ke Grosir lalu Agen, harga langsung ikut katalog terbaru, dan kembali ke Ecer lagi tetap 70.000
+    const switchedGrosir = repriceCartItems(cart, catalogAfterSave, 'grosir', { forceFollowNota: true })
+    expect(switchedGrosir[0]).toMatchObject({ sellPrice: 67000, appliedTier: 'grosir' })
+
+    const switchedAgen = repriceCartItems(switchedGrosir, catalogAfterSave, 'agen', { forceFollowNota: true })
+    expect(switchedAgen[0]).toMatchObject({ sellPrice: 65000, appliedTier: 'agen' })
+
+    const backToEcer = repriceCartItems(switchedAgen, catalogAfterSave, 'ecer', { forceFollowNota: true })
+    expect(backToEcer[0]).toMatchObject({ sellPrice: 70000, appliedTier: 'ecer' })
+  })
 })

@@ -6,6 +6,25 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.14.0] - 2026-11-27 (Roadmap #7: Koneksi Printer Thermal Bluetooth ESC/POS + Hotfix Edit Harga Keranjang)
+
+### Added
+- **Encoder ESC/POS Murni & Composable Web Bluetooth (`src/utils/thermalPrinter.js`, `src/composables/useThermalPrinter.js`):**
+  - Menyusun payload ESC/POS native secara ringan tanpa pustaka eksternal (`CMD_INIT`, bold, double-height header, pembungkusan teks rapi `formatWrapText`, rata kiri-kanan `formatTwoColumnLine`, serta sanitasi karakter ASCII `sanitizeEscPosText`) untuk ukuran kertas **`58mm` (32 kolom)** dan **`80mm` (48 kolom)**.
+  - Mendukung koneksi langsung **Web Bluetooth GATT** ke berbagai UUID layanan printer thermal, pemecahan paket BLE `splitIntoBleChunks` (default 80 byte dengan fallback otomatis ke 20 byte untuk printer MTU kecil), putus/sambung perangkat, serta fallback otomatis ke dialog cetak browser (`window.print()`) bila Bluetooth belum tersambung atau tidak didukung perangkat.
+- **Tab Pengaturan `Printer` & Auto-Print Checkout (`src/components/SettingsModal.vue`, `src/components/ReceiptModal.vue`, `src/App.vue`):**
+  - Menambahkan tab baru **`Printer`** di `SettingsModal.vue` berisi tombol **`Hubungkan Printer Bluetooth`** / **`Putus Koneksi Printer`**, pemilihan lebar kertas **`58mm (32 Kolom)`** vs **`80mm (48 Kolom)`**, toggle **`Cetak Otomatis Setelah Bayar`** (`autoPrint`), input **`Catatan Bawah Struk`** (`footerText`), serta tombol **`Tes Cetak Printer`** (`printTestThermal`).
+  - Memperbarui `ReceiptModal.vue` dengan tombol cepat **`Cetak BT`** / **`Cetak`** sesuai status koneksi plus tombol fallback **`Browser`**, pratinjau cetak `.thermal-80mm` vs `58mm`, tampilan `footerText` kustom, dan penyembunyian baris **`WA:`** saat nomor telepon toko kosong.
+  - Mengintegrasikan helper `openReceiptModal` di `src/App.vue` (untuk `finalizeDirectSale` maupun `handleProcessDebtPayment`) agar opsi `autoPrint` langsung mengeksekusi cetak struk secara otomatis seusai transaksi.
+- **Cakupan Automated Test (`tests/thermalPrinter.test.js`, `tests/pricing.test.js`, `tests/uiModals.test.js`):**
+  - Menambahkan suite khusus `tests/thermalPrinter.test.js` (5 skenario) untuk memverifikasi encoding ESC/POS `58mm`/`80mm`, persistensi pengaturan `localStorage`, koneksi GATT Bluetooth mock, retry chunk MTU 20-byte, dan fallback `window.print()`, plus memperluas skenario `uiModals.test.js` dan `pricing.test.js` (**10 file / 40 test lulus**).
+
+### Fixed
+- **Harga Ecer di Keranjang Terlihat Tertimpa Saat Simpan Harga Grosir/Agen (`src/App.vue`):**
+  - Memperbaiki perilaku di handler pembaruan harga keranjang di mana menyimpan harga baru ke katalog (**`Jadi Grosir`** / **`Jadi Agen`**) saat mode nota aktif masih **`Ecer`** ikut mengunci item keranjang ke tier yang disimpan; kini item disetel ulang ke `'auto'` (`nextMode = saveToCatalogTier !== 'none' ? 'auto' : priceMode`) sehingga item tetap pada tarif **`Ecer`** hingga kasir benar-benar memindah `Harga Nota` atau memilih pelanggan berlevel.
+
+---
+
 ## [2.13.1] - 2026-11-27 (Hotfix Live Update Pilihan Harga Ecer/Grosir/Agen di Keranjang)
 
 ### Fixed

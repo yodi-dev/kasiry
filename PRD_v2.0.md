@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry POS
 
-**Versi Dokumen:** 2.13 (QRIS, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, & 300 Katalog Bersih)  
+**Versi Dokumen:** 2.14 (QRIS, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, 300 Katalog Bersih & Printer Thermal Bluetooth)  
 **Status:** Production-Ready & Terverifikasi Build/Unit-Integration Test  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
 **Identitas Toko Bawaan:** Warung Kasiry (Generik siap pakai — profil disesuaikan pemilik warung di Pengaturan)  
@@ -16,6 +16,7 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
+| **v2.14.0** | 27 November 2026 | **Roadmap #7 (Printer Thermal Bluetooth ESC/POS) + Hotfix Harga Keranjang:** Encoder ESC/POS murni (`thermalPrinter.js`), composable Web Bluetooth (`useThermalPrinter.js`) dg fallback `window.print()`, tab **`Printer`** di `SettingsModal.vue` (`58mm`/`80mm`, *auto-print*, catatan bawah struk, *Tes Cetak*), pembaruan `ReceiptModal.vue` (hide `WA:` kosong, `.thermal-80mm`, `Cetak BT`), serta perbaikan penguncian tier saat simpan Grosir/Agen di mode nota `Ecer`. |
 | **v2.13.1** | 27 November 2026 | **Hotfix Live Sync Multi-Harga Keranjang:** Memastikan perubahan harga Ecer/Grosir/Agen langsung berlaku real-time saat ganti `Harga Nota` tanpa perlu mengosongkan keranjang (`repriceCartItems` + guard `Ecer (Kosong)`). |
 | **v2.13.0** | 27 November 2026 | **Roadmap #6 (Pembersihan Seed Awal, 300 Katalog Warung & Kebersihan Barang Pasif):** Ekspansi ke 300 barang populer warung harga `Rp 0` (`barcode: ''`, *dynamic import* `seedData.js`), pembersihan pelanggan awal menjadi `'Umum'` saja (`0` utang) & profil generik `Warung Kasiry`, fitur filter `Belum Harga`, `Belum Terjual`, & `Sepi ≥30 Hr` + isi harga cepat & hapus massal di `ProductManagementModal`, auto-edit harga barang `Rp 0` di `CartSection`, dan tombol reset `Mulai Toko Kosong` di `SettingsModal`. |
 | **v2.12.0** | 27 November 2026 | **Roadmap #5 (Fitur Kulakan / Belanja Stok & Stok Lunak):** Modal `RestockModal.vue` (`Catat Kulakan` multi-item + 3 sumber dana `Tunai Laci`, `QRIS / Rek`, `Dana Luar` + tab `Riwayat Kulakan` dg hapus rollback), skema Dexie `v5` `restocks`, manajemen stok lunak (`stock: null` tak terlacak vs angka non-blocking sehingga stok `0` tetap bebas dibeli), Excel 7 sheet (`Riwayat Kulakan`), Google Sheets `KULAKAN` & merge Drive. |
@@ -99,10 +100,12 @@ flowchart TD
 ### 4.4 Laporan Shift/Harian, Buka-Tutup Shift, Kas Keluar, Excel 6-Sheet & Arsip Data Tahunan
 - **Buka & Tutup Shift (`ShiftModal.vue`):** Mengelompokkan operasional 1 hari buka warung dalam 1 sesi shift fleksibel (mendukung tutup lewat tengah malam), auto-isi modal awal & pengingat shift kemarin yang lupa ditutup, serta rekonsiliasi fisik laci (`Modal Awal + Tunai Masuk - Kas Keluar Laci`) lengkap dengan pesan tutup buku WhatsApp.
 - **Catatan Kas Keluar (`ExpenseModal.vue`):** Mencatat pengeluaran kas harian dengan preset kategori (`Operasional`, `Makan & Transport`, `Tarik / Setor Owner`, `Lainnya`), sumber dana `Tunai (Dari Laci)` vs `Non-Tunai (QRIS / Rek)`, KPI real-time Sisa Tunai Laci, dan isolasi kategori `prive` agar tarik kas owner tidak mengurangi estimasi untung jualan.
-- **Laporan Kasir (`DailyReportModal.vue`):** Otomatis memakai lingkup **Shift Aktif** (atau hari kalender jika belum buka shift), menampilkan Uang Masuk Kas (Tunai & QRIS), Total Kas Keluar + Sisa Laci Bersih, Perkiraan Untung Bersih, Bon Baru, Top 5 Barang Terlaris, tab Kas Keluar, tab Riwayat Transaksi, tab Riwayat Shift tutup buku, kirim rekap WhatsApp, serta ekspor **Excel 6 sheet** (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`, `Riwayat Shift`) via dynamic `import('xlsx')`.
+- **Laporan Kasir (`DailyReportModal.vue`):** Otomatis memakai lingkup **Shift Aktif** (atau hari kalender jika belum buka shift), menampilkan Uang Masuk Kas (Tunai & QRIS), Total Kas Keluar + Sisa Laci Bersih, Perkiraan Untung Bersih, Bon Baru, Top 5 Barang Terlaris, tab Kas Keluar, tab Riwayat Transaksi, tab Riwayat Shift tutup buku, kirim rekap WhatsApp, serta ekspor **Excel 7 sheet** (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`, `Riwayat Shift`, `Riwayat Kulakan`) via dynamic `import('xlsx')`.
 - **Skalabilitas & Arsip Data Tahunan (`SettingsModal.vue`):**
   - Memori runtime (`useKasiryDB.js`) memakai `shallowRef([])`, hanya memuat **90 hari terakhir** ke UI Kasa harian (`ACTIVE_HISTORY_DAYS = 90`), serta melakukan pembaruan state parsial setelah checkout & CRUD.
   - Fitur **Kesehatan & Arsip Data Tahunan** menyediakan pilihan retensi `> 3 Bulan`, `> 6 Bulan`, dan `> 1 Tahun` yang otomatis mengunduh file `Arsip_<NamaToko>_sd_<Tanggal>.json` (+ mengunggah salinan arsip ke Google Drive bila terhubung & online), menyimpan `archiveState.cutoffAt`, lalu membersihkan baris lama di IndexedDB tanpa mengubah produk maupun `totalDebt` pelanggan.
+- **Koneksi Printer Thermal Bluetooth & Fallback Browser (`useThermalPrinter.js`, `thermalPrinter.js`, `ReceiptModal.vue`, `SettingsModal.vue`):**
+  - Mendukung koneksi langsung **Web Bluetooth GATT (ESC/POS)** tanpa dependensi pihak ketiga dengan chunking BLE aman (80 byte -> retry 20 byte) untuk kertas **`58mm` (32 kolom)** dan **`80mm` (48 kolom)**, pengaturan **`autoPrint`** pasca-bayar, catatan bawah struk kustom, **`Tes Cetak Printer`**, penyembunyian baris `WA:` kosong, serta fallback otomatis ke `window.print()`.
 
 ### 4.5 Cloud Sync `$0` (Google Drive, Google Sheets & Kepatuhan OAuth)
 - Koneksi Google 1-klik via Google Identity Services (`useGoogleSync.js`), mendukung offline queue untuk Google Sheets (`flushPendingSheetQueue`), merge two-way LWW berbasis `updatedAt`, penghormatan `archiveState` antar-perangkat (sementara impor JSON manual tetap dapat memulihkan file arsip lama via `honorArchiveCutoff: false`), dan *adaptive Drive batching* (10 transaksi / 3 menit saat transaksi $\ge 200$).
@@ -153,7 +156,7 @@ db.version(5).stores({
    - Konfigurasi Rolldown `codeSplitting.groups` di `vite.config.js` memisahkan `vendor-vue`, `vendor-dexie`, `vendor-xlsx`, dan `vendor-zxing`.
    - Entry bundle `index` terjaga ringan (< target 60 KB gzip per chunk utama), bebas chunk warning `> 500 kB`, dengan 12 modal sekunder terpisah sebagai async chunks (`prewarmCheckoutChunks` menghangatkan `PaymentModal`, `LazyInventoryModal`, dan `ReceiptModal` saat browser luang).
 2. **Offline PWA Precaching:** Workbox men-generate service worker precache di `dist/sw.js` sehingga seluruh chunk pecahan & aset statis tetap berjalan offline 100%.
-3. **Automated Tests:** Dijalankan melalui `npm test` (`Vitest` + `fake-indexeddb` + `@vue/test-utils`/`happy-dom`) mencakup 9 suite & 34 skenario di folder `tests/` (`customerStats`, `dailyStats`, `pricing`, `productUsage`, `useKasiryDB`, `useGoogleSync`, `dbMigration` `v1 -> v5`, `excelExport`, dan `uiModals`).
+3. **Automated Tests:** Dijalankan melalui `npm test` (`Vitest` + `fake-indexeddb` + `@vue/test-utils`/`happy-dom`) mencakup 10 suite & 40 skenario di folder `tests/` (`customerStats`, `dailyStats`, `pricing`, `productUsage`, `thermalPrinter`, `useKasiryDB`, `useGoogleSync`, `dbMigration` `v1 -> v5`, `excelExport`, dan `uiModals`).
 4. **Penyimpanan Persisten & Render Katalog:** `navigator.storage.persist()` aktif saat inisialisasi DB, dan kartu katalog di bawah lipatan layar (`idx >= 16`) memakai `.offscreen-card-defer` (`content-visibility: auto; contain-intrinsic-size: auto none auto 92px;`).
 
 ---
@@ -162,23 +165,23 @@ db.version(5).stores({
 
 Status terbaru sebelum rilis penuh ke pemilik warung:
 - [x] Build produksi bersih (`npm run build`), 0 error & 0 warning ukuran chunk.
-- [x] Automated tests Vitest lulus (`npm test`: 9 suite, 34 skenario).
+- [x] Automated tests Vitest lulus (`npm test`: 10 suite, 40 skenario).
 - [x] Verifikasi domain Google Search Console aktif (`public/google50a425d7a5de8ecd.html`).
 - [x] Halaman `/privacy.html`, `/terms.html`, ikon OAuth (`kasiry-oauth-120x120.png`), serta COOP header tersedia di `public/`.
 - [ ] **Uji Perangkat Fisik Manual (Final Field Check):**
   - Test hardware barcode scanner USB OTG / Bluetooth di HP Android & PC.
   - Test kamera belakang & depan langsung di HP terhadap barcode kemasan nyata (`CameraScannerModal`).
-  - Test cetak struk asli ke printer thermal 58mm via `window.print()` (`ReceiptModal`) & alur kirim nota/tagihan WhatsApp.
+  - Test pairing & cetak langsung ke printer thermal Bluetooth 58mm/80mm (Web Bluetooth ESC/POS) dan fallback `window.print()` (`ReceiptModal`), serta alur kirim nota/tagihan WhatsApp.
   - Test mode restore **Timpa Total (Reset)**, **Arsip Tahunan + Drive**, dan reload offline PWA (`npm run preview` / `https://kasiry.pages.dev`).
   - Pastikan status **Google OAuth Consent Screen** di Google Cloud Console berstatus *Published / Verified* agar akun Google toko baru tidak terkena batasan *Testing mode*.
 
 ---
 
-## 8. Roadmap Pengembangan Selanjutnya (Backlog v2.8+)
+## 8. Roadmap Pengembangan (Backlog v2.8–v2.14 Selesai)
 
-Daftar fitur berikut dicatat untuk dibahas detail (*design & spec alignment*) dan dikerjakan satu per satu pada iterasi berikutnya:
+Seluruh fitur utama pada backlog v2.8–v2.14 telah selesai diimplementasikan dan terintegrasi menyeluruh:
 
-| No | Item Fitur | Status | Ringkasan Cakupan Awal untuk Dibahas |
+| No | Item Fitur | Status | Ringkasan Implementasi Terverifikasi |
 | :-: | :--- | :---: | :--- |
 | 1 | **Sistem Buka & Tutup Shift** | `[x] Selesai (v2.10.0)` | Modal `ShiftModal.vue`, prompt pagi non-blokir + auto-modal awal, pengadopsian catatan hari ini, chip status shift di `TopBar.vue`, skema Dexie `v4` `shifts`, rekonsiliasi fisik laci vs sistem, tab **Shift** di `DailyReportModal`, Excel 6 sheet (`Riwayat Shift`), & Google Sheets `BUKA/TUTUP SHIFT` + merge Drive. |
 | 2 | **Transaksi Keluar / Pengeluaran Harian** | `[x] Selesai (v2.9.0)` | Modal cepat `ExpenseModal.vue`, skema Dexie `v3` `expenses`, sumber `Tunai Laci` vs `Non-Tunai`, isolasi `prive` dari laba, Laporan + WA, Excel, serta sync Google Sheets & Drive. |
@@ -186,4 +189,4 @@ Daftar fitur berikut dicatat untuk dibahas detail (*design & spec alignment*) da
 | 4 | **Metode Bayar QRIS** | `[x] Selesai (v2.8.0)` | Tab `QRIS` di `PaymentModal.vue` (otomatis uang pas, prefix `QRS-`), opsi `Tunai \| QRIS` di Buku Utang, pemisahan Laci Tunai vs QRIS di Laporan Harian, Struk 58mm, WA, Excel & Google Sheets (upload foto QRIS statis ditunda ke rilis opsional nanti). |
 | 5 | **Fitur Kulakan / Belanja Stok** | `[x] Selesai (v2.12.0)` | Modal `RestockModal.vue` (nota multi-item, sumber dana `Tunai Laci` / `QRIS Rek` / `Dana Luar`, deteksi modal naik & opsi edit jual, centang `Update Stok`), skema Dexie `v5` `restocks`, stok lunak non-blocking (`stock: null` vs `0` tetap bisa dibeli), Excel 7 sheet (`Riwayat Kulakan`), & Google Sync. |
 | 6 | **Pembersihan & Seed Data Awal Baru** | `[x] Selesai (v2.13.0)` | 300 katalog awal warung `Rp 0` (lazy `seedData.js`), pelanggan bersih hanya `'Umum'` (`0` utang), profil generik `Warung Kasiry`, filter `Belum Harga` / `Belum Terjual` / `Sepi ≥30 Hr` + isi harga cepat & hapus massal (`productUsage.js`), auto-prompt harga kasa, & reset toko kosong di Pengaturan. |
-| 7 | **Koneksi Printer Thermal (Bluetooth / USB & Ukuran Kertas)** | `[ ] Backlog (Selanjutnya)` | Pembahasan khusus koneksi langsung printer thermal (Web Bluetooth / ESC-POS / opsi 58mm vs 80mm / auto-print struk) + finishing keseluruhan. |
+| 7 | **Koneksi Printer Thermal Bluetooth (ESC/POS)** | `[x] Selesai (v2.14.0)` | Encoder ESC/POS murni (`thermalPrinter.js`) + `useThermalPrinter.js` via Web Bluetooth API (retry MTU 20B) & fallback `window.print()`, tab `Printer` di `SettingsModal.vue` (`58mm`/`80mm`, *auto-print*, catatan struk, *Tes Cetak*), serta cetak BT & `58mm`/`80mm` di `ReceiptModal.vue`. |

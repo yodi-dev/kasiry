@@ -96,6 +96,28 @@ import { exportKasiryExcel } from './utils/excelExport'
 import { computeDailyStats } from './utils/dailyStats'
 import { buildPricedCartItem, normalizePriceTier, repriceCartItems } from './utils/pricing'
 import { useGoogleSync } from './composables/useGoogleSync'
+import { useThermalPrinter } from './composables/useThermalPrinter'
+
+const {
+  printerSettings,
+  printReceiptThermal
+} = useThermalPrinter()
+
+const openReceiptModal = async (receipt) => {
+  receiptData.value = receipt
+  clearCart()
+  isPaymentOpen.value = false
+  isReceiptOpen.value = true
+
+  if (printerSettings.value?.autoPrint) {
+    await nextTick()
+    try {
+      await printReceiptThermal(receiptData.value, storeProfile.value)
+    } catch (err) {
+      console.error('[Kasiry] Auto-print gagal:', err)
+    }
+  }
+}
 
 // Dexie Database Composable (IndexedDB Engine)
 const {
@@ -409,8 +431,8 @@ const handleUpdateItemPrice = async ({ productId, priceMode, customPrice, saveTo
     }
   }
 
-  const nextMode = updatedCatalog && (saveToCatalogTier === 'ecer' || saveToCatalogTier === 'grosir' || saveToCatalogTier === 'agen')
-    ? (saveToCatalogTier === cartPriceTier.value ? 'auto' : saveToCatalogTier)
+  const nextMode = saveToCatalogTier !== 'none'
+    ? 'auto'
     : priceMode
 
   cart.value = cart.value.map(item => {
@@ -519,7 +541,7 @@ const finalizeDirectSale = async ({ paymentMethod, invoicePrefix, totalAmount, c
   appendTransactionToSheet(txPayload, storeProfile.value?.name)
   triggerCloudAutoBackup(true)
 
-  receiptData.value = {
+  openReceiptModal({
     invoiceNumber: invoice,
     time: timeStr,
     totalAmount,
@@ -528,11 +550,7 @@ const finalizeDirectSale = async ({ paymentMethod, invoicePrefix, totalAmount, c
     changeAmount,
     customer: custObj,
     items: [...cart.value]
-  }
-
-  clearCart()
-  isPaymentOpen.value = false
-  isReceiptOpen.value = true
+  })
 }
 
 // Payment Handlers (Menyimpan riwayat transaksi ke Dexie.js)
@@ -590,18 +608,14 @@ const handleProcessDebtPayment = async (data) => {
   appendTransactionToSheet(txPayload, storeProfile.value?.name)
   triggerCloudAutoBackup(true)
 
-  receiptData.value = {
+  openReceiptModal({
     invoiceNumber: invoice,
     time: timeStr,
     totalAmount: data.totalAmount,
     paymentMethod: 'UTANG / BON',
     customer: custObj,
     items: [...cart.value]
-  }
-
-  clearCart()
-  isPaymentOpen.value = false
-  isReceiptOpen.value = true
+  })
 }
 
 // Record Pelunasan Utang (Tersimpan ke Dexie.js + Google Sheets & Auto-Backup)

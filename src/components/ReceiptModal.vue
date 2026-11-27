@@ -1,5 +1,7 @@
 <script setup>
-import { X, Printer, Check, ArrowRight, Share2 } from '@lucide/vue'
+import { ref } from 'vue'
+import { X, Printer, Bluetooth, Check, ArrowRight, Share2, CheckCircle, AlertCircle } from '@lucide/vue'
+import { useThermalPrinter } from '../composables/useThermalPrinter'
 
 const props = defineProps({
   isOpen: {
@@ -21,8 +23,29 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'newTransaction'])
 
-const printReceipt = () => {
-  window.print()
+const {
+  printerSettings,
+  isBluetoothSupported,
+  isPrinterConnected,
+  isConnectingPrinter,
+  isPrinting,
+  connectedPrinterName,
+  printerError,
+  connectBluetoothPrinter,
+  printReceiptThermal
+} = useThermalPrinter()
+
+const printNotice = ref('')
+
+const printReceipt = async (forceBrowser = false) => {
+  printNotice.value = ''
+  const res = await printReceiptThermal(props.receiptData, props.storeProfile, { forceBrowser })
+  if (res?.ok && res.method === 'bluetooth') {
+    printNotice.value = `Struk berhasil dicetak ke ${connectedPrinterName.value || 'Printer Bluetooth'}!`
+    setTimeout(() => {
+      printNotice.value = ''
+    }, 2800)
+  }
 }
 
 const shareToWhatsApp = () => {
@@ -33,41 +56,40 @@ const shareToWhatsApp = () => {
   let itemsText = ''
   r.items.forEach(item => {
     const tierNote = item.priceTier && item.priceTier !== 'ecer'
-      ? ` [${item.priceLabel || item.priceTier}]`
+      ? ` (${item.priceLabel || item.priceTier})`
       : ''
-    itemsText += `• ${item.qty}x ${item.name}${tierNote} = Rp ${(item.sellPrice * item.qty).toLocaleString('id-ID')}\n`
+    itemsText += `- ${item.name} (${item.qty}x @ ${item.sellPrice.toLocaleString('id-ID')}${tierNote}) = Rp ${(item.sellPrice * item.qty).toLocaleString('id-ID')}\n`
   })
 
-  let bayarText = ''
-  if (r.paymentMethod === 'TUNAI') {
-    bayarText = `Bayar: Rp ${r.cashGiven.toLocaleString('id-ID')}\nKembalian: Rp ${r.changeAmount.toLocaleString('id-ID')}`
-  } else if (r.paymentMethod === 'QRIS') {
-    bayarText = `Bayar Pas (QRIS): Rp ${r.totalAmount.toLocaleString('id-ID')}\nStatus: LUNAS (Non-Tunai)`
-  } else {
-    bayarText = `Status: Dicatat di Buku Utang (${r.customer?.name || 'Pelanggan'})`
-  }
+  const bayarText = r.paymentMethod === 'TUNAI'
+    ? `Tunai: Rp ${r.cashGiven.toLocaleString('id-ID')}\nKembali: Rp ${r.changeAmount.toLocaleString('id-ID')}`
+    : r.paymentMethod === 'QRIS'
+      ? `Metode: QRIS (Lunas Non-Tunai)`
+      : `Status: DICATAT DI BUKU UTANG (BON)\nPelanggan: ${r.customer?.name || '-'}`
 
-  const text = `*NOTA BELANJA - ${store.name.toUpperCase()}*\n` +
+  const cleanPhone = (store?.phone || '').trim()
+  const cleanFooter = (printerSettings.value?.footerText || '').trim() || 'Matur nuwun atas kunjungannya!'
+  const text = `*NOTA ${store.name.toUpperCase()}*\n` +
+    (cleanPhone ? `WA: ${cleanPhone}\n` : '') +
+    `--------------------------------\n` +
     `No: ${r.invoiceNumber}\n` +
     `Waktu: ${r.time}\n` +
-    `Metode: ${r.paymentMethod}\n` +
-    (r.customer?.name ? `Pelanggan: ${r.customer.name}\n` : '') +
     `--------------------------------\n` +
     itemsText +
     `--------------------------------\n` +
     `*TOTAL: Rp ${r.totalAmount.toLocaleString('id-ID')}*\n` +
     bayarText + `\n` +
     `--------------------------------\n` +
-    `Matur nuwun atas kunjungannya!`
+    cleanFooter
 
   const encoded = encodeURIComponent(text)
   const phone = prompt('Nomor WhatsApp Pembeli (Boleh kosong untuk pilih kontak di WA):', '')
   if (phone !== null) {
-    let cleanPhone = phone.trim().replace(/\D/g, '')
-    if (cleanPhone.startsWith('0')) {
-      cleanPhone = '62' + cleanPhone.slice(1)
+    let targetWa = phone.trim().replace(/\D/g, '')
+    if (targetWa.startsWith('0')) {
+      targetWa = '62' + targetWa.slice(1)
     }
-    const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encoded}` : `https://wa.me/?text=${encoded}`
+    const url = targetWa ? `https://wa.me/${targetWa}?text=${encoded}` : `https://wa.me/?text=${encoded}`
     window.open(url, '_blank')
   }
 }
@@ -78,7 +100,10 @@ const shareToWhatsApp = () => {
     v-if="isOpen && receiptData"
     class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
   >
-    <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+    <div
+      class="bg-white rounded-3xl w-full shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]"
+      :class="printerSettings.paperWidth === '80mm' ? 'max-w-md' : 'max-w-sm'"
+    >
       <!-- Header Struk (Clean White & Emerald Check - disembunyikan saat cetak) -->
       <div class="print:hidden px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2">
@@ -95,12 +120,60 @@ const shareToWhatsApp = () => {
         </button>
       </div>
 
-      <!-- Kertas Struk Thermal Preview (Dioptimasi untuk Printer Thermal 58mm & Layar HP) -->
-      <div class="thermal-receipt-paper flex-1 overflow-y-auto p-5 font-mono text-xs text-slate-700 space-y-2.5 bg-slate-50/50 border-b border-dashed border-slate-200">
+      <!-- Strip Status Printer Thermal Bluetooth (Print hidden) -->
+      <div class="print:hidden px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2 text-[11px] shrink-0">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <span
+            class="w-2 h-2 rounded-full shrink-0"
+            :class="isPrinterConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'"
+          ></span>
+          <span class="font-semibold text-slate-700 truncate">
+            <template v-if="isPrinterConnected">
+              BT: {{ connectedPrinterName }} ({{ printerSettings.paperWidth }})
+            </template>
+            <template v-else>
+              Struk {{ printerSettings.paperWidth }} • {{ isBluetoothSupported ? 'Cetak Browser / BT' : 'Cetak Browser' }}
+            </template>
+          </span>
+        </div>
+
+        <button
+          v-if="!isPrinterConnected && isBluetoothSupported"
+          type="button"
+          :disabled="isConnectingPrinter"
+          @click="connectBluetoothPrinter"
+          class="px-2 py-0.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200 font-bold flex items-center gap-1 cursor-pointer shrink-0 disabled:opacity-50"
+        >
+          <Bluetooth class="w-3 h-3" />
+          <span>{{ isConnectingPrinter ? 'Menghubungkan...' : 'Hubungkan BT' }}</span>
+        </button>
+      </div>
+
+      <div
+        v-if="printNotice"
+        class="print:hidden mx-4 mt-2 p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] font-bold text-emerald-800 flex items-center gap-1.5 shrink-0"
+      >
+        <CheckCircle class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+        <span>{{ printNotice }}</span>
+      </div>
+
+      <div
+        v-if="printerError"
+        class="print:hidden mx-4 mt-2 p-2 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-800 flex items-center gap-1.5 shrink-0"
+      >
+        <AlertCircle class="w-3.5 h-3.5 text-amber-600 shrink-0" />
+        <span>{{ printerError }}</span>
+      </div>
+
+      <!-- Kertas Struk Thermal Preview (Dioptimasi untuk Printer Thermal 58mm / 80mm & Layar HP) -->
+      <div
+        class="thermal-receipt-paper flex-1 overflow-y-auto p-5 font-mono text-xs text-slate-700 space-y-2.5 bg-slate-50/50 border-b border-dashed border-slate-200"
+        :class="printerSettings.paperWidth === '80mm' ? 'thermal-80mm' : ''"
+      >
         <!-- Kop Warung -->
         <div class="text-center space-y-0.5">
           <h4 class="font-bold text-sm text-slate-900 tracking-wider uppercase">{{ storeProfile.name }}</h4>
-          <p class="text-[11px] text-slate-500">WA: {{ storeProfile.phone }}</p>
+          <p v-if="storeProfile.phone" class="text-[11px] text-slate-500">WA: {{ storeProfile.phone }}</p>
           <p class="text-[10px] text-slate-400">--------------------------------</p>
         </div>
 
@@ -180,34 +253,49 @@ const shareToWhatsApp = () => {
 
         <!-- Footer Struk -->
         <div class="text-center pt-2 text-[10px] text-slate-500 space-y-0.5">
-          <p class="font-medium">Matur Nuwun Atas Kunjungannya!</p>
+          <p v-if="printerSettings.footerText" class="font-medium">{{ printerSettings.footerText }}</p>
           <p>Kasiry</p>
         </div>
       </div>
 
       <!-- Action Buttons (disembunyikan saat cetak) -->
-      <div class="print:hidden p-3 bg-white flex items-center justify-between gap-2 shrink-0">
+      <div class="print:hidden p-3 bg-white flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 flex-wrap">
         <button 
-          @click="printReceipt"
-          class="h-10 px-3 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-slate-200 transition-colors"
-          title="Cetak struk ke printer thermal Bluetooth/USB"
+          type="button"
+          :disabled="isPrinting"
+          @click="printReceipt(false)"
+          class="h-10 px-3 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-slate-200 transition-colors disabled:opacity-50"
+          :title="isPrinterConnected ? 'Cetak langsung ke printer thermal Bluetooth' : 'Cetak struk ke printer thermal/browser'"
         >
-          <Printer class="w-3.5 h-3.5 text-slate-500" />
-          <span>Cetak</span>
+          <Bluetooth v-if="isPrinterConnected" class="w-3.5 h-3.5 text-emerald-600" />
+          <Printer v-else class="w-3.5 h-3.5 text-slate-500" />
+          <span>{{ isPrinting ? 'Mencetak...' : (isPrinterConnected ? 'Cetak BT' : 'Cetak') }}</span>
+        </button>
+
+        <button
+          v-if="isPrinterConnected"
+          type="button"
+          @click="printReceipt(true)"
+          class="h-10 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 font-medium text-[11px] rounded-xl cursor-pointer border border-slate-200 transition-colors"
+          title="Cetak lewat dialog cetak browser / USB"
+        >
+          Browser
         </button>
 
         <button 
+          type="button"
           @click="shareToWhatsApp"
-          class="h-10 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-medium text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-emerald-200 transition-colors"
+          class="h-10 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-emerald-200 transition-colors"
           title="Kirim nota belanja digital via WhatsApp"
         >
           <Share2 class="w-3.5 h-3.5 text-emerald-700" />
-          <span>Kirim WA</span>
+          <span>WA</span>
         </button>
 
         <button 
+          type="button"
           @click="emit('newTransaction')"
-          class="flex-1 h-10 px-3 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-xs transition-colors"
+          class="flex-1 h-10 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-xs transition-colors min-w-[115px]"
         >
           <span>Transaksi Baru</span>
           <ArrowRight class="w-3.5 h-3.5" />
@@ -247,6 +335,11 @@ const shareToWhatsApp = () => {
     box-shadow: none !important;
     font-size: 11px !important;
     line-height: 1.25 !important;
+  }
+  .thermal-receipt-paper.thermal-80mm {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    font-size: 12px !important;
   }
 }
 </style>

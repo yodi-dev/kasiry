@@ -99,7 +99,7 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
 └── 12 Modal Dialog (Lazy Loaded via defineAsyncComponent + watcher { immediate: true }):
     ├── PaymentModal.vue (Prewarmed: Tunai, QRIS uang pas, & Utang/Bon + dropdown loyalitas O(N))
     ├── LazyInventoryModal.vue (Prewarmed: Input kilat barcode baru + tambah kategori inline)
-    ├── ReceiptModal.vue (Prewarmed: Pratinjau struk thermal 58mm + Cetak terisolasi + Kirim WA)
+    ├── ReceiptModal.vue (Prewarmed: Pratinjau struk thermal 58mm/80mm, Cetak Bluetooth ESC/POS + Fallback Browser, & Kirim WA)
     ├── CameraScannerModal.vue (Lazy + vendor-zxing: Hybrid BarcodeDetector & ZXing + Switch Kamera/Flash/Zoom)
     ├── ProductManagementModal.vue (Kelola Barang CRUD + Filter Belum Harga / Belum Terjual / Sepi ≥30 Hr + Isi Harga Cepat + Hapus Massal)
     ├── RestockModal.vue (Catat Nota Kulakan Multi-Item, 3 Sumber Dana, Deteksi Modal Naik, & Riwayat Rollback)
@@ -108,7 +108,7 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
     ├── ExpenseModal.vue (Catatan Kas Keluar: Kategori cepat, Dari Laci vs Non-Tunai, KPI sisa laci & hapus 2-tap)
     ├── ShiftModal.vue (Buka Shift dg auto-modal awal & adopsi catatan hari ini, Tutup Buku + hitung selisih laci, Share WA)
     ├── DailyReportModal.vue (Ringkasan Shift Aktif/Harian, Kas Keluar, Riwayat Transaksi, Riwayat Shift, WA & Excel 7-sheet via vendor-xlsx)
-    └── SettingsModal.vue (Profil Toko + Versi App, Google Drive/Sheets Sync, Backup JSON + Preview, Arsip Tahunan & Reset Toko)
+    └── SettingsModal.vue (Profil Toko + Versi App, Tab Printer Thermal Bluetooth 58mm/80mm & Auto-Print, Google Drive/Sheets Sync, Backup JSON, Arsip Tahunan & Reset Toko)
 ```
 
 ---
@@ -120,7 +120,7 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
 2. Di Mobile, mengetuk tombol cepat tidak memicu keyboard HP muncul ke layar; keyboard hanya muncul jika pengguna langsung mengetuk kotak pencarian. Di Desktop, kursor tetap siap di `BarcodeInputBar` dan tombol `/` langsung mengarahkan fokus ke pencarian.
 3. Item langsung masuk ke **CartSection**; di Mobile, `StickyBottomBar` meluncur muncul di bawah.
 4. Kasir menekan **[ Pembayaran ]** (atau tombol `F2` di Desktop), memilih nominal cepat / uang pas, lalu menekan **Selesaikan Pembayaran**.
-5. Struk `ReceiptModal` tampil (siap **Cetak** thermal 58mm atau **Kirim WA**), transaksi tersimpan instan di IndexedDB & tercatat di `shallowRef` aktif tanpa *full table reload*, serta masuk ke antrean sinkronisasi Google Sheets & Drive.
+5. Struk `ReceiptModal` tampil (otomatis tercetak bila *Auto-Print* aktif, atau siap ketuk **Cetak BT** / **Browser** 58mm/80mm & **Kirim WA**), transaksi tersimpan instan di IndexedDB & tercatat di `shallowRef` aktif tanpa *full table reload*, serta masuk ke antrean sinkronisasi Google Sheets & Drive.
 
 ### Alur B: Menangani Barang Belum Terdaftar (*Lazy Inventory*)
 1. Barcode baru yang discan atau diketik + Enter belum ditemukan di database lokal.

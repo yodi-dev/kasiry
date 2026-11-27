@@ -781,7 +781,7 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await prodManage.findAll('button').find(b => b.text().trim() === 'Ya, Hapus').trigger('click')
     expect(prodManage.emitted('deleteProductsBulk')?.[0]?.[0]).toEqual([2, 1])
 
-    // 4. SettingsModal: tombol Mulai Toko Kosong memicu konfirmasi lalu emit resetStoreData('empty')
+    // 4. SettingsModal: tab Printer (58mm/80mm, autoPrint, footer, tes cetak) & reset data
     const settingsReset = mount(SettingsModal, {
       props: {
         isOpen: true,
@@ -790,6 +790,48 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
         customerCount: 1
       }
     })
+    const printerTab = settingsReset.findAll('button').find(b => b.text().trim() === 'Printer')
+    expect(printerTab).toBeTruthy()
+    await printerTab.trigger('click')
+    await nextTick()
+    expect(settingsReset.text()).toContain('Printer Thermal Bluetooth')
+    expect(settingsReset.text()).toContain('58mm (32 Kolom)')
+    expect(settingsReset.text()).toContain('80mm (48 Kolom)')
+    expect(settingsReset.text()).toContain('Cetak Otomatis Setelah Bayar')
+    expect(settingsReset.text()).toContain('Tes Cetak Printer')
+
+    const size80Btn = settingsReset.findAll('button').find(b => b.text().includes('80mm (48 Kolom)'))
+    await size80Btn.trigger('click')
+    const footerInput = settingsReset.find('#printer-footer-note')
+    await footerInput.setValue('Buka 06.00 - 22.00')
+    await nextTick()
+
+    const receiptNoPhone80 = mount(ReceiptModal, {
+      props: {
+        isOpen: true,
+        storeProfile: { name: 'Warung Kasiry', phone: '' },
+        receiptData: {
+          invoiceNumber: 'KSR-202',
+          time: '08:15',
+          totalAmount: 12000,
+          paymentMethod: 'TUNAI',
+          cashGiven: 20000,
+          changeAmount: 8000,
+          customer: { name: 'Umum' },
+          items: [{ id: 1, name: 'Kopi', sellPrice: 12000, qty: 1 }]
+        }
+      }
+    })
+    expect(receiptNoPhone80.text()).not.toContain('WA:')
+    expect(receiptNoPhone80.text()).toContain('Buka 06.00 - 22.00')
+    expect(receiptNoPhone80.html()).toContain('thermal-80mm')
+
+    // Pulihkan preferensi printer default agar tidak memengaruhi skenario lain
+    const size58Btn = settingsReset.findAll('button').find(b => b.text().includes('58mm (32 Kolom)'))
+    await size58Btn.trigger('click')
+    await footerInput.setValue('Terima kasih telah berbelanja!')
+    await nextTick()
+
     const backupTab = settingsReset.findAll('button').find(b => b.text().includes('Pencadangan'))
     await backupTab.trigger('click')
     await nextTick()

@@ -18,8 +18,12 @@ import {
   ShieldCheck,
   AlertCircle,
   Clock,
-  KeyRound
+  KeyRound,
+  Printer,
+  Bluetooth,
+  WifiOff
 } from '@lucide/vue'
+import { useThermalPrinter } from '../composables/useThermalPrinter'
 
 const props = defineProps({
   isOpen: {
@@ -114,9 +118,9 @@ const emit = defineEmits([
   'resetStoreData'
 ])
 
-// 2 Tabs: 'profile' (Nama Pemilik) | 'backup' (Cadangan & Google)
+// 3 Tabs: 'profile' (Profil Toko) | 'printer' (Printer Thermal) | 'backup' (Cadangan & Google)
 const activeTab = ref('profile')
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.13.0'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.14.0'
 
 const formName = ref(props.storeProfile?.name || 'Warung Kasiry')
 const formOwner = ref(props.storeProfile?.owner || 'Pemilik Toko')
@@ -127,6 +131,64 @@ const clientIdSaved = ref(false)
 const fileInputRef = ref(null)
 const isSaved = ref(false)
 const confirmingResetMode = ref(null) // 'empty' | 'starter' | null
+
+// Pengaturan & Koneksi Printer Thermal (Web Bluetooth ESC/POS + Fallback Browser)
+const {
+  printerSettings,
+  updatePrinterSettings,
+  isBluetoothSupported,
+  isPrinterConnected,
+  isConnectingPrinter,
+  isPrinting,
+  connectedPrinterName,
+  printerError,
+  connectBluetoothPrinter,
+  disconnectBluetoothPrinter,
+  printTestThermal
+} = useThermalPrinter()
+
+const testPrintNotice = ref(null)
+
+const handleConnectPrinter = async () => {
+  testPrintNotice.value = null
+  const ok = await connectBluetoothPrinter()
+  if (ok) {
+    testPrintNotice.value = {
+      type: 'success',
+      text: `Terhubung ke ${connectedPrinterName.value || 'Printer Thermal'}.`
+    }
+  }
+}
+
+const handleDisconnectPrinter = () => {
+  disconnectBluetoothPrinter()
+  testPrintNotice.value = {
+    type: 'info',
+    text: 'Koneksi Bluetooth printer diputus.'
+  }
+}
+
+const handleTestPrint = async () => {
+  testPrintNotice.value = null
+  const res = await printTestThermal({
+    name: formName.value || props.storeProfile?.name || 'Warung Kasiry',
+    owner: formOwner.value || props.storeProfile?.owner || 'Pemilik Toko',
+    phone: formPhone.value ?? props.storeProfile?.phone ?? ''
+  })
+  if (res?.ok) {
+    testPrintNotice.value = {
+      type: 'success',
+      text: res.method === 'bluetooth'
+        ? `Tes cetak berhasil dikirim via Bluetooth (${connectedPrinterName.value || 'Printer'}).`
+        : 'Dialog cetak browser dibuka (printer Bluetooth belum tersambung).'
+    }
+  } else {
+    testPrintNotice.value = {
+      type: 'error',
+      text: printerError.value || res?.error || 'Tes cetak gagal dijalankan.'
+    }
+  }
+}
 
 // Preview & Konfirmasi Restore Backup JSON sebelum menulis ke DB
 const pendingImportPreview = ref(null)
@@ -385,13 +447,13 @@ const cancelImport = () => {
               class="w-full h-full rounded-[14px] object-cover"
             />
             <div v-else class="w-full h-full rounded-[14px] bg-[#0a193d] flex items-center justify-center text-white text-base font-extrabold font-mono">
-              {{ formName ? formName.substring(0, 2).toUpperCase() : 'HS' }}
+              {{ formName ? formName.substring(0, 2).toUpperCase() : 'WK' }}
             </div>
           </div>
           <div class="min-w-0">
             <h4 class="text-base font-bold text-white truncate leading-tight">{{ formName }}</h4>
             <p class="text-xs text-slate-300 mt-0.5 truncate flex items-center gap-1.5">
-              <span>{{ formOwner || 'Habiba' }}</span>
+              <span>{{ formOwner || 'Pemilik Toko' }}</span>
               <span class="text-slate-500">•</span>
               <span class="font-mono text-[11px]">{{ formPhone || '-' }}</span>
             </p>
@@ -418,32 +480,45 @@ const cancelImport = () => {
         </div>
       </div>
 
-      <!-- 3. Segmented Pill Tab Bar (2 Tabs) -->
+      <!-- 3. Segmented Pill Tab Bar (3 Tabs) -->
       <div class="px-5 pt-3 pb-1 shrink-0">
-        <div class="p-1 bg-slate-100/80 rounded-2xl grid grid-cols-2 gap-1">
+        <div class="p-1 bg-slate-100/80 rounded-2xl grid grid-cols-3 gap-1">
           <button 
             @click="activeTab = 'profile'"
             :class="[
-              'py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+              'py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
               activeTab === 'profile' 
                 ? 'bg-[#0a193d] text-white shadow-xs' 
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             ]"
           >
-            <Store class="w-4 h-4" />
+            <Store class="w-4 h-4 shrink-0" />
             <span>Profil Toko</span>
+          </button>
+
+          <button 
+            @click="activeTab = 'printer'"
+            :class="[
+              'py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+              activeTab === 'printer' 
+                ? 'bg-[#0a193d] text-white shadow-xs' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            ]"
+          >
+            <Printer class="w-4 h-4 shrink-0" />
+            <span>Printer</span>
           </button>
 
           <button 
             @click="activeTab = 'backup'"
             :class="[
-              'py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+              'py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer',
               activeTab === 'backup' 
                 ? 'bg-[#0a193d] text-white shadow-xs' 
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             ]"
           >
-            <Cloud class="w-4 h-4" />
+            <Cloud class="w-4 h-4 shrink-0" />
             <span>Pencadangan</span>
           </button>
         </div>
@@ -525,7 +600,190 @@ const cancelImport = () => {
           </button>
         </div>
 
-        <!-- ==================== TAB 2: CADANGAN & GOOGLE (DISATUKAN) ==================== -->
+        <!-- ==================== TAB 2: PRINTER THERMAL ==================== -->
+        <div v-else-if="activeTab === 'printer'" class="space-y-4">
+          <!-- Koneksi Printer Bluetooth -->
+          <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h4 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <Bluetooth class="w-4 h-4 text-[#0a193d]" />
+                  <span>Printer Thermal Bluetooth</span>
+                </h4>
+                <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  Hubungkan printer thermal ESC/POS (58mm/80mm) langsung via Web Bluetooth.
+                </p>
+              </div>
+              <span
+                :class="[
+                  'shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full border',
+                  isPrinterConnected
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-white text-slate-600 border-slate-200'
+                ]"
+              >
+                {{ isPrinterConnected ? 'Terhubung' : 'Belum Terhubung' }}
+              </span>
+            </div>
+
+            <div
+              v-if="isPrinterConnected && connectedPrinterName"
+              class="px-3 py-2 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between gap-2"
+            >
+              <span class="font-semibold truncate">Perangkat: {{ connectedPrinterName }}</span>
+            </div>
+
+            <div
+              v-if="!isBluetoothSupported"
+              class="px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 leading-relaxed"
+            >
+              Browser/perangkat ini belum mendukung Web Bluetooth. Saat mencetak struk atau tes cetak, Kasiry akan otomatis memakai <strong>Cetak Browser</strong> (<code>window.print</code>).
+            </div>
+
+            <div
+              v-if="printerError"
+              class="px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-[11px] text-rose-700 font-medium"
+            >
+              {{ printerError }}
+            </div>
+
+            <div class="flex gap-2">
+              <button
+                v-if="!isPrinterConnected"
+                type="button"
+                @click="handleConnectPrinter"
+                :disabled="!isBluetoothSupported || isConnectingPrinter"
+                class="flex-1 py-2.5 px-3 rounded-xl bg-[#0a193d] hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <Bluetooth class="w-4 h-4" />
+                <span>{{ isConnectingPrinter ? 'Menghubungkan...' : 'Hubungkan Printer Bluetooth' }}</span>
+              </button>
+
+              <button
+                v-else
+                type="button"
+                @click="handleDisconnectPrinter"
+                class="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <WifiOff class="w-4 h-4" />
+                <span>Putus Koneksi Printer</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Ukuran Kertas Thermal -->
+          <div class="p-4 rounded-2xl border border-slate-200 bg-white space-y-2.5">
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600">Ukuran Kertas Struk</h4>
+              <p class="text-[11px] text-slate-500 mt-0.5">Menyesuaikan lebar baris ESC/POS Bluetooth & cetak browser.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                @click="updatePrinterSettings({ paperWidth: '58mm' })"
+                :class="[
+                  'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                  printerSettings.paperWidth === '58mm'
+                    ? 'bg-[#0a193d] text-white border-[#0a193d] shadow-xs'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                ]"
+              >
+                <div class="text-xs font-bold">58mm (32 Kolom)</div>
+                <div :class="['text-[11px] mt-0.5', printerSettings.paperWidth === '58mm' ? 'text-slate-300' : 'text-slate-500']">
+                  Standar printer mini warung
+                </div>
+              </button>
+
+              <button
+                type="button"
+                @click="updatePrinterSettings({ paperWidth: '80mm' })"
+                :class="[
+                  'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                  printerSettings.paperWidth === '80mm'
+                    ? 'bg-[#0a193d] text-white border-[#0a193d] shadow-xs'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                ]"
+              >
+                <div class="text-xs font-bold">80mm (48 Kolom)</div>
+                <div :class="['text-[11px] mt-0.5', printerSettings.paperWidth === '80mm' ? 'text-slate-300' : 'text-slate-500']">
+                  Lebar meja kasir / desktop
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Opsi Otomatis & Catatan Struk -->
+          <div class="p-4 rounded-2xl border border-slate-200 bg-white space-y-4">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-xs font-bold text-slate-800">Cetak Otomatis Setelah Bayar</div>
+                <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  Langsung mencetak struk begitu pembayaran tunai, QRIS, atau kasbon selesai.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="printerSettings.autoPrint"
+                aria-label="Cetak Otomatis Setelah Bayar"
+                @click="updatePrinterSettings({ autoPrint: !printerSettings.autoPrint })"
+                :class="[
+                  'w-11 h-6 rounded-full transition-colors p-0.5 shrink-0 cursor-pointer flex items-center',
+                  printerSettings.autoPrint ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start'
+                ]"
+              >
+                <span class="w-5 h-5 rounded-full bg-white shadow-xs block"></span>
+              </button>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100">
+              <label for="printer-footer-note" class="block text-xs font-bold text-slate-700 mb-1.5">
+                Catatan Bawah Struk
+              </label>
+              <input
+                id="printer-footer-note"
+                type="text"
+                :value="printerSettings.footerText"
+                @input="updatePrinterSettings({ footerText: $event.target.value })"
+                maxlength="80"
+                placeholder="Terima kasih sudah berbelanja!"
+                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:border-[#0a193d] focus:ring-2 focus:ring-[#0a193d]/10 outline-none transition-all"
+              />
+              <p class="text-[11px] text-slate-400 mt-1">
+                Otomatis tersimpan dan tampil di bagian bawah struk.
+              </p>
+            </div>
+          </div>
+
+          <!-- Tes Cetak Printer -->
+          <div class="space-y-2">
+            <button
+              type="button"
+              @click="handleTestPrint"
+              :disabled="isPrinting"
+              class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <Printer class="w-4 h-4" />
+              <span>{{ isPrinting ? 'Sedang Mencetak...' : 'Tes Cetak Printer' }}</span>
+            </button>
+
+            <div
+              v-if="testPrintNotice"
+              :class="[
+                'px-3.5 py-2.5 rounded-xl border text-xs font-medium',
+                testPrintNotice.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : testPrintNotice.type === 'error'
+                    ? 'bg-rose-50 border-rose-200 text-rose-700'
+                    : 'bg-slate-100 border-slate-200 text-slate-700'
+              ]"
+            >
+              {{ testPrintNotice.text }}
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 3: CADANGAN & GOOGLE (DISATUKAN) ==================== -->
         <div v-else class="space-y-4">
           <!-- 1. Bagian Cadangan Akun Google -->
           <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3.5">
