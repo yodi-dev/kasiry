@@ -53,7 +53,7 @@ kasiryy/
 │   ├── utils/              # customerStats.js, dailyStats.js, expenseConstants.js, pricing.js, productUsage.js, excelExport.js, sound.js
 │   ├── App.vue             # Orkestrator Kasa, prewarm jalur checkout, & state global
 │   └── style.css           # Tailwind CSS v4, Bento container queries & content-visibility
-├── tests/                  # 9 suite test Vitest (33 skenario: DB, migrasi, pricing, usage, sync, stats, Excel, UI)
+├── tests/                  # 9 suite test Vitest (34 skenario: DB, migrasi, pricing, usage, sync, stats, Excel, UI)
 ├── CHANGELOG.md            # Riwayat rilis SemVer (Keep a Changelog)
 ├── DESIGN_SYSTEM.md        # Panduan visual & token warna/komponen
 ├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.13)

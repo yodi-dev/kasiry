@@ -380,15 +380,18 @@ const tierPillBadgeClass = (tier) => {
 
             <button
               type="button"
+              :disabled="!((item.baseSellPrice ?? item.sellPrice) > 0)"
               @click="selectItemTierMode(item, 'ecer')"
               :class="[
-                'px-2 py-1.5 rounded-xl text-[10px] font-bold border text-center cursor-pointer transition-colors',
-                item.priceMode === 'ecer'
-                  ? 'bg-[#0a193d] text-white border-[#0a193d]'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                'px-2 py-1.5 rounded-xl text-[10px] font-bold border text-center transition-colors',
+                !((item.baseSellPrice ?? item.sellPrice) > 0)
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : item.priceMode === 'ecer'
+                  ? 'bg-[#0a193d] text-white border-[#0a193d] cursor-pointer'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 cursor-pointer'
               ]"
             >
-              Ecer Rp {{ (item.baseSellPrice ?? item.sellPrice).toLocaleString('id-ID') }}
+              {{ (item.baseSellPrice ?? item.sellPrice) > 0 ? `Ecer Rp ${(item.baseSellPrice ?? item.sellPrice).toLocaleString('id-ID')}` : 'Ecer (Kosong)' }}
             </button>
 
             <button

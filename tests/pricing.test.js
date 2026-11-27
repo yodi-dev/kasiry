@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   resolveCartItemPricing,
   buildPricedCartItem,
+  repriceCartItems,
   normalizePriceTier,
   sanitizeOptionalPrice,
   sanitizeMinQty
@@ -97,5 +98,35 @@ describe('Multi-Price Pricing Engine (Ecer / Grosir / Agen / Auto-Qty / Manual)'
     expect(sanitizeOptionalPrice('')).toBe(0)
     expect(sanitizeMinQty(1)).toBe(0)
     expect(sanitizeMinQty(5)).toBe(5)
+  })
+
+  it('reprices existing cart items immediately when switching Harga Nota after adding Ecer & Grosir without clearing cart', () => {
+    // 1. Produk baru di keranjang (sebelumnya priceMode terkunci 'grosir' usai edit harga grosir)
+    const initialCart = [
+      buildPricedCartItem(
+        { id: 10, name: 'Gas LPG 3 Kg', sellPrice: 22000, wholesalePrice: 20000, agentPrice: 19000, priceMode: 'grosir', qty: 1 },
+        'ecer'
+      ),
+      buildPricedCartItem(
+        { id: 20, name: 'Nego Khusus', sellPrice: 10000, wholesalePrice: 9000, priceMode: 'manual', customPrice: 8500, qty: 1 },
+        'ecer'
+      )
+    ]
+    const updatedCatalog = [
+      { id: 10, name: 'Gas LPG 3 Kg', sellPrice: 22500, wholesalePrice: 20500, wholesaleMinQty: 0, agentPrice: 19500 },
+      { id: 20, name: 'Nego Khusus', sellPrice: 10000, wholesalePrice: 9000, wholesaleMinQty: 0, agentPrice: 0 }
+    ]
+
+    // 2. Pindah Harga Nota -> Ecer: item #10 langsung ikut Ecer terbaru tanpa kosongkan keranjang; item manual #20 tetap aman
+    const asEcer = repriceCartItems(initialCart, updatedCatalog, 'ecer', { forceFollowNota: true })
+    expect(asEcer[0]).toMatchObject({ sellPrice: 22500, appliedTier: 'ecer', priceMode: 'auto' })
+    expect(asEcer[1]).toMatchObject({ sellPrice: 8500, appliedTier: 'manual', priceMode: 'manual' })
+
+    // 3. Pindah Harga Nota -> Grosir -> Agen: langsung berganti-ganti mulus
+    const asGrosir = repriceCartItems(asEcer, updatedCatalog, 'grosir', { forceFollowNota: true })
+    expect(asGrosir[0]).toMatchObject({ sellPrice: 20500, appliedTier: 'grosir' })
+
+    const asAgen = repriceCartItems(asGrosir, updatedCatalog, 'agen', { forceFollowNota: true })
+    expect(asAgen[0]).toMatchObject({ sellPrice: 19500, appliedTier: 'agen' })
   })
 })

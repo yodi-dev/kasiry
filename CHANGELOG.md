@@ -6,6 +6,15 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.13.1] - 2026-11-27 (Hotfix Live Update Pilihan Harga Ecer/Grosir/Agen di Keranjang)
+
+### Fixed
+- **Sinkronisasi Langsung Pilihan Harga di Keranjang (`src/utils/pricing.js`, `src/App.vue`, `src/components/CartSection.vue`):**
+  - Memperbaiki bug di mana setelah menyimpan harga baru per item (`Jadi Ecer`, `Jadi Grosir`, atau `Jadi Agen`) di editor keranjang, pergantian tombol **`Harga Nota: Ecer | Grosir | Agen`** atau pemilihan pelanggan berlevel tidak langsung memperbarui harga sebelum mengosongkan keranjang (`priceMode` sebelumnya tertinggal terkunci di tier lama).
+  - Menambahkan helper `repriceCartItems` agar setiap perubahan `Harga Nota` atau pelanggan otomatis menyinkronkan harga terbaru katalog dan mengembalikan item bertier katalog ke mode `'auto'` secara *real-time* (sambil tetap melindungi harga nego `'manual'`), sekaligus menonaktifkan tombol tier `Ecer (Kosong)` saat tarif dasar belum diatur.
+
+---
+
 ## [2.13.0] - 2026-11-27 (Roadmap #6: Pembersihan Data Awal, 300 Katalog Warung, Harga Cepat, Reset Toko & Barang Tidak Terjual)
 
 ### Added & Changed

@@ -94,7 +94,7 @@ import { useHardwareScanner } from './composables/useHardwareScanner'
 import { playBeepSound } from './utils/sound'
 import { exportKasiryExcel } from './utils/excelExport'
 import { computeDailyStats } from './utils/dailyStats'
-import { buildPricedCartItem, normalizePriceTier } from './utils/pricing'
+import { buildPricedCartItem, normalizePriceTier, repriceCartItems } from './utils/pricing'
 import { useGoogleSync } from './composables/useGoogleSync'
 
 // Dexie Database Composable (IndexedDB Engine)
@@ -280,22 +280,31 @@ const totalCartCount = computed(() => {
 const autoEditProductId = ref(null)
 
 const addToCart = (product) => {
-  const existingIndex = cart.value.findIndex(item => item.id === product.id)
+  const freshProd = products.value.find(p => p.id === product.id) || product
+  const existingIndex = cart.value.findIndex(item => item.id === freshProd.id)
   if (existingIndex > -1) {
     const existing = cart.value[existingIndex]
     cart.value[existingIndex] = buildPricedCartItem(
-      { ...existing, qty: existing.qty + 1 },
+      {
+        ...existing,
+        buyPrice: freshProd.buyPrice ?? existing.buyPrice,
+        baseSellPrice: freshProd.sellPrice ?? existing.baseSellPrice,
+        wholesalePrice: freshProd.wholesalePrice ?? existing.wholesalePrice,
+        wholesaleMinQty: freshProd.wholesaleMinQty ?? existing.wholesaleMinQty,
+        agentPrice: freshProd.agentPrice ?? existing.agentPrice,
+        qty: existing.qty + 1
+      },
       cartPriceTier.value
     )
   } else {
     cart.value.push(
       buildPricedCartItem(
-        { ...product, baseSellPrice: product.sellPrice, qty: 1 },
+        { ...freshProd, baseSellPrice: freshProd.sellPrice, qty: 1 },
         cartPriceTier.value
       )
     )
-    if (!(Number(product.sellPrice || 0) > 0)) {
-      autoEditProductId.value = product.id
+    if (!(Number(freshProd.sellPrice || 0) > 0)) {
+      autoEditProductId.value = freshProd.id
     }
   }
   ensureKasaFocus()
@@ -314,8 +323,19 @@ const increaseQty = (productId) => {
   const idx = cart.value.findIndex(i => i.id === productId)
   if (idx > -1) {
     const current = cart.value[idx]
+    const fresh = products.value.find(p => p.id === productId)
     cart.value[idx] = buildPricedCartItem(
-      { ...current, qty: current.qty + 1 },
+      {
+        ...current,
+        ...(fresh ? {
+          buyPrice: fresh.buyPrice,
+          baseSellPrice: fresh.sellPrice,
+          wholesalePrice: fresh.wholesalePrice,
+          wholesaleMinQty: fresh.wholesaleMinQty,
+          agentPrice: fresh.agentPrice
+        } : {}),
+        qty: current.qty + 1
+      },
       cartPriceTier.value
     )
   }
@@ -353,7 +373,7 @@ const clearCart = () => {
 const handleChangeCartPriceTier = (tier) => {
   cartPriceTier.value = normalizePriceTier(tier)
   tierAppliedByCustomer.value = false
-  cart.value = cart.value.map(item => buildPricedCartItem(item, cartPriceTier.value))
+  cart.value = repriceCartItems(cart.value, products.value, cartPriceTier.value, { forceFollowNota: true })
 }
 
 const handleCustomerPriceTierChange = ({ customer, priceTier }) => {
@@ -362,11 +382,11 @@ const handleCustomerPriceTierChange = ({ customer, priceTier }) => {
   if (normalized !== 'ecer') {
     cartPriceTier.value = normalized
     tierAppliedByCustomer.value = true
-    cart.value = cart.value.map(item => buildPricedCartItem(item, cartPriceTier.value))
+    cart.value = repriceCartItems(cart.value, products.value, cartPriceTier.value, { forceFollowNota: true })
   } else if (tierAppliedByCustomer.value) {
     cartPriceTier.value = 'ecer'
     tierAppliedByCustomer.value = false
-    cart.value = cart.value.map(item => buildPricedCartItem(item, 'ecer'))
+    cart.value = repriceCartItems(cart.value, products.value, cartPriceTier.value, { forceFollowNota: true })
   }
 }
 
@@ -390,12 +410,12 @@ const handleUpdateItemPrice = async ({ productId, priceMode, customPrice, saveTo
   }
 
   const nextMode = updatedCatalog && (saveToCatalogTier === 'ecer' || saveToCatalogTier === 'grosir' || saveToCatalogTier === 'agen')
-    ? saveToCatalogTier
+    ? (saveToCatalogTier === cartPriceTier.value ? 'auto' : saveToCatalogTier)
     : priceMode
 
   cart.value = cart.value.map(item => {
     if (item.id !== productId) return item
-    const baseProd = updatedCatalog || item
+    const baseProd = updatedCatalog || products.value.find(p => p.id === productId) || item
     return buildPricedCartItem(
       {
         ...item,
@@ -416,22 +436,7 @@ const handleUpdateItemPrice = async ({ productId, priceMode, customPrice, saveTo
 const handleSaveProduct = async (prodData) => {
   const saved = await saveProduct(prodData)
   if (saved) {
-    cart.value = cart.value.map(item => {
-      if (item.id !== saved.id) return item
-      return buildPricedCartItem(
-        {
-          ...item,
-          name: saved.name,
-          category: saved.category,
-          buyPrice: saved.buyPrice,
-          baseSellPrice: saved.sellPrice,
-          wholesalePrice: saved.wholesalePrice,
-          wholesaleMinQty: saved.wholesaleMinQty,
-          agentPrice: saved.agentPrice
-        },
-        cartPriceTier.value
-      )
-    })
+    cart.value = repriceCartItems(cart.value, products.value, cartPriceTier.value)
   }
   triggerCloudAutoBackup()
 }

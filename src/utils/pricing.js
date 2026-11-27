@@ -158,3 +158,39 @@ export function buildPricedCartItem(item, cartTier = 'ecer') {
     isFallbackPrice: resolved.isFallback
   }
 }
+
+/**
+ * Sinkronkan ulang harga seluruh item keranjang terhadap data katalog terbaru dan level harga nota aktif.
+ * Jika `forceFollowNota` aktif (saat ganti level nota Ecer/Grosir/Agen atau ganti pelanggan),
+ * item yang sebelumnya terkunci di tier katalog tertentu dikembalikan ke mode `'auto'`
+ * agar langsung mengikuti level nota baru (hanya harga nego `'manual'` yang dipertahankan).
+ */
+export function repriceCartItems(cartItems = [], products = [], cartTier = 'ecer', options = {}) {
+  const { forceFollowNota = false } = options
+  const normalizedCartTier = normalizePriceTier(cartTier)
+  const prodMap = new Map((products || []).map(p => [p.id, p]))
+
+  return (cartItems || []).map(item => {
+    const fresh = prodMap.get(item.id)
+    const nextMode = forceFollowNota && item.priceMode !== 'manual'
+      ? 'auto'
+      : (item.priceMode || 'auto')
+
+    return buildPricedCartItem(
+      {
+        ...item,
+        ...(fresh ? {
+          name: fresh.name,
+          category: fresh.category,
+          buyPrice: fresh.buyPrice,
+          baseSellPrice: fresh.sellPrice,
+          wholesalePrice: fresh.wholesalePrice,
+          wholesaleMinQty: fresh.wholesaleMinQty,
+          agentPrice: fresh.agentPrice
+        } : {}),
+        priceMode: nextMode
+      },
+      normalizedCartTier
+    )
+  })
+}
