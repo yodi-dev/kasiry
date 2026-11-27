@@ -7,6 +7,7 @@ import DebtBookModal from '../src/components/DebtBookModal.vue'
 import ReceiptModal from '../src/components/ReceiptModal.vue'
 import DailyReportModal from '../src/components/DailyReportModal.vue'
 import ExpenseModal from '../src/components/ExpenseModal.vue'
+import FrequentProductsSection from '../src/components/FrequentProductsSection.vue'
 import TopBar from '../src/components/TopBar.vue'
 import CustomerManagementModal from '../src/components/CustomerManagementModal.vue'
 import LazyInventoryModal from '../src/components/LazyInventoryModal.vue'
@@ -271,6 +272,24 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
         todayExpenseCount: 1
       }
     })
+
+    // Header TopBar harus berada di atas stacking context main workspace & search card
+    expect(topBar.find('header').classes()).toContain('z-40')
+
+    // FrequentProductsSection: badge kuantitas berada di dalam batas kartu (tidak overflow keluar)
+    const freqSection = mount(FrequentProductsSection, {
+      props: {
+        frequentProducts: [{ id: 1, name: 'Gas LPG 3 Kg', sellPrice: 22000, category: 'Sembako' }],
+        allProducts: [{ id: 1, name: 'Gas LPG 3 Kg', sellPrice: 22000, category: 'Sembako' }],
+        categories: ['Sembako'],
+        cartItems: [{ id: 1, name: 'Gas LPG 3 Kg', sellPrice: 22000, qty: 2 }]
+      }
+    })
+    const qtyBadge = freqSection.findAll('span').find(s => s.text().trim() === '2×')
+    expect(qtyBadge).toBeTruthy()
+    expect(qtyBadge.classes()).toContain('top-1.5')
+    expect(qtyBadge.classes()).toContain('right-1.5')
+    expect(qtyBadge.classes()).not.toContain('-top-1.5')
 
     // Dropdown Stok & Data pada desktop/tablet membuka pilihan Barang & Pelanggan
     const stokDropdownBtn = topBar.find('button[title="Kelola Barang & Data Pelanggan"]')

@@ -839,7 +839,7 @@ onUnmounted(() => {
     />
 
     <!-- 2. Ergonomic Workspace (Mobile: Scrollable Thumb Zone | Tablet & Desktop: Locked Bento Workstation) -->
-    <main class="w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 pt-1 pb-2 md:py-2.5 lg:py-3 flex-1 md:min-h-0 flex flex-col">
+    <main class="relative z-10 w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 pt-1 pb-2 md:py-2.5 lg:py-3 flex-1 md:min-h-0 flex flex-col">
       <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 md:gap-4 lg:gap-5 items-start md:items-stretch md:flex-1 md:min-h-0">
         
         <!-- BAGIAN 1: STRUK BELANJAAN / REGISTER CHECKOUT -->

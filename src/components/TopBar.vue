@@ -242,7 +242,7 @@ const drawerGroups = computed(() => [
 </script>
 
 <template>
-  <header class="w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 pt-3 sm:pt-3.5 pb-1.5 shrink-0">
+  <header class="relative z-40 w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 pt-3 sm:pt-3.5 pb-1.5 shrink-0">
     <div class="flex items-center justify-between gap-2 md:gap-3 md:bg-white/75 md:backdrop-blur-md md:rounded-2xl md:border md:border-white/90 md:shadow-xs md:px-4 md:py-2">
       <!-- Mobile Left: Sleek 2-Line Hamburger Menu Icon -->
       <button

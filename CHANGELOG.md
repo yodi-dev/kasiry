@@ -6,6 +6,14 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.9.1] - 2026-11-27 (Hotfix Layering Dropdown TopBar & Badge Kuantitas Barang Cepat)
+
+### Fixed
+- **Menu Dropdown `Stok & Data` Tertutup Card Pencarian (`src/components/TopBar.vue` & `src/App.vue`):** Menambahkan `relative z-40` pada `<header>` `TopBar` dan `relative z-10` pada `<main>` agar dropdown menu selalu berada di atas stacking context `backdrop-blur-md` dari panel katalog/pencarian produk, sambil tetap berada di bawah modal overlay (`z-50`).
+- **Badge Jumlah (`1×`, `2×`) Terpotong di Baris Paling Atas (`src/components/FrequentProductsSection.vue`):** Memindahkan badge kuantitas aktif dari `-top-1.5 -right-1.5` ke dalam batas aman sudut kanan atas kartu (`top-1.5 right-1.5` dengan clearance teks `pr-8`), menambahkan `pt-1 md:pr-1 pb-1` pada scroll pane, serta memberi `relative z-20` pada wrapper `#search` inline agar dropdown hasil pencarian tampil rapi di atas grid kartu.
+
+---
+
 ## [2.9.0] - 2026-11-27 (Roadmap #2: Pengeluaran Harian & Reorganisasi Menu Kompak)
 
 ### Added
