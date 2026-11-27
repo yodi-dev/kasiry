@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Plus, Flame, LayoutGrid } from '@lucide/vue'
 
 const props = defineProps({
@@ -24,6 +24,11 @@ const props = defineProps({
 const emit = defineEmits(['selectProduct'])
 
 const activeTab = ref('Terlaris')
+const displayLimit = ref(120)
+
+watch(activeTab, () => {
+  displayLimit.value = 120
+})
 
 // Peta cepat jumlah barang yang sedang ada di keranjang
 const cartQtyMap = computed(() => {
@@ -46,7 +51,7 @@ const activeCategories = computed(() => {
     .map(cat => ({ name: cat, count: counts[cat] }))
 })
 
-const displayedProducts = computed(() => {
+const filteredTabProducts = computed(() => {
   if (activeTab.value === 'Terlaris') {
     return props.frequentProducts
   }
@@ -54,6 +59,10 @@ const displayedProducts = computed(() => {
     return props.allProducts
   }
   return props.allProducts.filter(p => p.category?.trim() === activeTab.value)
+})
+
+const displayedProducts = computed(() => {
+  return filteredTabProducts.value.slice(0, displayLimit.value)
 })
 </script>
 
@@ -186,13 +195,32 @@ const displayedProducts = computed(() => {
           </div>
 
           <div class="flex items-center justify-between gap-1 mt-1.5 pt-1.5 border-t border-slate-100/90">
-            <p class="font-bold text-[#0284c7] text-xs sm:text-sm tabular-nums truncate">
+            <p v-if="item.sellPrice > 0" class="font-bold text-[#0284c7] text-xs sm:text-sm tabular-nums truncate">
               Rp {{ item.sellPrice.toLocaleString('id-ID') }}
             </p>
+            <span
+              v-else
+              class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 truncate"
+            >
+              Atur Harga
+            </span>
             <div class="size-6 sm:size-6 rounded-lg bg-sky-50 group-hover:bg-[#0a193d] text-sky-700 group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
               <Plus aria-hidden="true" class="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
           </div>
+        </button>
+      </div>
+
+      <div
+        v-if="filteredTabProducts.length > displayedProducts.length"
+        class="pt-3 flex justify-center"
+      >
+        <button
+          type="button"
+          @click="displayLimit += 120"
+          class="h-9 px-4 rounded-xl bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-xs font-bold text-[#0284c7] cursor-pointer shadow-2xs transition-colors"
+        >
+          Tampilkan Lagi ({{ displayedProducts.length }} / {{ filteredTabProducts.length }})
         </button>
       </div>
     </div>

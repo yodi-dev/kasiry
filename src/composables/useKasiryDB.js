@@ -2,6 +2,7 @@ import { ref, shallowRef, computed } from 'vue'
 import { db, initDatabase } from '../db/index'
 import { computeShiftClosingPreview } from '../utils/dailyStats'
 import { normalizePriceTier, sanitizeOptionalPrice, sanitizeMinQty } from '../utils/pricing'
+import { buildProductUsageMap } from '../utils/productUsage'
 
 // Helper agar objek/array reaktif Vue (Proxy) selalu dikonversi menjadi plain JS sebelum disimpan ke IndexedDB
 const toPlain = (val) => {
@@ -80,13 +81,23 @@ const lastLocalBackupTime = ref(
   typeof localStorage !== 'undefined' ? localStorage.getItem('kasiry_last_local_backup') || null : null
 )
 const storeProfile = ref({
-  name: 'Habiba Store',
-  owner: 'Habiba',
-  phone: '081234567890'
+  name: 'Warung Kasiry',
+  owner: 'Pemilik Toko',
+  phone: ''
 })
 
-// Kategori Barang
-const initialDefaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok', 'Curah', 'Lainnya']
+// Kategori Barang Warung Indonesia
+const initialDefaultCategories = [
+  'Sembako',
+  'Makanan',
+  'Minuman',
+  'Jajanan & Kopi',
+  'Bumbu Dapur',
+  'Kebersihan',
+  'Rokok',
+  'Curah',
+  'Obat & Lainnya'
+]
 const categoryList = ref([...initialDefaultCategories])
 
 // Gabungan kategori tersimpan + kategori yang ada di barang aktif
@@ -259,6 +270,21 @@ export function useKasiryDB() {
       await db.products.put(prod)
       await refreshProducts()
     }
+  }
+
+  const deleteProductsBulk = async (productIds = []) => {
+    const uniqueIds = Array.from(new Set(productIds)).filter(id => id !== null && id !== undefined)
+    if (uniqueIds.length === 0) return 0
+    const now = Date.now()
+    const docs = await db.products.bulkGet(uniqueIds)
+    const toSoftDelete = docs
+      .filter(p => p && !p.deleted)
+      .map(p => toPlain({ ...p, deleted: true, updatedAt: now }))
+    if (toSoftDelete.length > 0) {
+      await db.products.bulkPut(toSoftDelete)
+      await refreshProducts()
+    }
+    return toSoftDelete.length
   }
 
   // CRUD Pelanggan (Buku Utang & Level Harga Pelanggan)
@@ -1415,6 +1441,74 @@ export function useKasiryDB() {
     return { success: true }
   }
 
+  // Hitung statistik barang terjual / tidak pernah terjual lintas histori penuh IndexedDB
+  const getAllProductUsageStats = async (slowThresholdDays = 30) => {
+    const allTx = await db.transactions.toArray()
+    return buildProductUsageMap(products.value, allTx, Date.now(), slowThresholdDays)
+  }
+
+  // Atur ulang / reset data warung ke toko kosong (0 barang) atau katalog bawaan 300 barang populer
+  const resetStoreData = async ({ mode = 'empty' } = {}) => {
+    const now = Date.now()
+    const cleanMode = mode === 'starter' ? 'starter' : 'empty'
+    let starterCatalog = []
+    let starterCustomers = [
+      {
+        id: 1,
+        name: 'Umum',
+        phone: '',
+        totalDebt: 0,
+        priceTier: 'ecer',
+        lastDate: 'Hari ini',
+        updatedAt: now,
+        deleted: false
+      }
+    ]
+
+    if (cleanMode === 'starter') {
+      const seedMod = await import('../db/seedData')
+      starterCatalog = seedMod.seedProducts.map(p => ({ ...p, updatedAt: now }))
+      starterCustomers = seedMod.seedCustomers.map(c => ({ ...c, updatedAt: now }))
+    }
+
+    await db.transaction(
+      'rw',
+      [db.products, db.customers, db.transactions, db.debtPayments, db.expenses, db.restocks, db.shifts, db.settings],
+      async () => {
+        await Promise.all([
+          db.products.clear(),
+          db.customers.clear(),
+          db.transactions.clear(),
+          db.debtPayments.clear(),
+          db.expenses.clear(),
+          db.restocks.clear(),
+          db.shifts.clear()
+        ])
+
+        if (starterCatalog.length > 0) {
+          await db.products.bulkPut(toPlain(starterCatalog))
+        }
+        await db.customers.bulkPut(toPlain(starterCustomers))
+
+        await db.settings.bulkPut([
+          { key: 'categories', value: toPlain([...initialDefaultCategories]), updatedAt: now },
+          { key: 'archiveState', value: { cutoffAt: 0 }, updatedAt: now },
+          { key: 'lastOpeningCash', value: 0, updatedAt: now }
+        ])
+      }
+    )
+
+    archiveCutoffAt.value = 0
+    lastOpeningCash.value = 0
+    await refreshAllData()
+
+    return {
+      mode: cleanMode,
+      productCount: starterCatalog.length,
+      customerCount: starterCustomers.length
+    }
+  }
+
   return {
     isDbReady,
     products,
@@ -1446,6 +1540,9 @@ export function useKasiryDB() {
     refreshAllData,
     saveProduct,
     deleteProduct,
+    deleteProductsBulk,
+    getAllProductUsageStats,
+    resetStoreData,
     saveCustomer,
     deleteCustomer,
     recordDebtPayment,

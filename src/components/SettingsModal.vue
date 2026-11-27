@@ -29,9 +29,9 @@ const props = defineProps({
   storeProfile: {
     type: Object,
     default: () => ({
-      name: 'Habiba Store',
-      owner: 'Habiba',
-      phone: '081234567890'
+      name: 'Warung Kasiry',
+      owner: 'Pemilik Toko',
+      phone: ''
     })
   },
   isOnline: {
@@ -110,21 +110,23 @@ const emit = defineEmits([
   'exportBackup', 
   'importBackup',
   'updateClientId',
-  'archiveOldData'
+  'archiveOldData',
+  'resetStoreData'
 ])
 
 // 2 Tabs: 'profile' (Nama Pemilik) | 'backup' (Cadangan & Google)
 const activeTab = ref('profile')
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.6.0'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.13.0'
 
-const formName = ref(props.storeProfile?.name || 'Habiba Store')
-const formOwner = ref(props.storeProfile?.owner || 'Habiba')
-const formPhone = ref(props.storeProfile?.phone || '081234567890')
+const formName = ref(props.storeProfile?.name || 'Warung Kasiry')
+const formOwner = ref(props.storeProfile?.owner || 'Pemilik Toko')
+const formPhone = ref(props.storeProfile?.phone || '')
 const formClientId = ref(props.customClientId || '')
 const showClientIdConfig = ref(false)
 const clientIdSaved = ref(false)
 const fileInputRef = ref(null)
 const isSaved = ref(false)
+const confirmingResetMode = ref(null) // 'empty' | 'starter' | null
 
 // Preview & Konfirmasi Restore Backup JSON sebelum menulis ke DB
 const pendingImportPreview = ref(null)
@@ -207,11 +209,17 @@ watch([activeTab, archiveRetentionDays, () => props.totalTransactionCount], ([ta
 
 watch(() => props.storeProfile, (newVal) => {
   if (newVal) {
-    formName.value = newVal.name || 'Habiba Store'
-    formOwner.value = newVal.owner || 'Habiba'
-    formPhone.value = newVal.phone || '081234567890'
+    formName.value = newVal.name || 'Warung Kasiry'
+    formOwner.value = newVal.owner || 'Pemilik Toko'
+    formPhone.value = newVal.phone || ''
   }
 }, { deep: true, immediate: true })
+
+watch(() => props.isOpen, (open) => {
+  if (open) {
+    confirmingResetMode.value = null
+  }
+})
 
 // Status pengingat cadangan file offline
 const localBackupStatus = computed(() => {
@@ -246,9 +254,9 @@ const localBackupStatus = computed(() => {
 
 const saveProfile = () => {
   emit('updateProfile', {
-    name: formName.value.trim() || 'Habiba Store',
-    owner: formOwner.value.trim() || 'Habiba',
-    phone: formPhone.value.trim() || '081234567890'
+    name: formName.value.trim() || 'Warung Kasiry',
+    owner: formOwner.value.trim() || 'Pemilik Toko',
+    phone: formPhone.value.trim()
   })
   isSaved.value = true
   setTimeout(() => {
@@ -458,7 +466,7 @@ const cancelImport = () => {
                 <input 
                   type="text" 
                   v-model="formName"
-                  placeholder="Contoh: Habiba Store"
+                  placeholder="Contoh: Warung Kasiry"
                   class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-bold text-[#0a193d] outline-hidden transition-all"
                 />
               </div>
@@ -476,7 +484,7 @@ const cancelImport = () => {
                   <input 
                     type="text" 
                     v-model="formOwner"
-                    placeholder="Contoh: Habiba"
+                    placeholder="Contoh: Pemilik Toko"
                     class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-semibold text-[#0a193d] outline-hidden transition-all"
                   />
                 </div>
@@ -493,7 +501,7 @@ const cancelImport = () => {
                   <input 
                     type="text" 
                     v-model="formPhone"
-                    placeholder="081234567890"
+                    placeholder="08xxxxxxxxxx"
                     class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-mono font-semibold text-[#0a193d] outline-hidden transition-all"
                   />
                 </div>
@@ -919,6 +927,59 @@ const cancelImport = () => {
               <div v-else class="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/70 flex items-center gap-2 text-xs text-emerald-800 font-semibold">
                 <CheckCircle class="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Memori kasir ringan! Belum ada transaksi lama yang perlu diarsipkan untuk rentang ini.</span>
+              </div>
+            </div>
+
+            <!-- Bagian 4: Atur Ulang Data Awal / Mulai Toko Kosong -->
+            <div class="p-4 bg-white rounded-2xl border border-rose-200/80 shadow-xs space-y-3">
+              <div>
+                <h4 class="font-bold text-[#0a193d] text-sm">Atur Ulang Katalog &amp; Data Toko</h4>
+                <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  Gunakan saat ingin membersihkan data uji coba untuk mulai berjualan, atau memuat ulang 300 daftar barang warung siap isi harga.
+                </p>
+              </div>
+
+              <div v-if="!confirmingResetMode" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  @click="confirmingResetMode = 'empty'"
+                  class="p-2.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-left cursor-pointer transition-colors"
+                >
+                  <strong class="text-xs font-bold text-rose-800 block">Mulai Toko Kosong</strong>
+                  <span class="text-[11px] text-rose-700/80">Hapus katalog &amp; transaksi (0 barang)</span>
+                </button>
+                <button
+                  type="button"
+                  @click="confirmingResetMode = 'starter'"
+                  class="p-2.5 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100 text-left cursor-pointer transition-colors"
+                >
+                  <strong class="text-xs font-bold text-[#0a193d] block">Muat 300 Katalog Warung</strong>
+                  <span class="text-[11px] text-slate-600">Reset &amp; isi 300 barang populer Rp 0</span>
+                </button>
+              </div>
+
+              <div v-else class="p-3 rounded-xl bg-rose-50 border border-rose-200 space-y-2">
+                <p class="text-xs font-bold text-rose-900 leading-snug">
+                  {{ confirmingResetMode === 'empty'
+                    ? 'Yakin hapus SEMUA barang, transaksi, dan piutang agar mulai dari Toko Kosong (0 barang)?'
+                    : 'Yakin hapus semua transaksi/data lama dan muat ulang 300 katalog warung standar (harga Rp 0)?' }}
+                </p>
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    @click="confirmingResetMode = null"
+                    class="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    @click="emit('resetStoreData', confirmingResetMode); confirmingResetMode = null"
+                    class="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer"
+                  >
+                    Ya, Atur Ulang Sekarang
+                  </button>
+                </div>
               </div>
             </div>
 

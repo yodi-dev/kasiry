@@ -23,6 +23,10 @@ const props = defineProps({
   selectedCustomerName: {
     type: String,
     default: ''
+  },
+  autoEditProductId: {
+    type: Number,
+    default: null
   }
 })
 
@@ -33,7 +37,8 @@ const emit = defineEmits([
   'clearCart',
   'openPayment',
   'changePriceTier',
-  'updateItemPrice'
+  'updateItemPrice',
+  'clearAutoEdit'
 ])
 
 const totalItemCount = computed(() => {
@@ -54,14 +59,28 @@ watch(
   }
 )
 
+watch(
+  () => props.autoEditProductId,
+  (targetId) => {
+    if (!targetId) return
+    const targetItem = props.cartItems.find(i => i.id === targetId)
+    if (targetItem) {
+      editingItemId.value = targetItem.id
+      manualPriceInput.value = targetItem.sellPrice > 0 ? String(targetItem.sellPrice) : ''
+      saveTargetCatalogTier.value = !(targetItem.baseSellPrice > 0) ? 'ecer' : 'none'
+    }
+    emit('clearAutoEdit')
+  }
+)
+
 const togglePriceEditor = (item) => {
   if (editingItemId.value === item.id) {
     editingItemId.value = null
     return
   }
   editingItemId.value = item.id
-  manualPriceInput.value = String(item.sellPrice || item.baseSellPrice || '')
-  saveTargetCatalogTier.value = 'none'
+  manualPriceInput.value = item.sellPrice > 0 ? String(item.sellPrice) : ''
+  saveTargetCatalogTier.value = !(item.baseSellPrice > 0) ? 'ecer' : 'none'
 }
 
 const selectItemTierMode = (item, mode) => {
@@ -89,6 +108,17 @@ const applyManualPrice = (item) => {
     saveToCatalogTier: saveTargetCatalogTier.value
   })
   editingItemId.value = null
+}
+
+const handleOpenPaymentClick = () => {
+  const unpriced = props.cartItems.find(i => !(i.sellPrice > 0) && i.priceMode === 'auto')
+  if (unpriced) {
+    editingItemId.value = unpriced.id
+    manualPriceInput.value = ''
+    saveTargetCatalogTier.value = 'ecer'
+    return
+  }
+  emit('openPayment')
 }
 
 const tierPillBadgeClass = (tier) => {
@@ -197,8 +227,17 @@ const tierPillBadgeClass = (tier) => {
                 class="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-[#0284c7] font-medium cursor-pointer transition-colors"
                 :title="`Ubah harga atau pilih Ecer/Grosir/Agen untuk ${item.name}`"
               >
-                <span class="tabular-nums underline decoration-dashed decoration-slate-300 underline-offset-2">
+                <span
+                  v-if="item.sellPrice > 0"
+                  class="tabular-nums underline decoration-dashed decoration-slate-300 underline-offset-2"
+                >
                   Rp {{ item.sellPrice.toLocaleString('id-ID') }}
+                </span>
+                <span
+                  v-else
+                  class="px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 font-bold border border-amber-300/80"
+                >
+                  Isi Harga!
                 </span>
                 <span
                   :class="[
@@ -226,8 +265,17 @@ const tierPillBadgeClass = (tier) => {
               @click.stop="togglePriceEditor(item)"
               class="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-[#0284c7] font-medium cursor-pointer"
             >
-              <span class="tabular-nums underline decoration-dashed decoration-slate-300 underline-offset-2">
+              <span
+                v-if="item.sellPrice > 0"
+                class="tabular-nums underline decoration-dashed decoration-slate-300 underline-offset-2"
+              >
                 @ Rp {{ item.sellPrice.toLocaleString('id-ID') }}
+              </span>
+              <span
+                v-else
+                class="px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 font-bold border border-amber-300/80"
+              >
+                Isi Harga!
               </span>
               <span
                 :class="[
@@ -444,7 +492,7 @@ const tierPillBadgeClass = (tier) => {
       <button
         type="button"
         :disabled="cartItems.length === 0"
-        @click="emit('openPayment')"
+        @click="handleOpenPaymentClick"
         class="h-12 px-4 rounded-2xl font-bold text-sm flex items-center justify-between transition-all cursor-pointer disabled:bg-slate-200/80 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed"
         :class="cartItems.length > 0
           ? 'bg-linear-to-r from-[#0a193d] via-[#102b66] to-[#0284c7] hover:brightness-110 active:scale-98 text-white shadow-lg shadow-sky-900/15'

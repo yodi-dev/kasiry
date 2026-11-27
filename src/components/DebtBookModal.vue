@@ -35,7 +35,7 @@ const props = defineProps({
   },
   storeName: {
     type: String,
-    default: 'Habiba Store'
+    default: 'Warung Kasiry'
   }
 })
 

@@ -32,7 +32,7 @@ const props = defineProps({
   },
   defaultCashierName: {
     type: String,
-    default: 'Habiba'
+    default: 'Kasir'
   },
   lastOpeningCash: {
     type: Number,
@@ -56,7 +56,7 @@ const props = defineProps({
   },
   storeName: {
     type: String,
-    default: 'Habiba Store'
+    default: 'Warung Kasiry'
   },
   isAutoPrompt: {
     type: Boolean,
@@ -72,7 +72,7 @@ const emit = defineEmits([
   'startNextShift'
 ])
 
-const cashierInput = ref(props.defaultCashierName || 'Habiba')
+const cashierInput = ref(props.defaultCashierName || 'Kasir')
 const openingCashInput = ref(String(props.lastOpeningCash || 0))
 const adoptUnassigned = ref(true)
 
@@ -91,7 +91,7 @@ watch(
   () => [props.isOpen, props.activeShift?.id, props.completedShift?.id],
   ([open]) => {
     if (open) {
-      cashierInput.value = props.defaultCashierName || 'Habiba'
+      cashierInput.value = props.defaultCashierName || 'Kasir'
       openingCashInput.value = String(props.lastOpeningCash || 0)
       adoptUnassigned.value = true
       actualCashInput.value = ''
@@ -237,7 +237,7 @@ const shareClosedShiftToWA = () => {
               <input
                 type="text"
                 v-model="cashierInput"
-                placeholder="Contoh: Habiba"
+                placeholder="Contoh: Kasir"
                 class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-sm font-bold text-[#0a193d] outline-hidden transition-all"
               />
             </div>

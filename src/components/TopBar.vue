@@ -17,7 +17,7 @@ import {
 const props = defineProps({
   storeName: {
     type: String,
-    default: 'Habiba Store'
+    default: 'Warung Kasiry'
   },
   isOnline: {
     type: Boolean,
@@ -25,7 +25,7 @@ const props = defineProps({
   },
   totalDebtCount: {
     type: Number,
-    default: 4
+    default: 0
   },
   todayTxCount: {
     type: Number,

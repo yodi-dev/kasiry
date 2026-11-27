@@ -1,4 +1,4 @@
-# Sitemap & Arsitektur Alur Interaksi (UI Flow): Kasiry (Habiba Store)
+# Sitemap & Arsitektur Alur Interaksi (UI Flow): Kasiry POS
 
 Dokumen ini mendefinisikan struktur tampilan responsif dual-mode (*Mobile Thumb-Zone* dan *Tablet/Desktop Bento Workstation*), diagram status transaksi (*State Machine*), pemetaan komponen aktif (`src/components/`), serta alur interaksi utama dari hulu ke hilir.
 
@@ -13,7 +13,7 @@ Tanpa footer aplikasi di bagian bawah agar konsol jari kasir leluasa, serta soft
 
 ```text
 +-------------------------------------------------------------------------------+
-|  TOP BAR:  [=] Menu Drawer  |  Kasiry / Habiba Store  |  Online/Cloud Status  |
+|  TOP BAR:  [=] Menu Drawer  |  Kasiry / Warung Kasiry  |  Online/Cloud Status |
 +-------------------------------------------------------------------------------+
 |  1. GLANCE ZONE: STRUK BELANJAAN (CartSection — Scrollable di Atas)           |
 |  [Struk Belanjaan]  2 jenis • 3 pcs                              [Kosongkan]  |
@@ -101,14 +101,14 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
     ├── LazyInventoryModal.vue (Prewarmed: Input kilat barcode baru + tambah kategori inline)
     ├── ReceiptModal.vue (Prewarmed: Pratinjau struk thermal 58mm + Cetak terisolasi + Kirim WA)
     ├── CameraScannerModal.vue (Lazy + vendor-zxing: Hybrid BarcodeDetector & ZXing + Switch Kamera/Flash/Zoom)
-    ├── ProductManagementModal.vue (Kelola Barang CRUD + Stok Lunak Opsional + Manajemen Kategori Dinamis)
+    ├── ProductManagementModal.vue (Kelola Barang CRUD + Filter Belum Harga / Belum Terjual / Sepi ≥30 Hr + Isi Harga Cepat + Hapus Massal)
     ├── RestockModal.vue (Catat Nota Kulakan Multi-Item, 3 Sumber Dana, Deteksi Modal Naik, & Riwayat Rollback)
     ├── CustomerManagementModal.vue (Daftar Pelanggan loyalitas O(N), Profil & Riwayat penuh per ID via Dexie)
     ├── DebtBookModal.vue (Buku Utang Digital, Pelunasan Tunai/QRIS presisi kembalian, Pengingat WA, Riwayat Bon)
     ├── ExpenseModal.vue (Catatan Kas Keluar: Kategori cepat, Dari Laci vs Non-Tunai, KPI sisa laci & hapus 2-tap)
     ├── ShiftModal.vue (Buka Shift dg auto-modal awal & adopsi catatan hari ini, Tutup Buku + hitung selisih laci, Share WA)
     ├── DailyReportModal.vue (Ringkasan Shift Aktif/Harian, Kas Keluar, Riwayat Transaksi, Riwayat Shift, WA & Excel 7-sheet via vendor-xlsx)
-    └── SettingsModal.vue (Profil Toko + Versi App, Google Drive/Sheets Sync, Backup JSON + Preview, Arsip Tahunan)
+    └── SettingsModal.vue (Profil Toko + Versi App, Google Drive/Sheets Sync, Backup JSON + Preview, Arsip Tahunan & Reset Toko)
 ```
 
 ---

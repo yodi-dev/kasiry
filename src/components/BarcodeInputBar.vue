@@ -288,7 +288,12 @@ const handleEnter = (e) => {
           </p>
         </div>
         <div class="text-right shrink-0">
-          <p class="font-bold text-sky-700 text-sm">Rp {{ product.sellPrice.toLocaleString('id-ID') }}</p>
+          <p v-if="product.sellPrice > 0" class="font-bold text-sky-700 text-sm">
+            Rp {{ product.sellPrice.toLocaleString('id-ID') }}
+          </p>
+          <span v-else class="inline-block px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-bold">
+            Atur Harga
+          </span>
         </div>
       </div>
 

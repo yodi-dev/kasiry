@@ -13,8 +13,8 @@ const props = defineProps({
   storeProfile: {
     type: Object,
     default: () => ({
-      name: 'Habiba Store',
-      phone: '081234567890'
+      name: 'Warung Kasiry',
+      phone: ''
     })
   }
 })

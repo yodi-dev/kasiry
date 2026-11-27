@@ -215,7 +215,7 @@ export function computeShiftClosingPreview({
 /**
  * Format laporan tutup shift / tutup buku harian siap kirim ke WhatsApp.
  */
-export function formatShiftWhatsAppText(shift, storeName = 'Habiba Store') {
+export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
   if (!shift) return ''
   const s = shift.summary || {}
   const openStr = shift.openedAt

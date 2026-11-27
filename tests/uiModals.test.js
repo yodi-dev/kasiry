@@ -693,4 +693,109 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await confirmDelBtn.trigger('click')
     expect(restock.emitted('deleteRestock')?.[0]?.[0]).toBe(501)
   })
+
+  it('handles unpriced quick pricing, unsold/slow-moving catalog cleanup, autoEdit CartSection, and Settings reset flows', async () => {
+    // 1. FrequentProductsSection menampilkan label Atur Harga pada produk Rp 0
+    const freqUnpriced = mount(FrequentProductsSection, {
+      props: {
+        frequentProducts: [{ id: 1, name: 'Indomie Goreng', sellPrice: 0, category: 'Makanan' }],
+        allProducts: [{ id: 1, name: 'Indomie Goreng', sellPrice: 0, category: 'Makanan' }],
+        categories: ['Makanan'],
+        cartItems: []
+      }
+    })
+    expect(freqUnpriced.text()).toContain('Atur Harga')
+
+    // 2. CartSection membuka inline editor otomatis saat item Rp 0 masuk (autoEditProductId)
+    const cartAuto = mount(CartSection, {
+      props: {
+        cartItems: [{
+          id: 99,
+          name: 'Indomie Goreng',
+          sellPrice: 0,
+          baseSellPrice: 0,
+          qty: 1,
+          priceMode: 'auto',
+          appliedTier: 'ecer',
+          tierLabel: 'Ecer'
+        }],
+        totalAmount: 0,
+        totalCount: 1,
+        autoEditProductId: null
+      }
+    })
+    expect(cartAuto.text()).toContain('Isi Harga!')
+    await cartAuto.setProps({ autoEditProductId: 99 })
+    await nextTick()
+    expect(cartAuto.text()).toContain('Atur Harga: Indomie Goreng')
+
+    // 3. ProductManagementModal: filter Belum Harga -> simpan harga inline, filter Belum Terjual & hapus massal
+    const now = Date.now()
+    const prodManage = mount(ProductManagementModal, {
+      props: {
+        isOpen: true,
+        products: [
+          { id: 1, name: 'Beras 5kg', sellPrice: 0, buyPrice: 0, category: 'Sembako' },
+          { id: 2, name: 'Snack Pasif', sellPrice: 10000, buyPrice: 8000, category: 'Makanan' },
+          { id: 3, name: 'Laku Keras', sellPrice: 5000, buyPrice: 4000, category: 'Minuman' }
+        ],
+        categories: ['Sembako', 'Makanan', 'Minuman'],
+        getProductUsageStats: async () => ({
+          unpricedCount: 1,
+          neverSoldCount: 2,
+          slowMovingCount: 0,
+          byId: {
+            1: { totalQtySold: 0, txCount: 0, lastSoldAt: null, isUnpriced: true, isNeverSold: true, isSlowMoving: false },
+            2: { totalQtySold: 0, txCount: 0, lastSoldAt: null, isUnpriced: false, isNeverSold: true, isSlowMoving: false },
+            3: { totalQtySold: 12, txCount: 4, lastSoldAt: now, isUnpriced: false, isNeverSold: false, isSlowMoving: false }
+          }
+        })
+      }
+    })
+    await nextTick()
+    await nextTick()
+
+    const unpricedFilterBtn = prodManage.findAll('button').find(b => b.text().includes('Belum Harga (1)'))
+    expect(unpricedFilterBtn).toBeTruthy()
+    await unpricedFilterBtn.trigger('click')
+    await nextTick()
+
+    const quickInput = prodManage.find('input[aria-label="Harga cepat Beras 5kg"]')
+    await quickInput.setValue('68000')
+    await prodManage.findAll('button').find(b => b.text().trim() === 'Simpan').trigger('click')
+    expect(prodManage.emitted('saveProduct')?.[0]?.[0]).toMatchObject({
+      id: 1,
+      sellPrice: 68000,
+      buyPrice: 54400
+    })
+
+    // Pindah ke filter Belum Terjual & uji Pilih Semua + Hapus Terpilih
+    const neverSoldBtn = prodManage.findAll('button').find(b => b.text().includes('Belum Terjual'))
+    await neverSoldBtn.trigger('click')
+    await nextTick()
+    const selectAllBtn = prodManage.findAll('button').find(b => b.text().includes('Pilih Semua'))
+    await selectAllBtn.trigger('click')
+    await nextTick()
+    await prodManage.findAll('button').find(b => b.text().includes('Hapus Terpilih')).trigger('click')
+    await nextTick()
+    await prodManage.findAll('button').find(b => b.text().trim() === 'Ya, Hapus').trigger('click')
+    expect(prodManage.emitted('deleteProductsBulk')?.[0]?.[0]).toEqual([2, 1])
+
+    // 4. SettingsModal: tombol Mulai Toko Kosong memicu konfirmasi lalu emit resetStoreData('empty')
+    const settingsReset = mount(SettingsModal, {
+      props: {
+        isOpen: true,
+        storeProfile: { name: 'Warung Kasiry', owner: 'Pemilik Toko', phone: '' },
+        productCount: 300,
+        customerCount: 1
+      }
+    })
+    const backupTab = settingsReset.findAll('button').find(b => b.text().includes('Pencadangan'))
+    await backupTab.trigger('click')
+    await nextTick()
+    await settingsReset.findAll('button').find(b => b.text().includes('Mulai Toko Kosong')).trigger('click')
+    await nextTick()
+    await settingsReset.findAll('button').find(b => b.text().includes('Ya, Atur Ulang Sekarang')).trigger('click')
+    expect(settingsReset.emitted('resetStoreData')?.[0]).toEqual(['empty'])
+  })
 })

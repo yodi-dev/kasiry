@@ -16,7 +16,7 @@ import { getExpenseCategoryMeta, getExpenseSourceMeta } from './expenseConstants
  * @param {Array} options.shifts Riwayat buka & tutup shift
  */
 export async function exportKasiryExcel({
-  storeProfile = { name: 'Habiba Store', owner: 'Habiba', phone: '081234567890' },
+  storeProfile = { name: 'Warung Kasiry', owner: 'Pemilik Toko', phone: '' },
   stats = {},
   transactions = [],
   customers = [],
@@ -49,8 +49,8 @@ export async function exportKasiryExcel({
 
   const summaryData = [
     ['LAPORAN KASIR & PENJUALAN'],
-    ['Nama Warung', storeProfile.name || 'Habiba Store'],
-    ['Pemilik', storeProfile.owner || 'Habiba'],
+    ['Nama Warung', storeProfile.name || 'Warung Kasiry'],
+    ['Pemilik', storeProfile.owner || 'Pemilik Toko'],
     ['Kontak WA', storeProfile.phone || '-'],
     ['Tanggal Laporan', todayStr],
     ['Waktu Ekspor', new Date().toLocaleTimeString('id-ID')],

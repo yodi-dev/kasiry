@@ -1,5 +1,4 @@
 import Dexie from 'dexie'
-import { seedProducts, seedCustomers, seedSettings } from './seedData'
 
 export class KasiryDatabase extends Dexie {
   constructor() {
@@ -65,30 +64,37 @@ export async function ensureStoragePersistence() {
   }
 }
 
-// Inisialisasi Seed Data Otomatis jika database masih kosong
+// Inisialisasi Seed Data Otomatis secara dinamis hanya saat database masih kosong
 export async function initDatabase() {
   await ensureStoragePersistence()
-  
-  const productCount = await db.products.count()
-  if (productCount === 0) {
-    console.log('[Kasiry DB] Inisialisasi katalog bawaan warung...')
-    await db.products.bulkAdd(seedProducts)
-  }
 
-  const customerCount = await db.customers.count()
-  if (customerCount === 0) {
-    console.log('[Kasiry DB] Inisialisasi buku utang awal...')
-    await db.customers.bulkAdd(seedCustomers)
-  }
+  const [productCount, customerCount, settingsCount] = await Promise.all([
+    db.products.count(),
+    db.customers.count(),
+    db.settings.count()
+  ])
 
-  const settingsCount = await db.settings.count()
-  if (settingsCount === 0) {
-    for (const [key, value] of Object.entries(seedSettings)) {
-      await db.settings.put({
-        key,
-        value,
-        updatedAt: Date.now()
-      })
+  if (productCount === 0 || customerCount === 0 || settingsCount === 0) {
+    const { seedProducts, seedCustomers, seedSettings } = await import('./seedData')
+
+    if (productCount === 0) {
+      console.log('[Kasiry DB] Inisialisasi katalog bawaan warung (300 barang)...')
+      await db.products.bulkAdd(seedProducts)
+    }
+
+    if (customerCount === 0) {
+      console.log('[Kasiry DB] Inisialisasi akun pelanggan dasar...')
+      await db.customers.bulkAdd(seedCustomers)
+    }
+
+    if (settingsCount === 0) {
+      for (const [key, value] of Object.entries(seedSettings)) {
+        await db.settings.put({
+          key,
+          value,
+          updatedAt: Date.now()
+        })
+      }
     }
   }
 }

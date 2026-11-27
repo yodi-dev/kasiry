@@ -122,6 +122,9 @@ const {
   loadDatabase,
   saveProduct,
   deleteProduct,
+  deleteProductsBulk,
+  getAllProductUsageStats,
+  resetStoreData,
   saveCustomer,
   deleteCustomer,
   recordDebtPayment,
@@ -274,6 +277,8 @@ const totalCartCount = computed(() => {
 })
 
 // Cart Actions (mendukung Multi Harga Ecer / Grosir / Agen, Auto Qty & Edit Manual)
+const autoEditProductId = ref(null)
+
 const addToCart = (product) => {
   const existingIndex = cart.value.findIndex(item => item.id === product.id)
   if (existingIndex > -1) {
@@ -289,8 +294,20 @@ const addToCart = (product) => {
         cartPriceTier.value
       )
     )
+    if (!(Number(product.sellPrice || 0) > 0)) {
+      autoEditProductId.value = product.id
+    }
   }
   ensureKasaFocus()
+}
+
+const handleAttemptOpenPayment = () => {
+  const unpriced = cart.value.find(i => !(Number(i.sellPrice || 0) > 0) && i.priceMode === 'auto')
+  if (unpriced) {
+    autoEditProductId.value = unpriced.id
+    return
+  }
+  isPaymentOpen.value = true
 }
 
 const increaseQty = (productId) => {
@@ -359,7 +376,12 @@ const handleUpdateItemPrice = async ({ productId, priceMode, customPrice, saveTo
     const existingProd = products.value.find(p => p.id === productId)
     if (existingProd) {
       const nextProd = { ...existingProd }
-      if (saveToCatalogTier === 'ecer') nextProd.sellPrice = customPrice
+      if (saveToCatalogTier === 'ecer') {
+        nextProd.sellPrice = customPrice
+        if (!(Number(existingProd.buyPrice || 0) > 0)) {
+          nextProd.buyPrice = Math.round(customPrice * 0.8)
+        }
+      }
       if (saveToCatalogTier === 'grosir') nextProd.wholesalePrice = customPrice
       if (saveToCatalogTier === 'agen') nextProd.agentPrice = customPrice
       updatedCatalog = await saveProduct(nextProd)
@@ -377,6 +399,7 @@ const handleUpdateItemPrice = async ({ productId, priceMode, customPrice, saveTo
     return buildPricedCartItem(
       {
         ...item,
+        buyPrice: baseProd.buyPrice ?? item.buyPrice,
         baseSellPrice: baseProd.sellPrice ?? item.baseSellPrice,
         wholesalePrice: baseProd.wholesalePrice ?? item.wholesalePrice,
         wholesaleMinQty: baseProd.wholesaleMinQty ?? item.wholesaleMinQty,
@@ -417,6 +440,16 @@ const handleDeleteProduct = async (prodId) => {
   await deleteProduct(prodId)
   cart.value = cart.value.filter(c => c.id !== prodId)
   triggerCloudAutoBackup()
+}
+
+const handleDeleteProductsBulk = async (prodIds) => {
+  const removedCount = await deleteProductsBulk(prodIds)
+  if (removedCount > 0) {
+    const idSet = new Set(prodIds)
+    cart.value = cart.value.filter(c => !idSet.has(c.id))
+    playBeepSound('success')
+    triggerCloudAutoBackup()
+  }
 }
 
 const handleAddCategory = async (catName) => {
@@ -864,6 +897,28 @@ const handleArchiveOldData = async (payload) => {
   }
 }
 
+const handleResetStoreData = async (mode) => {
+  try {
+    const res = await resetStoreData({ mode })
+    cart.value = []
+    cartPriceTier.value = 'ecer'
+    activeCartCustomer.value = null
+    tierAppliedByCustomer.value = false
+    autoEditProductId.value = null
+    isSettingsOpen.value = false
+    playBeepSound('success')
+    alert(
+      res.mode === 'empty'
+        ? 'Berhasil mengatur ulang ke Toko Kosong (0 barang, akun Umum, dan 0 utang).'
+        : `Berhasil memuat ulang ${res.productCount} katalog barang warung siap isi harga.`
+    )
+    triggerCloudAutoBackup()
+  } catch (err) {
+    playBeepSound('warning')
+    alert('Gagal mengatur ulang data toko: ' + err.message)
+  }
+}
+
 // Cek apakah perangkat dominan layar sentuh / mobile (jangan paksa virtual keyboard muncul otomatis)
 const isTouchViewport = () => {
   if (typeof window === 'undefined') return false
@@ -898,7 +953,7 @@ const ensureKasaFocus = () => {
 const handleGlobalCheckoutShortcut = (e) => {
   if (e.key === 'F2' && !isAnyModalOpen.value && cart.value.length > 0) {
     e.preventDefault()
-    isPaymentOpen.value = true
+    handleAttemptOpenPayment()
   }
 }
 
@@ -1075,13 +1130,15 @@ onUnmounted(() => {
             :totalCount="totalCartCount"
             :cartPriceTier="cartPriceTier"
             :selectedCustomerName="activeCartCustomer?.name || ''"
+            :autoEditProductId="autoEditProductId"
+            @clearAutoEdit="autoEditProductId = null"
             @increaseQty="increaseQty"
             @decreaseQty="decreaseQty"
             @removeItem="removeItem"
             @clearCart="clearCart"
             @changePriceTier="handleChangeCartPriceTier"
             @updateItemPrice="handleUpdateItemPrice"
-            @openPayment="isPaymentOpen = true"
+            @openPayment="handleAttemptOpenPayment"
           />
         </div>
 
@@ -1142,20 +1199,22 @@ onUnmounted(() => {
       <StickyBottomBar 
         :totalAmount="totalCartAmount"
         :itemCount="totalCartCount"
-        @openPayment="isPaymentOpen = true"
+        @openPayment="handleAttemptOpenPayment"
       />
     </div>
 
     <!-- 4. Modals & Overlays (Dimuat malas / code-split agar booting kasir cepat) -->
-    <!-- Modal Kelola Barang (Tambah, Edit, Hapus) -->
+    <!-- Modal Kelola Barang (Tambah, Edit, Hapus, Kebersihan Katalog) -->
     <ProductManagementModal 
       v-if="activatedModals.productManage || isProductManageOpen"
       :isOpen="isProductManageOpen"
       :products="products"
       :categories="categories"
+      :getProductUsageStats="getAllProductUsageStats"
       @close="isProductManageOpen = false"
       @saveProduct="handleSaveProduct"
       @deleteProduct="handleDeleteProduct"
+      @deleteProductsBulk="handleDeleteProductsBulk"
       @addCategory="handleAddCategory"
       @deleteCategory="handleDeleteCategory"
     />
@@ -1311,6 +1370,7 @@ onUnmounted(() => {
       @importBackup="handleImportBackup"
       @updateClientId="handleUpdateCustomClientId"
       @archiveOldData="handleArchiveOldData"
+      @resetStoreData="handleResetStoreData"
     />
 
     <!-- Modal Struk / Nota Pembayaran Berhasil -->

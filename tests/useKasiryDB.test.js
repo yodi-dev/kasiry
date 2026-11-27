@@ -48,17 +48,23 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     }
   })
 
-  it('seeds initial warung catalog, customers, and settings cleanly', async () => {
+  it('seeds clean 300 starter warung products (unpriced), single Umum customer with 0 debt, and Warung Kasiry profile', async () => {
     expect(kasiry.isDbReady.value).toBe(true)
-    expect(kasiry.products.value.length).toBe(38)
-    expect(kasiry.customers.value.length).toBe(5)
-    expect(kasiry.customers.value.some(c => c.name === 'Umum')).toBe(true)
-    expect(kasiry.storeProfile.value.name).toBe('Habiba Store')
+    expect(kasiry.products.value.length).toBe(300)
+    const uniqueNames = new Set(kasiry.products.value.map(p => p.name.toLowerCase()))
+    expect(uniqueNames.size).toBe(300)
+    expect(kasiry.products.value.every(p => p.sellPrice === 0 && p.buyPrice === 0 && p.barcode === '')).toBe(true)
+
+    expect(kasiry.customers.value.length).toBe(1)
+    expect(kasiry.customers.value[0].name).toBe('Umum')
+    expect(kasiry.customers.value[0].totalDebt).toBe(0)
+    expect(kasiry.storeProfile.value.name).toBe('Warung Kasiry')
     expect(kasiry.categories.value).toContain('Sembako')
+    expect(kasiry.categories.value).toContain('Bumbu Dapur')
   })
 
   it('records cash and bon transactions, caps overpayment debt, and guards Umum from bon debt', async () => {
-    const prod = kasiry.products.value[0]
+    const prod = await kasiry.saveProduct({ ...kasiry.products.value[0], sellPrice: 22000, buyPrice: 19500 })
     await kasiry.recordTransaction({
       invoiceNumber: 'KSR-1001',
       totalAmount: prod.sellPrice,
@@ -134,7 +140,7 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
 
     const now = Date.now()
     const DAY = 24 * 60 * 60 * 1000
-    const buTejo = kasiry.customers.value.find(c => c.name === 'Bu Tejo')
+    const buTejo = await kasiry.saveCustomer({ name: 'Bu Tejo', phone: '081234567891', totalDebt: 45000 })
 
     await dbModule.db.transactions.bulkAdd([
       {
@@ -180,7 +186,7 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
   it('archives old transactions to JSON while keeping product catalog and customer debts intact', async () => {
     const now = Date.now()
     const DAY = 24 * 60 * 60 * 1000
-    const buTejoBefore = kasiry.customers.value.find(c => c.name === 'Bu Tejo')
+    const buTejoBefore = await kasiry.saveCustomer({ name: 'Bu Tejo', phone: '081234567891', totalDebt: 45000 })
     const initialDebt = buTejoBefore.totalDebt
 
     await dbModule.db.transactions.bulkAdd([
@@ -223,12 +229,12 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     const archiveRes = await kasiry.archiveOldTransactions(180)
     expect(archiveRes.archivedTxCount).toBe(1)
     expect(archiveRes.archivedPayCount).toBe(1)
-    expect(archiveRes.archiveFilename).toMatch(/^Arsip_Habiba_Store_sd_\d{4}-\d{2}-\d{2}\.json$/)
+    expect(archiveRes.archiveFilename).toMatch(/^Arsip_Warung_Kasiry_sd_\d{4}-\d{2}-\d{2}\.json$/)
     expect(downloads).toContain(archiveRes.archiveFilename)
 
     // Transaksi lama terhapus dari IndexedDB, transaksi baru tetap ada, utang & barang tetap 100% utuh
     expect(kasiry.totalTransactionCount.value).toBe(1)
-    expect(kasiry.products.value.length).toBe(38)
+    expect(kasiry.products.value.length).toBe(300)
     const buTejoAfter = kasiry.customers.value.find(c => c.name === 'Bu Tejo')
     expect(buTejoAfter.totalDebt).toBe(initialDebt)
 
@@ -519,5 +525,51 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(rolledBack.stock).toBe(0)
     expect(rolledBack.buyPrice).toBe(15000)
     expect(rolledBack.sellPrice).toBe(18000)
+  })
+
+  it('supports bulk soft-delete, multi-year product usage analytics, and store reset (empty vs 300 starter)', async () => {
+    const pA = kasiry.products.value[0]
+    const pB = kasiry.products.value[1]
+    await kasiry.saveProduct({ ...pA, sellPrice: 22000, buyPrice: 19500 })
+    await kasiry.saveProduct({ ...pB, sellPrice: 20000, buyPrice: 17500 })
+
+    // Catat penjualan hanya untuk pA
+    await kasiry.recordTransaction({
+      invoiceNumber: 'KSR-USG-1',
+      totalAmount: 44000,
+      paymentMethod: 'TUNAI',
+      cashGiven: 50000,
+      changeAmount: 6000,
+      customer: { id: 1, name: 'Umum' },
+      items: [{ ...pA, sellPrice: 22000, buyPrice: 19500, qty: 2 }]
+    })
+
+    const usage = await kasiry.getAllProductUsageStats(30)
+    expect(usage.byId[pA.id].totalQtySold).toBe(2)
+    expect(usage.byId[pA.id].isNeverSold).toBe(false)
+    expect(usage.byId[pB.id].totalQtySold).toBe(0)
+    expect(usage.byId[pB.id].isNeverSold).toBe(true)
+    expect(usage.unpricedCount).toBe(298)
+
+    // Hapus massal 2 barang starter yang tidak dipakai
+    const pUnused1 = kasiry.products.value[10]
+    const pUnused2 = kasiry.products.value[11]
+    const deletedCount = await kasiry.deleteProductsBulk([pUnused1.id, pUnused2.id])
+    expect(deletedCount).toBe(2)
+    expect(kasiry.products.value).toHaveLength(298)
+
+    // Reset ke Toko Kosong -> 0 barang, 0 transaksi, hanya akun Umum
+    const emptyRes = await kasiry.resetStoreData({ mode: 'empty' })
+    expect(emptyRes).toEqual({ mode: 'empty', productCount: 0, customerCount: 1 })
+    expect(kasiry.products.value).toHaveLength(0)
+    expect(kasiry.transactions.value).toHaveLength(0)
+    expect(kasiry.customers.value).toHaveLength(1)
+    expect(kasiry.customers.value[0].name).toBe('Umum')
+
+    // Reset kembali ke 300 katalog warung standar
+    const starterRes = await kasiry.resetStoreData({ mode: 'starter' })
+    expect(starterRes).toEqual({ mode: 'starter', productCount: 300, customerCount: 1 })
+    expect(kasiry.products.value).toHaveLength(300)
+    expect(kasiry.products.value.every(p => p.sellPrice === 0)).toBe(true)
   })
 })

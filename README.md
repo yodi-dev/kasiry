@@ -1,4 +1,4 @@
-# Kasiry (Habiba Store POS)
+# Kasiry POS (Warung Kasiry)
 
 > **Aplikasi Kasir Warung Pintar & Buku Utang Digital (PWA Offline-First)**  
 > Dirancang khusus untuk warung kelontong & UMKM Indonesia dengan prinsip **Zero Login Wall**, **100% Berfungsi Tanpa Internet**, **Dual Layout Adaptif (Mobile Thumb-Zone & Desktop Bento Workstation)**, **Scanner Hardware HID & Kamera Hybrid**, **Skalabilitas Data Multi-Tahun**, dan **Cadangan Cloud Gratis ($0) ke Google Drive & Sheets**.
@@ -12,6 +12,7 @@
 - **Tata Letak Responsif Dual-Mode:**
   - **Mobile (`< 768px`):** Alur ergonomi terbalik (*Glance Zone* keranjang di atas + tombol cepat di tengah + *Floating Bottom Console* di jangkauan jempol bawah), bebas footer agar layar transaksi lega, penguncian soft-keyboard HP hingga input benar-benar disentuh, serta Drawer terseksi (*Keuangan & Kasir*, *Stok & Pelanggan*, *Sistem*).
   - **Tablet & Desktop (`md+` / `lg+`):** *Bento POS Workstation* 2-kolom dengan TopBar kompak (`Chip Shift` | `Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Laporan`, `⚙️`), filter kategori pill, input pencarian inline berfokus otomatis, serta pintasan keyboard `/` (Cari) dan `F2` (Pembayaran).
+- **300 Katalog Awal Warung Indonesia, Harga Cepat & Kebersihan Barang Pasif:** Saat pertama dibuka, Kasiry sudah menyediakan 300 nama barang populer warung (termuat malas agar booting ringan, harga `Rp 0`, akun `'Umum'` bersih `0` utang, profil default `Warung Kasiry`) lengkap dengan isi harga cepat per baris di `Kelola Barang`, auto-buka editor harga bila item `Rp 0` diklik di kasa, filter **Belum Harga / Belum Terjual / Sepi ≥30 Hr** + **Hapus Massal**, serta tombol **Mulai Toko Kosong** di Pengaturan.
 - **Hardware Barcode Scanner (HID) & Kamera Hybrid:** Mendukung scanner USB/Bluetooth OTG secara global sekaligus kamera depan/belakang browser menggunakan kombinasi `BarcodeDetector` native + `@zxing/library`, lengkap dengan zoom, lampu kilat (*torch*), dan panduan jarak fokus.
 - **Lazy Inventory + Kategori Dinamis:** Scan barcode barang yang belum terdaftar akan membuka modal input kilat — kini sekaligus bisa menambah kategori baru secara inline dan langsung memasukkan barang ke keranjang.
 - **Kulakan / Belanja Stok & Manajemen Stok Lunak:** Mencatat nota kulakan multi-item (`RestockModal.vue`) untuk otomatis memperbarui harga beli/modal, opsi update harga jual, serta menambah stok produk (opsional/lunak: barang stok `0` tetap bebas dibeli tanpa memblokir kasa), lengkap dengan pilihan sumber dana **Tunai Laci**, **QRIS/Rek**, atau **Dana Luar**.
@@ -48,14 +49,14 @@ kasiryy/
 ├── src/
 │   ├── components/         # 17 komponen aktif UI Kasa & 12 modal (lazy-loaded via defineAsyncComponent)
 │   ├── composables/        # useKasiryDB.js, useGoogleSync.js, useHardwareScanner.js
-│   ├── db/                 # KasiryDatabase schema v5 & seed produk/pelanggan awal
-│   ├── utils/              # customerStats.js, dailyStats.js, expenseConstants.js, pricing.js, excelExport.js, sound.js
+│   ├── db/                 # KasiryDatabase schema v5 & 300 starter katalog warung (lazy seedData)
+│   ├── utils/              # customerStats.js, dailyStats.js, expenseConstants.js, pricing.js, productUsage.js, excelExport.js, sound.js
 │   ├── App.vue             # Orkestrator Kasa, prewarm jalur checkout, & state global
 │   └── style.css           # Tailwind CSS v4, Bento container queries & content-visibility
-├── tests/                  # 8 suite test Vitest (30 skenario: DB, migrasi, pricing, sync, stats, Excel, UI)
+├── tests/                  # 9 suite test Vitest (33 skenario: DB, migrasi, pricing, usage, sync, stats, Excel, UI)
 ├── CHANGELOG.md            # Riwayat rilis SemVer (Keep a Changelog)
 ├── DESIGN_SYSTEM.md        # Panduan visual & token warna/komponen
-├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.12)
+├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.13)
 ├── SITEMAP.md              # Alur interaksi & arsitektur komponen
 └── vite.config.js          # Rolldown vendor splitting & PWA Workbox configuration
 ```

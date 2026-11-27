@@ -1,8 +1,26 @@
 # Changelog Kasiry POS
 
-Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **Kasiry (Habiba Store POS)** dicatat pada dokumen ini mengikuti format [Keep a Changelog](https://keepachangelog.com/id-ID/1.0.0/) dan [Semantic Versioning](https://semver.org/).
+Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **Kasiry POS** dicatat pada dokumen ini mengikuti format [Keep a Changelog](https://keepachangelog.com/id-ID/1.0.0/) dan [Semantic Versioning](https://semver.org/).
 
 > **Catatan Kompatibilitas Data:** Format JSON backup lokal/Google Drive tetap mempertahankan schema `version: '2.4'` agar file cadangan lama dan arsip tahunan tetap kompatibel lintas versi.
+
+---
+
+## [2.13.0] - 2026-11-27 (Roadmap #6: Pembersihan Data Awal, 300 Katalog Warung, Harga Cepat, Reset Toko & Barang Tidak Terjual)
+
+### Added & Changed
+- **300 Katalog Barang Populer Warung Indonesia (`src/db/seedData.js`, `src/db/index.js`):**
+  - Mengembangkan daftar barang bawaan dari 38 menjadi **300 produk warung terlaris** across 9 kategori (`Curah`, `Sembako`, `Makanan`, `Minuman`, `Jajanan & Kopi`, `Bumbu Dapur`, `Kebersihan`, `Rokok`, `Obat & Lainnya`) dengan `sellPrice: 0`, `buyPrice: 0`, dan `barcode: ''` agar pemilik toko cukup mengisi harga masing-masing dan mengikat barcode saat dibutuhkan.
+  - `initDatabase()` memuat `./seedData` secara dinamis (`await import('./seedData')`) hanya saat IndexedDB masih kosong sehingga ukuran bundle awal tetap ringan.
+- **Pembersihan Pelanggan Awal & Identitas Generik (`Warung Kasiry`):**
+  - Menghapus seluruh contoh akun berutang demo dari `seedCustomers`; database awal kini bersih hanya berisi **1 akun `'Umum'`** dengan `totalDebt: 0`.
+  - Menstandarkan seluruh profil/fallback default aplikasi menjadi **`Warung Kasiry`** (`owner: 'Pemilik Toko'`, nomor WA kosong) di `seedSettings`, `useKasiryDB.js`, `SettingsModal.vue`, `ShiftModal.vue`, `ReceiptModal.vue`, `TopBar.vue`, `CustomerManagementModal.vue`, `DebtBookModal.vue`, `DailyReportModal.vue`, `dailyStats.js`, dan `excelExport.js` (dengan mempertahankan fallback file backup Cloud lama agar cadangan pengguna lama tetap aman).
+- **Manajemen Barang Tidak Terjual, Pengisian Harga Cepat & Hapus Massal (`src/utils/productUsage.js`, `src/components/ProductManagementModal.vue`):**
+  - Menambahkan analitik penggunaan produk multi-tahun (`buildProductUsageMap` & `getAllProductUsageStats`) di `ProductManagementModal.vue` dengan filter status **`Semua`**, **`Belum Harga`**, **`Belum Terjual`**, dan **`Sepi ≥30 Hr`** untuk merapikan katalog starter maupun bahan acuan promo barang kurang laku.
+  - Menyediakan **Input Harga Cepat Inline** (`Isi Harga` / tombol `Promo`) langsung per baris barang + **Pilih Banyak (`Pilih Semua` & `Hapus Terpilih`)** atomik via `deleteProductsBulk`, plus slice render (`60` per tahap) agar daftar 300 barang tetap ringan.
+- **Alur Kasa Otomatis untuk Barang Belum Berharga & Reset Toko (`CartSection.vue`, `FrequentProductsSection.vue`, `BarcodeInputBar.vue`, `SettingsModal.vue`, `App.vue`):**
+  - Menampilkan badge **`Atur Harga`** pada katalog/pencarian dan **`Isi Harga!`** di keranjang bagi produk bertarif `Rp 0`. Saat barang `Rp 0` ditambahkan ke keranjang (atau diklik bayar saat masih `Rp 0`), editor harga inline di `CartSection.vue` langsung terbuka otomatis dengan opsi default **Simpan Jadi Ecer**.
+  - Menambahkan kontrol **Atur Ulang Katalog & Data Toko** di `SettingsModal.vue` (`Mulai Toko Kosong` 0 barang vs `Muat 300 Katalog Warung`) melalui `resetStoreData` di `useKasiryDB.js`.
 
 ---
 
