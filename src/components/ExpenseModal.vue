@@ -15,6 +15,7 @@ import {
   getExpenseCategoryMeta,
   getExpenseSourceMeta
 } from '../utils/expenseConstants'
+import { recordBelongsToShift } from '../utils/dailyStats'
 
 const props = defineProps({
   isOpen: {
@@ -24,6 +25,10 @@ const props = defineProps({
   expenses: {
     type: Array,
     default: () => []
+  },
+  activeShift: {
+    type: Object,
+    default: null
   },
   stats: {
     type: Object,
@@ -65,6 +70,11 @@ const parsedAmount = computed(() => {
 })
 
 const todayExpenses = computed(() => {
+  if (props.activeShift && props.activeShift.status === 'OPEN') {
+    return (props.expenses || [])
+      .filter(e => e && !e.deleted && recordBelongsToShift(e, props.activeShift, 'createdAt'))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+  }
   const startOfDay = new Date()
   startOfDay.setHours(0, 0, 0, 0)
   const cutoff = startOfDay.getTime()

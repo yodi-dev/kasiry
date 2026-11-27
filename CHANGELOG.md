@@ -6,6 +6,24 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.10.0] - 2026-11-27 (Roadmap #3: Sistem Buka & Tutup Shift / Tutup Buku Harian)
+
+### Added
+- **Modal Buka & Tutup Shift (`src/components/ShiftModal.vue`):**
+  - Model 1 shift = 1 hari buka warung (jam buka & tutup fleksibel termasuk melewati tengah malam).
+  - Prompt **Buka Shift** 1x saat pagi jika belum ada shift aktif (lengkap dengan tombol **Nanti Saja** agar tidak menghalangi pembeli), pengisian otomatis nama kasir (`storeProfile.owner`), auto-isi nominal modal awal laci terakhir + preset cepat (`Rp 0`–`500rb`), serta opsi **Sertakan catatan hari ini yang belum masuk shift** bila terlanjur melakukan transaksi sebelum klik Buka Shift.
+  - Pengingat otomatis apabila shift dari **hari kemarin** masih berstatus terbuka agar segera ditutup buku sebelum omzet tercampur ke hari baru.
+  - Layar **Tutup Shift & Buku Harian** dengan hitungan otomatis **`Seharusnya di Laci = Modal Awal + Penjualan Tunai + Pelunasan Bon Tunai - Kas Keluar Laci`** (QRIS dan Utang Baru dipisahkan), input uang fisik + tombol **Pas (Sesuai Sistem)**, live selisih (**Pas ✓**, **Lebih**, **Kurang**), catatan tutup buku, dan **Kirim Laporan Tutup Shift ke WhatsApp**.
+- **Chip Status Shift di TopBar (`src/components/TopBar.vue`):** Indikator status shift aktif / kemarin / belum buka di sisi kiri bar desktop maupun mobile + akses langsung di Drawer **Keuangan & Kasir**.
+- **Skema IndexedDB v4 (`src/db/index.js` & `src/composables/useKasiryDB.js`):** Penambahan tabel `shifts` (`++id, shiftCode, status, openedAt, closedAt, updatedAt, deleted`), penandaan `shiftId` & `shiftCode` pada transaksi, pelunasan utang, dan kas keluar, serta dukungan penuh backup/restore JSON dan arsip tahunan (tanpa menghapus shift yang masih terbuka).
+- **Integrasi Lingkup Shift di Laporan, Excel 6 Sheet & Cloud Sync:**
+  - `src/utils/dailyStats.js` (`computeDailyStats`, `computeShiftClosingPreview`, `formatShiftWhatsAppText`) kini otomatis menghitung angka dalam lingkup Shift Aktif ketika shift berjalan.
+  - `DailyReportModal.vue` menambahkan banner status Shift Aktif + tab ke-4 **`Shift`** (riwayat tutup buku lengkap + tombol Kirim WA per shift); `ExpenseModal.vue` menyelaraskan filter pengeluarannya ke shift aktif.
+  - `src/utils/excelExport.js` menambahkan baris modal awal & kas seharusnya di **Ringkasan Kas** serta sheet ke-6 **`Riwayat Shift`**.
+  - `src/composables/useGoogleSync.js` menambahkan `appendShiftEventToSheet` (`BUKA SHIFT` / `TUTUP SHIFT`) beserta *two-way LWW merge* untuk tabel `shifts`.
+
+---
+
 ## [2.9.1] - 2026-11-27 (Hotfix Layering Dropdown TopBar & Badge Kuantitas Barang Cepat)
 
 ### Fixed

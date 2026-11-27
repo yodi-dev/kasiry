@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { computeDailyStats } from '../src/utils/dailyStats'
+import {
+  computeDailyStats,
+  computeShiftClosingPreview,
+  formatShiftWhatsAppText
+} from '../src/utils/dailyStats'
 
 describe('computeDailyStats (Separation of Cash Drawer, QRIS Non-Cash, and Bon)', () => {
   it('separates TUNAI, QRIS, UTANG/BON sales and TUNAI vs QRIS debt repayments accurately', () => {
@@ -111,5 +115,88 @@ describe('computeDailyStats (Separation of Cash Drawer, QRIS Non-Cash, and Bon)'
     // Laba kotor 30.000 - biaya ops 15.000 = 15.000 (prive 25.000 tidak memotong untung jualan)
     expect(stats.todayGrossProfit).toBe(30000)
     expect(stats.todayProfit).toBe(15000)
+  })
+
+  it('scopes stats cleanly to active shift across midnight and computes closing drawer variance', () => {
+    const activeShift = {
+      id: 77,
+      shiftCode: 'SHF-77',
+      cashierName: 'Ibu Habiba',
+      openingCash: 200000,
+      openedAt: 1700070000000, // buka malam
+      status: 'OPEN'
+    }
+    const transactions = [
+      // Transaksi dari shift sebelumnya yang sudah tutup -> TIDAK BOLEH masuk hitungan shift aktif
+      {
+        invoiceNumber: 'KSR-PREV',
+        createdAt: 1700060000000,
+        paymentMethod: 'TUNAI',
+        totalAmount: 90000,
+        shiftId: 66,
+        shiftCode: 'SHF-66',
+        items: [{ name: 'Gula', sellPrice: 90000, buyPrice: 80000, qty: 1 }]
+      },
+      // Transaksi shift aktif (termasuk setelah lewat tengah malam)
+      {
+        invoiceNumber: 'KSR-NOW-1',
+        createdAt: 1700090000000,
+        paymentMethod: 'TUNAI',
+        totalAmount: 50000,
+        shiftId: 77,
+        shiftCode: 'SHF-77',
+        items: [{ name: 'Beras', sellPrice: 50000, buyPrice: 43000, qty: 1 }]
+      },
+      {
+        invoiceNumber: 'QRS-NOW-2',
+        createdAt: 1700095000000,
+        paymentMethod: 'QRIS',
+        totalAmount: 30000,
+        shiftId: 77,
+        shiftCode: 'SHF-77',
+        items: [{ name: 'Minyak', sellPrice: 30000, buyPrice: 25000, qty: 1 }]
+      }
+    ]
+    const debtPayments = [
+      { customerId: 2, amount: 20000, paymentMethod: 'TUNAI', paymentDate: 1700092000000, shiftId: 77, shiftCode: 'SHF-77' }
+    ]
+    const expenses = [
+      { id: 1, expenseNumber: 'KLR-1', createdAt: 1700093000000, amount: 15000, category: 'operasional', source: 'TUNAI_LACI', shiftId: 77, shiftCode: 'SHF-77', deleted: false }
+    ]
+
+    const scoped = computeDailyStats(transactions, debtPayments, expenses, {
+      activeShift,
+      nowTs: 1700100000000
+    })
+    expect(scoped.isShiftScoped).toBe(true)
+    expect(scoped.transactionCount).toBe(2)
+    expect(scoped.openingCash).toBe(200000)
+    expect(scoped.todayCashDrawer).toBe(70000) // 50k tunai + 20k bon tunai
+    expect(scoped.todayExpensesCash).toBe(15000)
+    // Seharusnya di laci = 200.000 modal + 70.000 masuk - 15.000 keluar = 255.000
+    expect(scoped.expectedCashDrawer).toBe(255000)
+
+    const preview = computeShiftClosingPreview({
+      shift: activeShift,
+      transactions,
+      debtPayments,
+      expenses,
+      actualCash: 250000
+    })
+    expect(preview.expectedCash).toBe(255000)
+    expect(preview.actualCash).toBe(250000)
+    expect(preview.cashDifference).toBe(-5000)
+
+    const waText = formatShiftWhatsAppText({
+      ...activeShift,
+      closedAt: 1700100000000,
+      expectedCash: preview.expectedCash,
+      actualCash: preview.actualCash,
+      cashDifference: preview.cashDifference,
+      closingNote: 'Uang kembalian kurang',
+      summary: preview
+    }, 'Habiba Store')
+    expect(waText).toContain('SHF-77')
+    expect(waText).toContain('Kurang -Rp 5.000')
   })
 })

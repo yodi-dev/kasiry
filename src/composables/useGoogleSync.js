@@ -537,6 +537,30 @@ export function useGoogleSync() {
     }, storeName)
   }
 
+  // Catat Aktivitas Buka / Tutup Shift ke Google Sheets melalui pipeline antrean yang sama
+  const appendShiftEventToSheet = async ({ action = 'BUKA SHIFT', shift = {} } = {}, storeName = 'Toko') => {
+    const isClosing = action === 'TUTUP SHIFT'
+    const ts = isClosing ? (shift.closedAt || Date.now()) : (shift.openedAt || Date.now())
+    const openingCash = Number(shift.openingCash || 0)
+    const actualCash = Number(shift.actualCash || 0)
+    const expectedCash = Number(shift.expectedCash ?? openingCash)
+    const diff = Number(shift.cashDifference ?? (actualCash - expectedCash))
+    const detail = isClosing
+      ? `Modal Rp ${openingCash.toLocaleString('id-ID')} • Seharusnya Rp ${expectedCash.toLocaleString('id-ID')} • Fisik Rp ${actualCash.toLocaleString('id-ID')} • Selisih Rp ${diff.toLocaleString('id-ID')}${shift.closingNote ? ` • ${shift.closingNote}` : ''}`
+      : `Buka toko dengan modal awal Rp ${openingCash.toLocaleString('id-ID')}`
+
+    return appendTransactionToSheet({
+      invoiceNumber: shift.shiftCode || `SHF-${String(ts).slice(-6)}`,
+      createdAt: ts,
+      paymentMethod: action,
+      customerName: shift.cashierName || 'Kasir',
+      totalAmount: isClosing ? actualCash : openingCash,
+      cashGiven: isClosing ? expectedCash : openingCash,
+      changeAmount: isClosing ? diff : 0,
+      itemsText: detail
+    }, storeName)
+  }
+
   // ==============================================================
   // ENGINE TWO-WAY SYNC MULTI-DEVICE (Berdasarkan Timestamp updatedAt)
   // ==============================================================
@@ -672,6 +696,24 @@ export function useGoogleSync() {
       const mergedExpenses = Array.from(expMap.values())
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 
+      // 7. Merge Shift Buka/Tutup Buku (berdasarkan shiftCode atau id, LWW per updatedAt; jaga shift OPEN tetap aktif)
+      const shiftMap = new Map()
+      ;(lData.shifts || []).forEach(sh => {
+        if (archiveCutoff > 0 && sh.status !== 'OPEN' && toTimestamp(sh.openedAt) < archiveCutoff) return
+        const key = sh.shiftCode || sh.id
+        shiftMap.set(key, sh)
+      })
+      ;(rData.shifts || []).forEach(rs => {
+        if (archiveCutoff > 0 && rs.status !== 'OPEN' && toTimestamp(rs.openedAt) < archiveCutoff) return
+        const key = rs.shiftCode || rs.id
+        const ls = shiftMap.get(key)
+        if (!ls || (rs.updatedAt || 0) > (ls.updatedAt || 0)) {
+          shiftMap.set(key, rs)
+        }
+      })
+      const mergedShifts = Array.from(shiftMap.values())
+        .sort((a, b) => (b.openedAt || 0) - (a.openedAt || 0))
+
       const mergedPayload = {
         app: 'Kasiry POS',
         version: '2.4',
@@ -683,6 +725,7 @@ export function useGoogleSync() {
           transactions: mergedTransactions,
           debtPayments: mergedDebtPayments,
           expenses: mergedExpenses,
+          shifts: mergedShifts,
           settings: mergedSettings
         }
       }
@@ -793,6 +836,7 @@ export function useGoogleSync() {
     appendTransactionToSheet,
     appendDebtPaymentToSheet,
     appendExpenseToSheet,
+    appendShiftEventToSheet,
     ensureSpreadsheet
   }
 }

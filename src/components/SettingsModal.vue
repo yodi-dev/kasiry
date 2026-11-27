@@ -287,6 +287,7 @@ const onFileSelected = (event) => {
       const activeCusts = Array.isArray(d.customers) ? d.customers.filter(c => !c.deleted) : []
       const txList = Array.isArray(d.transactions) ? d.transactions : []
       const activeExpenses = Array.isArray(d.expenses) ? d.expenses.filter(e => !e.deleted) : []
+      const activeShifts = Array.isArray(d.shifts) ? d.shifts.filter(s => !s.deleted) : []
 
       pendingImportPreview.value = {
         fileName: file.name,
@@ -304,6 +305,7 @@ const onFileSelected = (event) => {
         customerCount: activeCusts.length,
         transactionCount: txList.length,
         expenseCount: activeExpenses.length,
+        shiftCount: activeShifts.length,
         content
       }
     } catch (err) {
@@ -747,7 +749,7 @@ const cancelImport = () => {
                 <div class="flex justify-between">
                   <span class="text-slate-500">Isi Data:</span>
                   <span class="font-bold text-[#0284c7]">
-                    {{ pendingImportPreview.productCount }} barang • {{ pendingImportPreview.customerCount }} pelanggan • {{ pendingImportPreview.transactionCount }} struk<template v-if="pendingImportPreview.expenseCount > 0"> • {{ pendingImportPreview.expenseCount }} kas keluar</template>
+                    {{ pendingImportPreview.productCount }} barang • {{ pendingImportPreview.customerCount }} pelanggan • {{ pendingImportPreview.transactionCount }} struk<template v-if="pendingImportPreview.expenseCount > 0"> • {{ pendingImportPreview.expenseCount }} kas keluar</template><template v-if="pendingImportPreview.shiftCount > 0"> • {{ pendingImportPreview.shiftCount }} shift</template>
                   </span>
                 </div>
               </div>

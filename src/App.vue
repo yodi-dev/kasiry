@@ -82,6 +82,7 @@ const ReceiptModal = lazyModal(loadReceiptModal)
 const DebtBookModal = lazyModal(() => import('./components/DebtBookModal.vue'))
 const DailyReportModal = lazyModal(() => import('./components/DailyReportModal.vue'))
 const ExpenseModal = lazyModal(() => import('./components/ExpenseModal.vue'))
+const ShiftModal = lazyModal(() => import('./components/ShiftModal.vue'))
 const SettingsModal = lazyModal(() => import('./components/SettingsModal.vue'))
 const CameraScannerModal = lazyModal(() => import('./components/CameraScannerModal.vue'))
 const ProductManagementModal = lazyModal(() => import('./components/ProductManagementModal.vue'))
@@ -103,6 +104,11 @@ const {
   transactions,
   debtPayments,
   expenses,
+  shifts,
+  activeShift,
+  isActiveShiftStale,
+  lastOpeningCash,
+  unassignedTodayCount,
   totalTransactionCount,
   olderTransactionCount,
   storeProfile,
@@ -118,6 +124,8 @@ const {
   recordDebtPayment,
   recordExpense,
   deleteExpense,
+  openShift,
+  closeShift,
   recordTransaction,
   saveStoreProfile,
   getFullDatabasePayload,
@@ -152,6 +160,7 @@ const {
   appendTransactionToSheet,
   appendDebtPaymentToSheet,
   appendExpenseToSheet,
+  appendShiftEventToSheet,
   ensureSpreadsheet
 } = useGoogleSync()
 
@@ -193,6 +202,9 @@ const isLazyInventoryOpen = ref(false)
 const isDebtBookOpen = ref(false)
 const isDailyReportOpen = ref(false)
 const isExpenseOpen = ref(false)
+const isShiftOpen = ref(false)
+const isShiftAutoPrompt = ref(false)
+const completedShiftSummary = ref(null)
 const isSettingsOpen = ref(false)
 const isReceiptOpen = ref(false)
 const isCameraOpen = ref(false)
@@ -209,6 +221,7 @@ const isAnyModalOpen = computed(() => {
     isDebtBookOpen.value ||
     isDailyReportOpen.value ||
     isExpenseOpen.value ||
+    isShiftOpen.value ||
     isSettingsOpen.value ||
     isCameraOpen.value ||
     isLazyInventoryOpen.value ||
@@ -223,8 +236,12 @@ const unpaidDebtCount = computed(() => {
   ).length
 })
 
-// Computed Laporan Kasir Real-time dari Transaksi, Pelunasan, & Pengeluaran Hari Ini
-const stats = computed(() => computeDailyStats(transactions.value, debtPayments.value, expenses.value))
+// Computed Laporan Kasir Real-time dalam lingkup Shift Aktif (atau hari ini jika belum buka shift)
+const stats = computed(() =>
+  computeDailyStats(transactions.value, debtPayments.value, expenses.value, {
+    activeShift: activeShift.value
+  })
+)
 
 // Computed Filtered Products for Search
 const searchResults = computed(() => {
@@ -478,6 +495,49 @@ const handleDeleteExpense = async (expenseId) => {
   }
 }
 
+// Buka & Tutup Shift Kasir
+const openShiftModalManual = () => {
+  completedShiftSummary.value = null
+  isShiftAutoPrompt.value = false
+  isShiftOpen.value = true
+}
+
+const handleDismissShiftPrompt = () => {
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem('kasiry_shift_prompt_dismissed', new Date().toISOString().slice(0, 10))
+  }
+  isShiftAutoPrompt.value = false
+  isShiftOpen.value = false
+}
+
+const handleOpenShift = async (payload) => {
+  const opened = await openShift(payload)
+  if (opened) {
+    playBeepSound('success')
+    completedShiftSummary.value = null
+    isShiftAutoPrompt.value = false
+    isShiftOpen.value = false
+    appendShiftEventToSheet({ action: 'BUKA SHIFT', shift: opened }, storeProfile.value?.name)
+    triggerCloudAutoBackup(true)
+  }
+}
+
+const handleCloseShift = async (payload) => {
+  const closed = await closeShift(payload)
+  if (closed) {
+    playBeepSound('success')
+    isShiftAutoPrompt.value = false
+    completedShiftSummary.value = closed
+    appendShiftEventToSheet({ action: 'TUTUP SHIFT', shift: closed }, storeProfile.value?.name)
+    triggerCloudAutoBackup(true)
+  }
+}
+
+const handleStartNextShift = () => {
+  completedShiftSummary.value = null
+  isShiftAutoPrompt.value = false
+}
+
 // Handler Scan Barcode (Hardware Scanner maupun Kamera)
 const handleBarcodeScan = (code) => {
   isCameraOpen.value = false
@@ -603,7 +663,8 @@ const handleDownloadExcel = async () => {
     const {
       transactions: allTransactions,
       debtPayments: allDebtPayments,
-      expenses: allExpenses
+      expenses: allExpenses,
+      shifts: allShifts
     } = await getAllTransactionsForExport()
     await exportKasiryExcel({
       storeProfile: storeProfile.value,
@@ -611,7 +672,8 @@ const handleDownloadExcel = async () => {
       transactions: allTransactions,
       customers: customers.value,
       debtPayments: allDebtPayments,
-      expenses: allExpenses
+      expenses: allExpenses,
+      shifts: allShifts
     })
     playBeepSound('success')
   } catch (err) {
@@ -710,6 +772,7 @@ const modalFlagKeys = [
   'debtBook',
   'dailyReport',
   'expense',
+  'shift',
   'settings',
   'camera',
   'lazyInventory',
@@ -722,6 +785,7 @@ const activatedModals = reactive({
   debtBook: false,
   dailyReport: false,
   expense: false,
+  shift: false,
   settings: false,
   camera: false,
   lazyInventory: false,
@@ -736,6 +800,7 @@ watch(
     isDebtBookOpen,
     isDailyReportOpen,
     isExpenseOpen,
+    isShiftOpen,
     isSettingsOpen,
     isCameraOpen,
     isLazyInventoryOpen,
@@ -779,6 +844,16 @@ const handleKasaClick = (e) => {
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalCheckoutShortcut)
   await loadDatabase()
+
+  // Munculkan prompt Buka Shift 1x saat pagi jika belum ada shift aktif (atau ingatkan bila shift kemarin masih terbuka)
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const dismissedDay = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('kasiry_shift_prompt_dismissed') : null
+  if (!isAnyModalOpen.value && (isActiveShiftStale.value || (!activeShift.value && dismissedDay !== todayKey))) {
+    completedShiftSummary.value = null
+    isShiftAutoPrompt.value = !isActiveShiftStale.value
+    isShiftOpen.value = true
+  }
+
   if (!isTouchViewport()) {
     ensureKasaFocus()
     setTimeout(ensureKasaFocus, 200)
@@ -825,11 +900,14 @@ onUnmounted(() => {
       :totalDebtCount="unpaidDebtCount"
       :todayTxCount="stats.transactionCount"
       :todayExpenseCount="stats.todayExpenseCount"
+      :activeShift="activeShift"
+      :isActiveShiftStale="isActiveShiftStale"
       :isGoogleConnected="isGoogleConnected"
       :googleUser="googleUser"
       @openDebtBook="isDebtBookOpen = true"
       @openDailyReport="isDailyReportOpen = true"
       @openExpense="isExpenseOpen = true"
+      @openShift="openShiftModalManual"
       @openSettings="isSettingsOpen = true"
       @openCamera="isCameraOpen = true"
       @openProductManage="isProductManageOpen = true"
@@ -990,11 +1068,15 @@ onUnmounted(() => {
       :stats="stats"
       :transactions="transactions"
       :expenses="expenses"
+      :shifts="shifts"
+      :activeShift="activeShift"
+      :isActiveShiftStale="isActiveShiftStale"
       :storeName="storeProfile.name"
       :isExporting="isExportingExcel"
       @close="isDailyReportOpen = false"
       @downloadExcel="handleDownloadExcel"
       @openExpense="isDailyReportOpen = false; isExpenseOpen = true"
+      @openShift="isDailyReportOpen = false; openShiftModalManual()"
       @deleteExpense="handleDeleteExpense"
     />
 
@@ -1003,10 +1085,33 @@ onUnmounted(() => {
       v-if="activatedModals.expense || isExpenseOpen"
       :isOpen="isExpenseOpen"
       :expenses="expenses"
+      :activeShift="activeShift"
       :stats="stats"
       @close="isExpenseOpen = false"
       @recordExpense="handleRecordExpense"
       @deleteExpense="handleDeleteExpense"
+    />
+
+    <!-- Modal Buka & Tutup Shift (Tutup Buku Harian) -->
+    <ShiftModal
+      v-if="activatedModals.shift || isShiftOpen"
+      :isOpen="isShiftOpen"
+      :activeShift="activeShift"
+      :completedShift="completedShiftSummary"
+      :isActiveShiftStale="isActiveShiftStale"
+      :defaultCashierName="storeProfile.owner"
+      :lastOpeningCash="lastOpeningCash"
+      :unassignedTodayCount="unassignedTodayCount"
+      :transactions="transactions"
+      :debtPayments="debtPayments"
+      :expenses="expenses"
+      :storeName="storeProfile.name"
+      :isAutoPrompt="isShiftAutoPrompt"
+      @close="isShiftOpen = false; completedShiftSummary = null"
+      @dismissPrompt="handleDismissShiftPrompt"
+      @openShift="handleOpenShift"
+      @closeShift="handleCloseShift"
+      @startNextShift="handleStartNextShift"
     />
 
     <!-- Modal Pengaturan & Integrasi Google -->

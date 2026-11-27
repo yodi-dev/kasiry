@@ -12,6 +12,7 @@ import { getExpenseCategoryMeta, getExpenseSourceMeta } from './expenseConstants
  * @param {Array} options.customers Daftar pelanggan buku utang
  * @param {Array} options.debtPayments Riwayat pelunasan utang
  * @param {Array} options.expenses Riwayat kas keluar / pengeluaran
+ * @param {Array} options.shifts Riwayat buka & tutup shift
  */
 export async function exportKasiryExcel({
   storeProfile = { name: 'Habiba Store', owner: 'Habiba', phone: '081234567890' },
@@ -19,7 +20,8 @@ export async function exportKasiryExcel({
   transactions = [],
   customers = [],
   debtPayments = [],
-  expenses = []
+  expenses = [],
+  shifts = []
 }) {
   const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
@@ -64,6 +66,12 @@ export async function exportKasiryExcel({
     ['Biaya Operasional Hari Ini', stats.todayOperationalExpenses || 0],
     ['Tarik / Setor Owner Hari Ini', stats.todayPriveTotal || 0],
     ['Sisa Tunai Fisik di Laci (Bersih)', netCashDrawer],
+    ...(stats.isShiftScoped
+      ? [
+          ['Modal Awal Laci (Shift Aktif)', stats.openingCash || 0],
+          ['Total Seharusnya di Laci (Termasuk Modal)', stats.expectedCashDrawer ?? netCashDrawer]
+        ]
+      : []),
     ['Estimasi Untung Bersih', stats.todayProfit || 0],
     ['Bon / Utang Baru Tercatat', stats.todayNewDebt || 0],
     ['Total Transaksi / Struk', `${stats.transactionCount || 0} Kali`],
@@ -267,6 +275,73 @@ export async function exportKasiryExcel({
     { wch: 36 }
   ]
   XLSX.utils.book_append_sheet(wb, wsExpense, 'Pengeluaran Kas')
+
+  // ==========================================
+  // SHEET 6: RIWAYAT SHIFT (BUKA & TUTUP BUKU)
+  // ==========================================
+  const shiftHeader = [
+    'No',
+    'Kode Shift',
+    'Kasir / Penjaga',
+    'Status',
+    'Waktu Buka',
+    'Waktu Tutup',
+    'Modal Awal (Rp)',
+    'Tunai Masuk Laci (Rp)',
+    'QRIS (Rp)',
+    'Kas Keluar Laci (Rp)',
+    'Seharusnya di Laci (Rp)',
+    'Uang Fisik (Rp)',
+    'Selisih (Rp)',
+    'Catatan'
+  ]
+  const activeShifts = (shifts || []).filter(s => s && !s.deleted)
+  const formatShiftDate = (ts) => (ts
+    ? new Date(ts).toLocaleString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : '-')
+  const shiftRows = activeShifts.map((s, idx) => {
+    const sum = s.summary || {}
+    return [
+      idx + 1,
+      s.shiftCode || '-',
+      s.cashierName || '-',
+      s.status === 'OPEN' ? 'Masih Buka' : 'Tutup Buku',
+      formatShiftDate(s.openedAt),
+      formatShiftDate(s.closedAt),
+      s.openingCash || 0,
+      sum.todayCashDrawer || 0,
+      sum.todayQrisTotal || 0,
+      sum.todayExpensesCash || 0,
+      s.expectedCash ?? sum.expectedCash ?? '',
+      s.actualCash ?? '',
+      s.cashDifference ?? '',
+      s.closingNote || '-'
+    ]
+  })
+  const wsShift = XLSX.utils.aoa_to_sheet([shiftHeader, ...shiftRows])
+  wsShift['!cols'] = [
+    { wch: 6 },
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 16 },
+    { wch: 20 },
+    { wch: 15 },
+    { wch: 20 },
+    { wch: 22 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 30 }
+  ]
+  XLSX.utils.book_append_sheet(wb, wsShift, 'Riwayat Shift')
 
   // Eksekusi download file .xlsx
   const fileDate = new Date().toISOString().slice(0, 10)

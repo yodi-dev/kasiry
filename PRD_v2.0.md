@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry (Habiba Store)
 
-**Versi Dokumen:** 2.9 (QRIS, Pengeluaran Harian & Kas Keluar, Reorganisasi TopBar Kompak, UI Tests)  
+**Versi Dokumen:** 2.10 (QRIS, Pengeluaran Harian, Sistem Buka & Tutup Shift, Navigasi Kompak)  
 **Status:** Production-Ready & Terverifikasi Build/Unit-Integration Test  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
 **Identitas Toko Acuan:** Habiba Store (Pemilik: Habiba | WA: 081234567890)  
@@ -16,7 +16,8 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
-| **v2.9.0** | 27 November 2026 | **Roadmap #2 (Pengeluaran Harian & Navigasi Kompak):** Modal `ExpenseModal.vue` (`Operasional`, `Makan & Transport`, `Tarik / Setor Owner`, `Lainnya`; sumber `Tunai Dari Laci` vs `Non-Tunai`), tabel Dexie `v3` `expenses`, pemotongan bersih Laci & Laba di `computeDailyStats` (prive tidak kurangi laba), integrasi `DailyReportModal` (tab Kas Keluar + WA), Excel 5 sheet (`Pengeluaran Kas`), Google Sheets (`KAS KELUAR`) + merge Drive, dan TopBar kompak (`Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Laporan`, `⚙️`). |
+| **v2.10.0** | 27 November 2026 | **Roadmap #3 (Sistem Buka & Tutup Shift / Tutup Buku Harian):** Modal `ShiftModal.vue` (prompt pagi + tombol *"Nanti Saja"*, auto-modal awal terakhir, pengadopsian catatan hari ini, tutup buku fisik laci vs `expectedCash` + live selisih, kirim WA tutup shift), chip status shift di `TopBar.vue`, skema Dexie `v4` `shifts` + tag `shiftId/shiftCode`, tab **Shift** di `DailyReportModal`, Excel 6 sheet (`Riwayat Shift`), dan Google Sheets `BUKA/TUTUP SHIFT` + merge Drive. |
+| **v2.9.0–v2.9.1** | 27 November 2026 | **Roadmap #2 (Pengeluaran Harian & Navigasi Kompak + Hotfix UI):** Modal `ExpenseModal.vue`, tabel Dexie `v3` `expenses`, isolasi `prive` dari laba, Excel 5 sheet (`Pengeluaran Kas`), Google Sheets `KAS KELUAR`, TopBar kompak (`Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Laporan`, `⚙️`), serta fix stacking context `z-40` dropdown & badge kuantitas `top-1.5 right-1.5`. |
 | **v2.8.1–v2.8.3** | 26 November 2026 | **Stabilisasi QRIS & Cetak Termal:** Hotfix `getCustomerTxCount` & suite komponen `@vue/test-utils`, tata letak KPI kembalian desktop `PaymentModal`, isolasi `@media print` di `ReceiptModal`, serta fix clipping kartu KPI QRIS (`min-w-0`). |
 | **v2.8.0** | 26 November 2026 | **Roadmap #1 (Metode Bayar QRIS & Pemisahan Laci):** Tab `QRIS` di `PaymentModal.vue` (otomatis uang pas, prefix `QRS-`), opsi `Tunai | QRIS` di pelunasan Buku Utang, pemisahan Laci Tunai vs QRIS di Laporan Harian, WA, Excel & Google Sheets (`computeDailyStats`). |
 | **v2.7.1** | 26 November 2026 | **Tahap 3 (Sinkronisasi Dokumen & Checklist Rilis):** Pembaruan menyeluruh `README.md`, `PRD_v2.0.md`, `SITEMAP.md`, serta checklist final verifikasi Google OAuth & uji perangkat fisik. |
@@ -70,7 +71,7 @@ flowchart TD
     DesktopMode --> D_Right["Kolom Kanan (7/12 - 8/12): BarcodeInputBar Inline + Tab Kategori + Grid Adaptif"]
     DesktopMode --> D_Foot["Footer Desktop >= 1024px: Pintasan (/ & F2) + Privacy & Terms"]
 
-    App -.->|"Lazy Async Chunks (defineAsyncComponent)"| Modals["10 Modal Fitur: Payment, Receipt, LazyInventory, ProductCRUD, CustomerCRUD, DebtBook, Expense, DailyReport, Settings, CameraScanner"]
+    App -.->|"Lazy Async Chunks (defineAsyncComponent)"| Modals["11 Modal Fitur: Payment, Receipt, LazyInventory, ProductCRUD, CustomerCRUD, DebtBook, Expense, Shift, DailyReport, Settings, CameraScanner"]
 ```
 
 ---
@@ -91,9 +92,10 @@ flowchart TD
 - **Utang / Bon:** Akun `"Umum"` otomatis diblokir baik di UI (`PaymentModal.vue`) maupun di lapisan database (`useKasiryDB.js`) agar utang selalu terikat ke pelanggan nyata. Pencarian nama atau daftar pelanggan baru berlangsung instan tanpa formulir panjang.
 - **Manajemen Pelanggan (`CustomerManagementModal.vue`) & Buku Utang (`DebtBookModal.vue`):** Dilengkapi riwayat belanja penuh per pelanggan lewat query indeks on-demand (`getCustomerTransactions`), cicilan utang dengan pembatasan nominal lunas vs uang kembalian (`Math.min(amount, currentDebt)`), serta tombol pengingat WhatsApp sopan.
 
-### 4.4 Laporan Harian, Kas Keluar, Excel 5-Sheet & Arsip Data Tahunan
+### 4.4 Laporan Shift/Harian, Buka-Tutup Shift, Kas Keluar, Excel 6-Sheet & Arsip Data Tahunan
+- **Buka & Tutup Shift (`ShiftModal.vue`):** Mengelompokkan operasional 1 hari buka warung dalam 1 sesi shift fleksibel (mendukung tutup lewat tengah malam), auto-isi modal awal & pengingat shift kemarin yang lupa ditutup, serta rekonsiliasi fisik laci (`Modal Awal + Tunai Masuk - Kas Keluar Laci`) lengkap dengan pesan tutup buku WhatsApp.
 - **Catatan Kas Keluar (`ExpenseModal.vue`):** Mencatat pengeluaran kas harian dengan preset kategori (`Operasional`, `Makan & Transport`, `Tarik / Setor Owner`, `Lainnya`), sumber dana `Tunai (Dari Laci)` vs `Non-Tunai (QRIS / Rek)`, KPI real-time Sisa Tunai Laci, dan isolasi kategori `prive` agar tarik kas owner tidak mengurangi estimasi untung jualan.
-- **Laporan Harian (`DailyReportModal.vue`):** Menampilkan Uang Masuk Kas (Tunai & QRIS), Total Kas Keluar + Sisa Laci Bersih, Perkiraan Untung Bersih, Bon Baru, Top 5 Barang Terlaris, tab Kas Keluar, tab Riwayat Transaksi Hari Ini, kirim rekap WhatsApp, serta ekspor **Excel 5 sheet** (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`) via dynamic `import('xlsx')` yang menarik semua data lintas tahun (`getAllTransactionsForExport()`).
+- **Laporan Kasir (`DailyReportModal.vue`):** Otomatis memakai lingkup **Shift Aktif** (atau hari kalender jika belum buka shift), menampilkan Uang Masuk Kas (Tunai & QRIS), Total Kas Keluar + Sisa Laci Bersih, Perkiraan Untung Bersih, Bon Baru, Top 5 Barang Terlaris, tab Kas Keluar, tab Riwayat Transaksi, tab Riwayat Shift tutup buku, kirim rekap WhatsApp, serta ekspor **Excel 6 sheet** (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`, `Riwayat Shift`) via dynamic `import('xlsx')`.
 - **Skalabilitas & Arsip Data Tahunan (`SettingsModal.vue`):**
   - Memori runtime (`useKasiryDB.js`) memakai `shallowRef([])`, hanya memuat **90 hari terakhir** ke UI Kasa harian (`ACTIVE_HISTORY_DAYS = 90`), serta melakukan pembaruan state parsial setelah checkout & CRUD.
   - Fitur **Kesehatan & Arsip Data Tahunan** menyediakan pilihan retensi `> 3 Bulan`, `> 6 Bulan`, dan `> 1 Tahun` yang otomatis mengunduh file `Arsip_<NamaToko>_sd_<Tanggal>.json` (+ mengunggah salinan arsip ke Google Drive bila terhubung & online), menyimpan `archiveState.cutoffAt`, lalu membersihkan baris lama di IndexedDB tanpa mengubah produk maupun `totalDebt` pelanggan.
@@ -104,7 +106,7 @@ flowchart TD
 
 ---
 
-## 5. Model Data Lokal (Dexie.js `KasiryDB` v3)
+## 5. Model Data Lokal (Dexie.js `KasiryDB` v4)
 
 ```javascript
 // src/db/index.js — KasiryDatabase
@@ -126,8 +128,13 @@ db.version(2).stores({
 db.version(3).stores({
   expenses: '++id, expenseNumber, createdAt, category, source, updatedAt, deleted'
 })
+
+// Migrasi v4: pencatatan buka & tutup shift harian
+db.version(4).stores({
+  shifts: '++id, shiftCode, status, openedAt, closedAt, updatedAt, deleted'
+})
 ```
-*Catatan `settings` keys:* `storeProfile`, `categories`, `archiveState` (`{ cutoffAt }`). Format backup JSON eksternal mempertahankan `version: '2.4'` (kompatibel lintas versi dengan node opsional `expenses`).
+*Catatan `settings` keys:* `storeProfile`, `categories`, `archiveState` (`{ cutoffAt }`), `lastOpeningCash`. Format backup JSON eksternal mempertahankan `version: '2.4'` (kompatibel lintas versi dengan node opsional `expenses` & `shifts`).
 
 ---
 
@@ -135,9 +142,9 @@ db.version(3).stores({
 
 1. **Code Splitting & Bundle Budget:**
    - Konfigurasi Rolldown `codeSplitting.groups` di `vite.config.js` memisahkan `vendor-vue`, `vendor-dexie`, `vendor-xlsx`, dan `vendor-zxing`.
-   - Entry bundle `index` terjaga ringan (< target 60 KB gzip per chunk utama), bebas chunk warning `> 500 kB`, dengan 10 modal sekunder terpisah sebagai async chunks (`prewarmCheckoutChunks` menghangatkan `PaymentModal`, `LazyInventoryModal`, dan `ReceiptModal` saat browser luang).
+   - Entry bundle `index` terjaga ringan (< target 60 KB gzip per chunk utama), bebas chunk warning `> 500 kB`, dengan 11 modal sekunder terpisah sebagai async chunks (`prewarmCheckoutChunks` menghangatkan `PaymentModal`, `LazyInventoryModal`, dan `ReceiptModal` saat browser luang).
 2. **Offline PWA Precaching:** Workbox men-generate service worker precache di `dist/sw.js` sehingga seluruh chunk pecahan & aset statis tetap berjalan offline 100%.
-3. **Automated Tests:** Dijalankan melalui `npm test` (`Vitest` + `fake-indexeddb` + `@vue/test-utils`/`happy-dom`) mencakup 7 suite & 20 skenario di folder `tests/` (`customerStats`, `dailyStats`, `useKasiryDB`, `useGoogleSync`, `dbMigration` `v1 -> v3`, `excelExport`, dan `uiModals`).
+3. **Automated Tests:** Dijalankan melalui `npm test` (`Vitest` + `fake-indexeddb` + `@vue/test-utils`/`happy-dom`) mencakup 7 suite & 22 skenario di folder `tests/` (`customerStats`, `dailyStats`, `useKasiryDB`, `useGoogleSync`, `dbMigration` `v1 -> v4`, `excelExport`, dan `uiModals`).
 4. **Penyimpanan Persisten & Render Katalog:** `navigator.storage.persist()` aktif saat inisialisasi DB, dan kartu katalog di bawah lipatan layar (`idx >= 16`) memakai `.offscreen-card-defer` (`content-visibility: auto; contain-intrinsic-size: auto none auto 92px;`).
 
 ---
@@ -146,7 +153,7 @@ db.version(3).stores({
 
 Status terbaru sebelum rilis penuh ke pemilik warung:
 - [x] Build produksi bersih (`npm run build`), 0 error & 0 warning ukuran chunk.
-- [x] Automated tests Vitest lulus (`npm test`: 7 suite, 20 skenario).
+- [x] Automated tests Vitest lulus (`npm test`: 7 suite, 22 skenario).
 - [x] Verifikasi domain Google Search Console aktif (`public/google50a425d7a5de8ecd.html`).
 - [x] Halaman `/privacy.html`, `/terms.html`, ikon OAuth (`kasiry-oauth-120x120.png`), serta COOP header tersedia di `public/`.
 - [ ] **Uji Perangkat Fisik Manual (Final Field Check):**
@@ -164,9 +171,9 @@ Daftar fitur berikut dicatat untuk dibahas detail (*design & spec alignment*) da
 
 | No | Item Fitur | Status | Ringkasan Cakupan Awal untuk Dibahas |
 | :-: | :--- | :---: | :--- |
-| 1 | **Sistem Buka & Tutup Shift** | `[ ] Backlog (Selanjutnya)` | Modal/saldo kas awal laci, pencatatan nama kasir/shift aktif, ringkasan uang fisik laci vs sistem (sudah siap terhubung ke `expenses` & QRIS), selisih kas, & rekap laporan per shift. |
-| 2 | **Transaksi Keluar / Pengeluaran Harian** | `[x] Selesai (v2.9.0)` | Modal cepat `ExpenseModal.vue`, skema Dexie `v3` `expenses`, sumber `Tunai Laci` vs `Non-Tunai`, isolasi `prive` dari laba, Laporan + WA, Excel 5 sheet, serta sync Google Sheets & Drive. |
-| 3 | **Multi Harga (Ecer / Grosir / Agen)** | `[ ] Backlog` | Definisi tier harga atau aturan grosir bertingkat (berdasarkan qty atau level pelanggan/manual switch saat transaksi) serta skema IndexedDB & backup kompatibel. |
+| 1 | **Sistem Buka & Tutup Shift** | `[x] Selesai (v2.10.0)` | Modal `ShiftModal.vue`, prompt pagi non-blokir + auto-modal awal, pengadopsian catatan hari ini, chip status shift di `TopBar.vue`, skema Dexie `v4` `shifts`, rekonsiliasi fisik laci vs sistem, tab **Shift** di `DailyReportModal`, Excel 6 sheet (`Riwayat Shift`), & Google Sheets `BUKA/TUTUP SHIFT` + merge Drive. |
+| 2 | **Transaksi Keluar / Pengeluaran Harian** | `[x] Selesai (v2.9.0)` | Modal cepat `ExpenseModal.vue`, skema Dexie `v3` `expenses`, sumber `Tunai Laci` vs `Non-Tunai`, isolasi `prive` dari laba, Laporan + WA, Excel, serta sync Google Sheets & Drive. |
+| 3 | **Multi Harga (Ecer / Grosir / Agen)** | `[ ] Backlog (Selanjutnya)` | Definisi tier harga atau aturan grosir bertingkat (berdasarkan qty atau level pelanggan/manual switch saat transaksi) serta skema IndexedDB & backup kompatibel. |
 | 4 | **Metode Bayar QRIS** | `[x] Selesai (v2.8.0)` | Tab `QRIS` di `PaymentModal.vue` (otomatis uang pas, prefix `QRS-`), opsi `Tunai \| QRIS` di Buku Utang, pemisahan Laci Tunai vs QRIS di Laporan Harian, Struk 58mm, WA, Excel & Google Sheets (upload foto QRIS statis ditunda ke rilis opsional nanti). |
 | 5 | **Fitur Kulakan / Belanja Stok** | `[ ] Backlog` | Pencatatan stok masuk barang, harga kulak/modal terbaru, pembaruan stok produk (opsional pelacakan stok aktif), serta keterhubungannya dengan pengeluaran kas warung atau shift. |
 | 6 | **Pembersihan & Seed Data Awal Baru** | `[ ] Backlog` | Audit dan peremajaan `src/db/seedData.js` (produk awal warung & contoh pelanggan buku utang) atau opsi awal warung bersih vs data contoh. |

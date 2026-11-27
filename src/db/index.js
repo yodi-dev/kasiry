@@ -27,11 +27,17 @@ export class KasiryDatabase extends Dexie {
       expenses: '++id, expenseNumber, createdAt, category, source, updatedAt, deleted'
     })
 
+    // Schema Version 4: Tabel shifts untuk sistem buka & tutup shift / tutup buku harian
+    this.version(4).stores({
+      shifts: '++id, shiftCode, status, openedAt, closedAt, updatedAt, deleted'
+    })
+
     this.products = this.table('products')
     this.transactions = this.table('transactions')
     this.customers = this.table('customers')
     this.debtPayments = this.table('debtPayments')
     this.expenses = this.table('expenses')
+    this.shifts = this.table('shifts')
     this.settings = this.table('settings')
   }
 }

@@ -86,6 +86,28 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(expBody.values[0][4]).toBe(-19000)
     expect(expBody.values[0][5]).toBe(0)
     expect(expBody.values[0][7]).toContain('Isi ulang galon')
+
+    // 5. Buka / Tutup Shift tercatat ke Google Sheets
+    await sync.appendShiftEventToSheet({
+      action: 'TUTUP SHIFT',
+      shift: {
+        shiftCode: 'SHF-999',
+        cashierName: 'Habiba',
+        openedAt: 1700000000000,
+        closedAt: 1700009000000,
+        openingCash: 200000,
+        expectedCash: 250000,
+        actualCash: 248000,
+        cashDifference: -2000,
+        closingNote: 'Selisih receh'
+      }
+    }, 'Habiba Store')
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    const shiftBody = JSON.parse(fetchMock.mock.calls[3][1].body)
+    expect(shiftBody.values[0][1]).toBe('SHF-999')
+    expect(shiftBody.values[0][2]).toBe('TUTUP SHIFT')
+    expect(shiftBody.values[0][4]).toBe(248000)
+    expect(shiftBody.values[0][6]).toBe(-2000)
   })
 
   it('batches Drive snapshots to 3 minutes / 10 transactions once txCount >= 200', async () => {
@@ -153,6 +175,10 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
           { id: 70, expenseNumber: 'KLR-OLD', createdAt: 1500000, amount: 5000, updatedAt: 1500000 },
           { id: 71, expenseNumber: 'KLR-DEL', createdAt: 2600000, amount: 10000, deleted: true, updatedAt: 9000 }
         ],
+        shifts: [
+          { id: 80, shiftCode: 'SHF-OLD-CLOSED', status: 'CLOSED', openedAt: 1500000, updatedAt: 1500000 },
+          { id: 81, shiftCode: 'SHF-SYNC', status: 'CLOSED', openedAt: 2500000, actualCash: 300000, updatedAt: 9000 }
+        ],
         settings: [
           { key: 'archiveState', value: { cutoffAt: 1000000 }, updatedAt: 1000 }
         ]
@@ -188,6 +214,9 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
         expenses: [
           { id: 71, expenseNumber: 'KLR-DEL', createdAt: 2600000, amount: 10000, deleted: false, updatedAt: 5000 }
         ],
+        shifts: [
+          { id: 81, shiftCode: 'SHF-SYNC', status: 'OPEN', openedAt: 2500000, updatedAt: 5000 }
+        ],
         settings: [
           { key: 'archiveState', value: { cutoffAt }, updatedAt: 9000 }
         ]
@@ -214,5 +243,8 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(appliedPayload.data.expenses).toHaveLength(1)
     expect(appliedPayload.data.expenses[0].expenseNumber).toBe('KLR-DEL')
     expect(appliedPayload.data.expenses[0].deleted).toBe(true)
+    expect(appliedPayload.data.shifts).toHaveLength(1)
+    expect(appliedPayload.data.shifts[0].shiftCode).toBe('SHF-SYNC')
+    expect(appliedPayload.data.shifts[0].status).toBe('CLOSED')
   })
 })

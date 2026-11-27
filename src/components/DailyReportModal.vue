@@ -15,6 +15,7 @@ import {
   Trash2
 } from '@lucide/vue'
 import { getExpenseCategoryMeta, getExpenseSourceMeta } from '../utils/expenseConstants'
+import { recordBelongsToShift, formatShiftWhatsAppText } from '../utils/dailyStats'
 
 const props = defineProps({
   isOpen: {
@@ -45,6 +46,18 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  shifts: {
+    type: Array,
+    default: () => []
+  },
+  activeShift: {
+    type: Object,
+    default: null
+  },
+  isActiveShiftStale: {
+    type: Boolean,
+    default: false
+  },
   storeName: {
     type: String,
     default: 'Habiba Store'
@@ -55,7 +68,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'downloadExcel', 'openExpense', 'deleteExpense'])
+const emit = defineEmits(['close', 'downloadExcel', 'openExpense', 'deleteExpense', 'openShift'])
 
 // Active Tab: 'summary' | 'expenses' | 'history'
 const activeTab = ref('summary')
@@ -76,9 +89,14 @@ const todayFormatted = computed(() => {
   }).format(new Date())
 })
 
-// Daftar transaksi hari ini diurutkan dari yang terbaru
+// Daftar transaksi lingkup shift aktif (atau hari ini bila belum buka shift) diurutkan terbaru
 const todayTransactions = computed(() => {
   if (!props.transactions || props.transactions.length === 0) return []
+  if (props.activeShift && props.activeShift.status === 'OPEN') {
+    return props.transactions
+      .filter(t => recordBelongsToShift(t, props.activeShift, 'createdAt'))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+  }
   const startOfDay = new Date()
   startOfDay.setHours(0, 0, 0, 0)
   const todayTimestamp = startOfDay.getTime()
@@ -88,9 +106,14 @@ const todayTransactions = computed(() => {
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 })
 
-// Daftar pengeluaran aktif hari ini diurutkan dari yang terbaru
+// Daftar pengeluaran aktif lingkup shift aktif (atau hari ini) diurutkan terbaru
 const todayExpenses = computed(() => {
   if (!props.expenses || props.expenses.length === 0) return []
+  if (props.activeShift && props.activeShift.status === 'OPEN') {
+    return props.expenses
+      .filter(e => e && !e.deleted && recordBelongsToShift(e, props.activeShift, 'createdAt'))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+  }
   const startOfDay = new Date()
   startOfDay.setHours(0, 0, 0, 0)
   const todayTimestamp = startOfDay.getTime()
@@ -99,6 +122,27 @@ const todayExpenses = computed(() => {
     .filter(e => e && !e.deleted && (e.createdAt || 0) >= todayTimestamp)
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 })
+
+const closedShifts = computed(() => {
+  return (props.shifts || [])
+    .filter(s => s && !s.deleted && s.status === 'CLOSED')
+    .sort((a, b) => (b.closedAt || b.openedAt || 0) - (a.closedAt || a.openedAt || 0))
+})
+
+const formatDateTime = (ts) => {
+  if (!ts) return '-'
+  return new Date(ts).toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const shareClosedShiftToWA = (shift) => {
+  const text = formatShiftWhatsAppText(shift, props.storeName)
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+}
 
 const grossCashDrawer = computed(() => {
   const cashSales = props.stats.todayCashSales ?? props.stats.todaySales ?? 0
@@ -134,6 +178,12 @@ const generateWhatsAppText = () => {
 
   let text = `*📊 LAPORAN KASIR ${props.storeName.toUpperCase()}*\n`
   text += `📅 Tanggal: ${todayFormatted.value}\n`
+  if (props.stats.isShiftScoped) {
+    const expDrawer = props.stats.expectedCashDrawer ?? ((props.stats.openingCash || 0) + netCashDrawer.value)
+    text += `🕒 Shift: ${props.stats.shiftCode || '-'} (${props.stats.shiftCashierName || 'Kasir'})\n`
+    text += `💼 Modal Awal Laci: Rp ${(props.stats.openingCash || 0).toLocaleString('id-ID')}\n`
+    text += `🧮 Seharusnya di Laci (dg Modal): Rp ${expDrawer.toLocaleString('id-ID')}\n`
+  }
   text += `--------------------------------\n`
   text += `💵 *Total Kas Masuk:* Rp ${totalCash.toLocaleString('id-ID')}\n`
   text += `   • Uang Tunai Masuk Laci: Rp ${cashDrawerTotal.toLocaleString('id-ID')}\n`
@@ -202,11 +252,14 @@ const confirmDeleteExpense = (id) => {
           </div>
           <div>
             <h3 class="text-base font-bold text-[#0a193d] leading-tight">
-              Laporan Penjualan Hari Ini
+              {{ activeShift ? 'Laporan Shift Kasir Aktif' : 'Laporan Penjualan Hari Ini' }}
             </h3>
             <p class="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
               <Calendar class="w-3.5 h-3.5 text-slate-400" />
-              <span>{{ todayFormatted }}</span>
+              <span v-if="activeShift">
+                {{ activeShift.shiftCode }} • {{ activeShift.cashierName }} • Buka {{ formatDateTime(activeShift.openedAt) }}
+              </span>
+              <span v-else>{{ todayFormatted }}</span>
             </p>
           </div>
         </div>
@@ -222,44 +275,57 @@ const confirmDeleteExpense = (id) => {
 
       <!-- 2. Segmented Pill Tab Switcher -->
       <div class="px-5 pt-3.5 pb-1 shrink-0 bg-white border-b border-slate-100">
-        <div class="p-1 bg-slate-100 rounded-2xl flex gap-1">
+        <div class="p-1 bg-slate-100 rounded-2xl grid grid-cols-4 gap-1">
           <button 
             @click="activeTab = 'summary'"
             :class="[
-              'flex-1 h-10 px-2 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all',
+              'h-10 px-1.5 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer transition-all',
               activeTab === 'summary' 
                 ? 'bg-[#0a193d] text-white shadow-xs' 
                 : 'text-slate-600 hover:text-slate-900'
             ]"
           >
-            <BarChart3 class="w-4 h-4 shrink-0" />
-            <span>Ringkasan<span class="hidden sm:inline"> Kas</span></span>
+            <BarChart3 class="w-3.5 h-3.5 shrink-0 hidden sm:block" />
+            <span>Ringkasan</span>
           </button>
 
           <button 
             @click="activeTab = 'expenses'"
             :class="[
-              'flex-1 h-10 px-2 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all',
+              'h-10 px-1.5 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer transition-all',
               activeTab === 'expenses' 
                 ? 'bg-[#0a193d] text-white shadow-xs' 
                 : 'text-slate-600 hover:text-slate-900'
             ]"
           >
-            <Wallet class="w-4 h-4 shrink-0" />
+            <Wallet class="w-3.5 h-3.5 shrink-0 hidden sm:block" />
             <span>Kas Keluar ({{ todayExpenses.length }})</span>
           </button>
 
           <button 
             @click="activeTab = 'history'"
             :class="[
-              'flex-1 h-10 px-2 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all',
+              'h-10 px-1.5 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer transition-all',
               activeTab === 'history' 
                 ? 'bg-[#0a193d] text-white shadow-xs' 
                 : 'text-slate-600 hover:text-slate-900'
             ]"
           >
-            <Receipt class="w-4 h-4 shrink-0" />
+            <Receipt class="w-3.5 h-3.5 shrink-0 hidden sm:block" />
             <span>Riwayat <span class="hidden sm:inline">Transaksi </span>({{ todayTransactions.length }})</span>
+          </button>
+
+          <button 
+            @click="activeTab = 'shifts'"
+            :class="[
+              'h-10 px-1.5 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer transition-all',
+              activeTab === 'shifts' 
+                ? 'bg-[#0a193d] text-white shadow-xs' 
+                : 'text-slate-600 hover:text-slate-900'
+            ]"
+          >
+            <Clock class="w-3.5 h-3.5 shrink-0 hidden sm:block" />
+            <span>Shift ({{ closedShifts.length }})</span>
           </button>
         </div>
       </div>
@@ -269,6 +335,41 @@ const confirmDeleteExpense = (id) => {
         
         <!-- TAB 1: RINGKASAN KAS & STATISTIK -->
         <div v-if="activeTab === 'summary'" class="space-y-4">
+          <!-- Strip Status Shift Aktif / Buka Tutup Shift -->
+          <div
+            :class="[
+              'p-3.5 rounded-2xl border flex items-center justify-between gap-3',
+              activeShift
+                ? (isActiveShiftStale ? 'bg-amber-50/90 border-amber-300/80' : 'bg-sky-50/80 border-sky-200/80')
+                : 'bg-slate-50 border-slate-200/80'
+            ]"
+          >
+            <div class="min-w-0">
+              <p class="text-xs font-bold text-[#0a193d] flex items-center gap-1.5">
+                <Clock class="w-3.5 h-3.5 text-[#0284c7] shrink-0" />
+                <span v-if="activeShift">
+                  {{ isActiveShiftStale ? 'Shift Kemarin Masih Terbuka' : 'Shift Aktif Berjalan' }}
+                  • Modal Awal: <span class="font-mono">Rp {{ (stats.openingCash || 0).toLocaleString('id-ID') }}</span>
+                </span>
+                <span v-else>Belum Buka Shift (Memakai Hitungan Hari Ini)</span>
+              </p>
+              <p class="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                <template v-if="activeShift">
+                  Seharusnya di laci saat ini: <strong class="font-mono text-[#0a193d]">Rp {{ ((stats.expectedCashDrawer ?? ((stats.openingCash || 0) + netCashDrawer)) || 0).toLocaleString('id-ID') }}</strong>
+                </template>
+                <template v-else>
+                  Buka shift untuk mengatur modal awal laci &amp; tutup buku harian.
+                </template>
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="emit('openShift')"
+              class="h-9 px-3 rounded-xl bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs shrink-0 cursor-pointer transition-all active:scale-95 shadow-2xs"
+            >
+              {{ activeShift ? 'Tutup Shift' : 'Buka Shift' }}
+            </button>
+          </div>
           <!-- 4 Kartu Indikator Keuangan -->
           <div class="grid grid-cols-2 gap-2.5 sm:gap-3">
             <!-- Total Uang Kas Masuk -->
@@ -580,6 +681,88 @@ const confirmDeleteExpense = (id) => {
                 Rp {{ tx.totalAmount.toLocaleString('id-ID') }}
               </span>
             </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: RIWAYAT SHIFT & TUTUP BUKU HARIAN -->
+        <div v-else-if="activeTab === 'shifts'" class="space-y-3">
+          <div
+            v-if="closedShifts.length === 0"
+            class="h-44 flex flex-col items-center justify-center text-center p-4 text-slate-400"
+          >
+            <Clock class="w-10 h-10 mb-2 text-slate-300" />
+            <p class="text-xs font-semibold text-slate-500">Belum ada riwayat tutup shift</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Rekap buka/tutup buku harian kasir akan tercatat rapi di sini</p>
+          </div>
+
+          <div
+            v-for="s in closedShifts"
+            :key="s.id || s.shiftCode"
+            class="p-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs space-y-2.5"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-mono font-bold text-xs text-[#0a193d]">{{ s.shiftCode }}</span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70">
+                    {{ s.cashierName }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5">
+                  {{ formatDateTime(s.openedAt) }} → {{ formatDateTime(s.closedAt) }}
+                </p>
+              </div>
+              <button
+                type="button"
+                @click="shareClosedShiftToWA(s)"
+                class="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
+              >
+                <MessageSquare class="w-3.5 h-3.5" />
+                <span>Kirim WA</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              <div>
+                <span class="text-slate-400 block">Modal Awal</span>
+                <span class="font-mono font-bold text-[#0a193d]">Rp {{ (s.openingCash || 0).toLocaleString('id-ID') }}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block">Tunai Masuk</span>
+                <span class="font-mono font-bold text-emerald-700">Rp {{ (s.summary?.todayCashDrawer || 0).toLocaleString('id-ID') }}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block">Kas Keluar Laci</span>
+                <span class="font-mono font-bold text-rose-700">Rp {{ (s.summary?.todayExpensesCash || 0).toLocaleString('id-ID') }}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block">QRIS (Non-Tunai)</span>
+                <span class="font-mono font-bold text-[#0284c7]">Rp {{ (s.summary?.todayQrisTotal || 0).toLocaleString('id-ID') }}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block">Fisik di Laci</span>
+                <span class="font-mono font-bold text-[#0a193d]">Rp {{ (s.actualCash || 0).toLocaleString('id-ID') }}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block">Selisih Laci</span>
+                <span
+                  :class="[
+                    'font-mono font-bold',
+                    (s.cashDifference || 0) === 0
+                      ? 'text-emerald-700'
+                      : (s.cashDifference || 0) > 0
+                      ? 'text-[#0284c7]'
+                      : 'text-rose-700'
+                  ]"
+                >
+                  {{ (s.cashDifference || 0) === 0 ? 'Pas ✓' : `${s.cashDifference > 0 ? '+' : '-'}Rp ${Math.abs(s.cashDifference).toLocaleString('id-ID')}` }}
+                </span>
+              </div>
+            </div>
+
+            <p v-if="s.closingNote" class="text-[11px] text-slate-500 italic">
+              Catatan: "{{ s.closingNote }}"
+            </p>
           </div>
         </div>
 

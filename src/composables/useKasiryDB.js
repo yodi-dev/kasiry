@@ -1,5 +1,6 @@
 import { ref, shallowRef, computed } from 'vue'
 import { db, initDatabase } from '../db/index'
+import { computeShiftClosingPreview } from '../utils/dailyStats'
 
 // Helper agar objek/array reaktif Vue (Proxy) selalu dikonversi menjadi plain JS sebelum disimpan ke IndexedDB
 const toPlain = (val) => {
@@ -26,13 +27,44 @@ const customers = ref([])
 const transactions = shallowRef([])
 const debtPayments = shallowRef([])
 const expenses = shallowRef([])
+const shifts = shallowRef([])
+const lastOpeningCash = ref(0)
 const totalTransactionCount = ref(0)
 const totalDebtPaymentCount = ref(0)
 const totalExpenseCount = ref(0)
+const totalShiftCount = ref(0)
 const archiveCutoffAt = ref(0)
 const olderTransactionCount = computed(() =>
   Math.max(0, totalTransactionCount.value - transactions.value.length)
 )
+
+const activeShift = computed(() =>
+  shifts.value.find(s => !s.deleted && s.status === 'OPEN') || null
+)
+
+const isActiveShiftStale = computed(() => {
+  if (!activeShift.value) return false
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  return Number(activeShift.value.openedAt || 0) < startOfToday.getTime()
+})
+
+const unassignedTodayCount = computed(() => {
+  if (activeShift.value) return 0
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  const todayTs = startOfToday.getTime()
+  const unassignedTx = transactions.value.filter(
+    t => (t?.createdAt || 0) >= todayTs && !t.shiftId && !t.shiftCode
+  ).length
+  const unassignedPays = debtPayments.value.filter(
+    p => (p?.paymentDate || 0) >= todayTs && !p.shiftId && !p.shiftCode
+  ).length
+  const unassignedExps = expenses.value.filter(
+    e => !e?.deleted && (e?.createdAt || 0) >= todayTs && !e.shiftId && !e.shiftCode
+  ).length
+  return unassignedTx + unassignedPays + unassignedExps
+})
 const lastLocalBackupTime = ref(
   typeof localStorage !== 'undefined' ? localStorage.getItem('kasiry_last_local_backup') || null : null
 )
@@ -106,27 +138,39 @@ export function useKasiryDB() {
 
   const refreshRecentTransactions = async () => {
     const windowCutoff = Date.now() - ACTIVE_HISTORY_DAYS * MS_PER_DAY
-    const [recentTx, recentPays, recentExpenses, txCount, payCount, expCount] = await Promise.all([
+    const [recentTx, recentPays, recentExpenses, recentShifts, openShifts, txCount, payCount, expCount, shiftCount] = await Promise.all([
       db.transactions.where('createdAt').aboveOrEqual(windowCutoff).reverse().toArray(),
       db.debtPayments.where('paymentDate').aboveOrEqual(windowCutoff).reverse().toArray(),
       db.expenses.where('createdAt').aboveOrEqual(windowCutoff).reverse().filter(e => !e.deleted).toArray(),
+      db.shifts.where('openedAt').aboveOrEqual(windowCutoff).reverse().filter(s => !s.deleted).toArray(),
+      db.shifts.where('status').equals('OPEN').filter(s => !s.deleted).toArray(),
       db.transactions.count(),
       db.debtPayments.count(),
-      db.expenses.filter(e => !e.deleted).count()
+      db.expenses.filter(e => !e.deleted).count(),
+      db.shifts.filter(s => !s.deleted).count()
     ])
+
+    const shiftMap = new Map()
+    ;[...openShifts, ...recentShifts].forEach(s => {
+      if (s && !s.deleted) shiftMap.set(s.id, s)
+    })
+
     transactions.value = recentTx
     debtPayments.value = recentPays
     expenses.value = recentExpenses
+    shifts.value = Array.from(shiftMap.values()).sort((a, b) => (b.openedAt || 0) - (a.openedAt || 0))
     totalTransactionCount.value = txCount
     totalDebtPaymentCount.value = payCount
     totalExpenseCount.value = expCount
+    totalShiftCount.value = shiftCount
   }
 
   const refreshSettings = async () => {
-    const [profileSetting, catSetting, archiveSetting] = await Promise.all([
+    const [profileSetting, catSetting, archiveSetting, openingCashSetting] = await Promise.all([
       db.settings.get('storeProfile'),
       db.settings.get('categories'),
-      db.settings.get('archiveState')
+      db.settings.get('archiveState'),
+      db.settings.get('lastOpeningCash')
     ])
 
     if (profileSetting && profileSetting.value) {
@@ -134,6 +178,7 @@ export function useKasiryDB() {
     }
 
     archiveCutoffAt.value = Number(archiveSetting?.value?.cutoffAt || 0)
+    lastOpeningCash.value = Math.max(0, Number(openingCashSetting?.value || 0))
 
     if (catSetting && Array.isArray(catSetting.value) && catSetting.value.length > 0) {
       categoryList.value = catSetting.value
@@ -262,12 +307,15 @@ export function useKasiryDB() {
     await db.customers.put(cust)
 
     // Catat histori pelunasan sebesar nominal utang yang dibayarkan
+    const currentShift = activeShift.value
     const paymentRecord = toPlain({
       id: generateUniqueId(),
       customerId,
       amount: appliedAmount,
       paymentMethod: method,
       paymentDate: now,
+      shiftId: currentShift?.id || null,
+      shiftCode: currentShift?.shiftCode || null,
       updatedAt: now
     })
     await db.debtPayments.add(paymentRecord)
@@ -306,6 +354,7 @@ export function useKasiryDB() {
       ? expenseNumber.trim()
       : `KLR-${String(id).slice(-7)}`
 
+    const currentShift = activeShift.value
     const expenseRecord = toPlain({
       id,
       expenseNumber: expNo,
@@ -314,6 +363,8 @@ export function useKasiryDB() {
       category: cleanCategory,
       source: cleanSource,
       note: cleanNote,
+      shiftId: currentShift?.id || null,
+      shiftCode: currentShift?.shiftCode || null,
       updatedAt: now,
       deleted: false
     })
@@ -335,9 +386,136 @@ export function useKasiryDB() {
     return true
   }
 
+  // Buka & Tutup Shift (1 shift = 1 hari operasional toko dengan modal awal & tutup buku laci)
+  const openShift = async ({
+    cashierName,
+    openingCash = 0,
+    adoptUnassignedToday = true,
+    openedAt
+  } = {}) => {
+    const existingOpen = await db.shifts.where('status').equals('OPEN').filter(s => !s.deleted).first()
+    if (existingOpen) {
+      await refreshRecentTransactions()
+      return existingOpen
+    }
+
+    const now = Date.now()
+    const cleanOpenedAt = Number.isFinite(Number(openedAt)) ? Number(openedAt) : now
+    const numericOpening = Math.round(Number(openingCash || 0))
+    const cleanOpening = Number.isFinite(numericOpening) && numericOpening >= 0 ? numericOpening : 0
+    const cleanCashier = (cashierName || storeProfile.value?.owner || 'Kasir').trim() || 'Kasir'
+    const id = generateUniqueId()
+    const shiftCode = `SHF-${String(id).slice(-7)}`
+
+    const shiftRecord = toPlain({
+      id,
+      shiftCode,
+      cashierName: cleanCashier,
+      openingCash: cleanOpening,
+      openedAt: cleanOpenedAt,
+      closedAt: null,
+      status: 'OPEN',
+      actualCash: null,
+      expectedCash: null,
+      cashDifference: null,
+      closingNote: '',
+      summary: null,
+      updatedAt: now,
+      deleted: false
+    })
+
+    const startOfToday = new Date(now)
+    startOfToday.setHours(0, 0, 0, 0)
+    const todayTs = startOfToday.getTime()
+
+    await db.transaction('rw', [db.shifts, db.transactions, db.debtPayments, db.expenses, db.settings], async () => {
+      await db.shifts.add(shiftRecord)
+      await db.settings.put({
+        key: 'lastOpeningCash',
+        value: cleanOpening,
+        updatedAt: now
+      })
+
+      if (adoptUnassignedToday) {
+        const [unassignedTx, unassignedPays, unassignedExps] = await Promise.all([
+          db.transactions.where('createdAt').aboveOrEqual(todayTs).filter(t => !t.shiftId && !t.shiftCode).toArray(),
+          db.debtPayments.where('paymentDate').aboveOrEqual(todayTs).filter(p => !p.shiftId && !p.shiftCode).toArray(),
+          db.expenses.where('createdAt').aboveOrEqual(todayTs).filter(e => !e.deleted && !e.shiftId && !e.shiftCode).toArray()
+        ])
+
+        if (unassignedTx.length > 0) {
+          await db.transactions.bulkPut(toPlain(unassignedTx.map(t => ({ ...t, shiftId: id, shiftCode, updatedAt: now }))))
+        }
+        if (unassignedPays.length > 0) {
+          await db.debtPayments.bulkPut(toPlain(unassignedPays.map(p => ({ ...p, shiftId: id, shiftCode, updatedAt: now }))))
+        }
+        if (unassignedExps.length > 0) {
+          await db.expenses.bulkPut(toPlain(unassignedExps.map(e => ({ ...e, shiftId: id, shiftCode, updatedAt: now }))))
+        }
+      }
+    })
+
+    lastOpeningCash.value = cleanOpening
+    await refreshRecentTransactions()
+    return shiftRecord
+  }
+
+  const closeShift = async ({
+    shiftId,
+    actualCash,
+    closingNote = '',
+    closedAt
+  } = {}) => {
+    const targetId = shiftId ?? activeShift.value?.id
+    const shift = targetId
+      ? await db.shifts.get(targetId)
+      : await db.shifts.where('status').equals('OPEN').filter(s => !s.deleted).first()
+    if (!shift || shift.deleted || shift.status === 'CLOSED') return null
+
+    const now = Date.now()
+    const cleanClosedAt = Number.isFinite(Number(closedAt)) ? Number(closedAt) : now
+    const startOfOpenedDay = new Date(shift.openedAt || now)
+    startOfOpenedDay.setHours(0, 0, 0, 0)
+    const queryStart = Math.min(Number(shift.openedAt || now), startOfOpenedDay.getTime())
+
+    const [periodTx, periodPays, periodExps] = await Promise.all([
+      db.transactions.where('createdAt').aboveOrEqual(queryStart).toArray(),
+      db.debtPayments.where('paymentDate').aboveOrEqual(queryStart).toArray(),
+      db.expenses.where('createdAt').aboveOrEqual(queryStart).filter(e => !e.deleted).toArray()
+    ])
+
+    const numericActual = Math.round(Number(actualCash))
+    if (!Number.isFinite(numericActual) || numericActual < 0) return null
+
+    const preview = computeShiftClosingPreview({
+      shift: { ...shift, closedAt: cleanClosedAt },
+      transactions: periodTx,
+      debtPayments: periodPays,
+      expenses: periodExps,
+      actualCash: numericActual
+    })
+
+    const updatedShift = toPlain({
+      ...shift,
+      status: 'CLOSED',
+      closedAt: cleanClosedAt,
+      actualCash: preview.actualCash,
+      expectedCash: preview.expectedCash,
+      cashDifference: preview.cashDifference,
+      closingNote: typeof closingNote === 'string' ? closingNote.trim() : '',
+      summary: preview,
+      updatedAt: now
+    })
+
+    await db.shifts.put(updatedShift)
+    await refreshRecentTransactions()
+    return updatedShift
+  }
+
   // Pencatatan Transaksi Baru (update state inkremental agar checkout selalu instan <5ms)
   const recordTransaction = async ({ invoiceNumber, totalAmount, paymentMethod, cashGiven, changeAmount, customer, items }) => {
     const now = Date.now()
+    const currentShift = activeShift.value
     const txRecord = toPlain({
       id: generateUniqueId(),
       invoiceNumber,
@@ -348,6 +526,8 @@ export function useKasiryDB() {
       changeAmount: changeAmount || 0,
       customerId: customer ? customer.id : null,
       customerName: customer ? customer.name : null,
+      shiftId: currentShift?.id || null,
+      shiftCode: currentShift?.shiftCode || null,
       items: items.map(item => ({
         id: item.id,
         name: item.name,
@@ -412,12 +592,13 @@ export function useKasiryDB() {
 
   // Dapatkan seluruh data database untuk sinkronisasi cloud
   const getFullDatabasePayload = async () => {
-    const [allProducts, allCustomers, allTransactions, allDebtPayments, allExpenses, allSettings] = await Promise.all([
+    const [allProducts, allCustomers, allTransactions, allDebtPayments, allExpenses, allShifts, allSettings] = await Promise.all([
       db.products.toArray(),
       db.customers.toArray(),
       db.transactions.toArray(),
       db.debtPayments.toArray(),
       db.expenses.toArray(),
+      db.shifts.toArray(),
       db.settings.toArray()
     ])
 
@@ -432,6 +613,7 @@ export function useKasiryDB() {
         transactions: allTransactions,
         debtPayments: allDebtPayments,
         expenses: allExpenses,
+        shifts: allShifts,
         settings: allSettings
       }
     })
@@ -462,17 +644,19 @@ export function useKasiryDB() {
     return true
   }
 
-  // Ambil seluruh transaksi, pelunasan, & pengeluaran dari IndexedDB on-demand (khusus ekspor Excel lengkap)
+  // Ambil seluruh transaksi, pelunasan, pengeluaran, & shift dari IndexedDB on-demand (khusus ekspor Excel lengkap)
   const getAllTransactionsForExport = async () => {
-    const [allTransactions, allDebtPayments, allExpenses] = await Promise.all([
+    const [allTransactions, allDebtPayments, allExpenses, allShifts] = await Promise.all([
       db.transactions.orderBy('createdAt').reverse().toArray(),
       db.debtPayments.orderBy('paymentDate').reverse().toArray(),
-      db.expenses.orderBy('createdAt').reverse().filter(e => !e.deleted).toArray()
+      db.expenses.orderBy('createdAt').reverse().filter(e => !e.deleted).toArray(),
+      db.shifts.orderBy('openedAt').reverse().filter(s => !s.deleted).toArray()
     ])
     return {
       transactions: allTransactions,
       debtPayments: allDebtPayments,
-      expenses: allExpenses
+      expenses: allExpenses,
+      shifts: allShifts
     }
   }
 
@@ -505,34 +689,38 @@ export function useKasiryDB() {
   // Hitung jumlah riwayat yang memenuhi syarat arsip (lebih tua dari retentionDays) tanpa memuat payload penuh
   const getArchivableSummary = async (retentionDays = 180) => {
     const cutoffTimestamp = Date.now() - retentionDays * MS_PER_DAY
-    const [txCount, payCount, expenseCount] = await Promise.all([
+    const [txCount, payCount, expenseCount, shiftCount] = await Promise.all([
       db.transactions.where('createdAt').below(cutoffTimestamp).count(),
       db.debtPayments.where('paymentDate').below(cutoffTimestamp).count(),
-      db.expenses.where('createdAt').below(cutoffTimestamp).count()
+      db.expenses.where('createdAt').below(cutoffTimestamp).count(),
+      db.shifts.where('openedAt').below(cutoffTimestamp).filter(s => s.status !== 'OPEN').count()
     ])
     return {
       retentionDays,
       cutoffTimestamp,
       txCount,
       payCount,
-      expenseCount
+      expenseCount,
+      shiftCount
     }
   }
 
   // Arsipkan & pangkas transaksi lama ke file JSON (+ siapkan payload untuk arsip Drive) tanpa menyentuh utang/barang/pelanggan
   const archiveOldTransactions = async (retentionDays = 180) => {
     const cutoffTimestamp = Date.now() - retentionDays * MS_PER_DAY
-    const [oldTx, oldPays, oldExpenses] = await Promise.all([
+    const [oldTx, oldPays, oldExpenses, oldShifts] = await Promise.all([
       db.transactions.where('createdAt').below(cutoffTimestamp).toArray(),
       db.debtPayments.where('paymentDate').below(cutoffTimestamp).toArray(),
-      db.expenses.where('createdAt').below(cutoffTimestamp).toArray()
+      db.expenses.where('createdAt').below(cutoffTimestamp).toArray(),
+      db.shifts.where('openedAt').below(cutoffTimestamp).filter(s => s.status !== 'OPEN').toArray()
     ])
 
-    if (oldTx.length === 0 && oldPays.length === 0 && oldExpenses.length === 0) {
+    if (oldTx.length === 0 && oldPays.length === 0 && oldExpenses.length === 0 && oldShifts.length === 0) {
       return {
         archivedTxCount: 0,
         archivedPayCount: 0,
         archivedExpenseCount: 0,
+        archivedShiftCount: 0,
         cutoffTimestamp,
         archiveFilename: null,
         archivePayload: null
@@ -552,7 +740,8 @@ export function useKasiryDB() {
       data: {
         transactions: oldTx,
         debtPayments: oldPays,
-        expenses: oldExpenses
+        expenses: oldExpenses,
+        shifts: oldShifts
       }
     })
 
@@ -569,10 +758,13 @@ export function useKasiryDB() {
     URL.revokeObjectURL(url)
 
     const nextCutoff = Math.max(archiveCutoffAt.value || 0, cutoffTimestamp)
-    await db.transaction('rw', [db.transactions, db.debtPayments, db.expenses, db.settings], async () => {
+    await db.transaction('rw', [db.transactions, db.debtPayments, db.expenses, db.shifts, db.settings], async () => {
       await db.transactions.where('createdAt').below(cutoffTimestamp).delete()
       await db.debtPayments.where('paymentDate').below(cutoffTimestamp).delete()
       await db.expenses.where('createdAt').below(cutoffTimestamp).delete()
+      if (oldShifts.length > 0) {
+        await db.shifts.bulkDelete(oldShifts.map(s => s.id))
+      }
       await db.settings.put({
         key: 'archiveState',
         value: { cutoffAt: nextCutoff },
@@ -587,6 +779,7 @@ export function useKasiryDB() {
       archivedTxCount: oldTx.length,
       archivedPayCount: oldPays.length,
       archivedExpenseCount: oldExpenses.length,
+      archivedShiftCount: oldShifts.length,
       cutoffTimestamp,
       archiveFilename,
       archivePayload
@@ -609,6 +802,7 @@ export function useKasiryDB() {
     const txList = Array.isArray(d.transactions) ? d.transactions : []
     const payList = Array.isArray(d.debtPayments) ? d.debtPayments : []
     const activeExpenses = Array.isArray(d.expenses) ? d.expenses.filter(e => !e.deleted) : []
+    const activeShifts = Array.isArray(d.shifts) ? d.shifts.filter(s => !s.deleted) : []
 
     return {
       valid: true,
@@ -619,6 +813,7 @@ export function useKasiryDB() {
       transactionCount: txList.length,
       debtPaymentCount: payList.length,
       expenseCount: activeExpenses.length,
+      shiftCount: activeShifts.length,
       payload
     }
   }
@@ -641,16 +836,18 @@ export function useKasiryDB() {
         transactions: inTransactions = [],
         debtPayments: inDebtPayments = [],
         expenses: inExpenses = [],
+        shifts: inShifts = [],
         settings: inSettings = []
       } = payload.data
 
-      await db.transaction('rw', [db.products, db.customers, db.transactions, db.debtPayments, db.expenses, db.settings], async () => {
+      await db.transaction('rw', [db.products, db.customers, db.transactions, db.debtPayments, db.expenses, db.shifts, db.settings], async () => {
         if (mode === 'replace') {
           await db.products.clear()
           await db.customers.clear()
           await db.transactions.clear()
           await db.debtPayments.clear()
           await db.expenses.clear()
+          await db.shifts.clear()
           await db.settings.clear()
 
           if (Array.isArray(inProducts) && inProducts.length > 0) {
@@ -667,6 +864,9 @@ export function useKasiryDB() {
           }
           if (Array.isArray(inExpenses) && inExpenses.length > 0) {
             await db.expenses.bulkPut(toPlain(inExpenses))
+          }
+          if (Array.isArray(inShifts) && inShifts.length > 0) {
+            await db.shifts.bulkPut(toPlain(inShifts))
           }
           if (Array.isArray(inSettings) && inSettings.length > 0) {
             await db.settings.bulkPut(toPlain(inSettings))
@@ -779,6 +979,30 @@ export function useKasiryDB() {
           if (toPutExps.length > 0) await db.expenses.bulkPut(toPutExps)
         }
 
+        if (Array.isArray(inShifts) && inShifts.length > 0) {
+          const existingShifts = await db.shifts.toArray()
+          const shiftById = new Map(existingShifts.map(s => [s.id, s]))
+          const shiftByCode = new Map(existingShifts.filter(s => s.shiftCode).map(s => [s.shiftCode, s]))
+          const usedShiftIds = new Set(existingShifts.map(s => s.id))
+          const toPutShifts = []
+
+          for (const rs of inShifts) {
+            if (effectiveCutoff > 0 && rs.status !== 'OPEN' && (rs.openedAt || 0) < effectiveCutoff) continue
+            const localMatch = (rs.shiftCode && shiftByCode.get(rs.shiftCode)) || shiftById.get(rs.id)
+            if (!localMatch) {
+              const cleanShift = toPlain(rs)
+              if (!cleanShift.id || usedShiftIds.has(cleanShift.id)) {
+                cleanShift.id = generateUniqueId()
+              }
+              usedShiftIds.add(cleanShift.id)
+              toPutShifts.push(cleanShift)
+            } else if ((rs.updatedAt || 0) >= (localMatch.updatedAt || 0)) {
+              toPutShifts.push(toPlain({ ...rs, id: localMatch.id }))
+            }
+          }
+          if (toPutShifts.length > 0) await db.shifts.bulkPut(toPutShifts)
+        }
+
         if (Array.isArray(inSettings) && inSettings.length > 0) {
           const existingSettings = await db.settings.toArray()
           const setMap = new Map(existingSettings.map(s => [s.key, s]))
@@ -801,7 +1025,8 @@ export function useKasiryDB() {
         productCount: inProducts?.length || 0,
         transactionCount: inTransactions?.length || 0,
         customerCount: inCustomers?.length || 0,
-        expenseCount: inExpenses?.length || 0
+        expenseCount: inExpenses?.length || 0,
+        shiftCount: inShifts?.length || 0
       }
     } catch (err) {
       console.error('[Kasiry DB] Gagal memulihkan cadangan:', err)
@@ -847,9 +1072,15 @@ export function useKasiryDB() {
     transactions,
     debtPayments,
     expenses,
+    shifts,
+    activeShift,
+    isActiveShiftStale,
+    lastOpeningCash,
+    unassignedTodayCount,
     totalTransactionCount,
     totalDebtPaymentCount,
     totalExpenseCount,
+    totalShiftCount,
     olderTransactionCount,
     archiveCutoffAt,
     storeProfile,
@@ -867,6 +1098,8 @@ export function useKasiryDB() {
     recordDebtPayment,
     recordExpense,
     deleteExpense,
+    openShift,
+    closeShift,
     recordTransaction,
     saveStoreProfile,
     getFullDatabasePayload,

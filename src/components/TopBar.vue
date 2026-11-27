@@ -9,7 +9,8 @@ import {
   ChevronDown,
   Package,
   Users,
-  Wallet
+  Wallet,
+  Clock
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -40,6 +41,14 @@ const props = defineProps({
   googleUser: {
     type: Object,
     default: null
+  },
+  activeShift: {
+    type: Object,
+    default: null
+  },
+  isActiveShiftStale: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -47,6 +56,7 @@ const emit = defineEmits([
   'openDebtBook',
   'openDailyReport',
   'openExpense',
+  'openShift',
   'openSettings',
   'openCamera',
   'openProductManage',
@@ -85,6 +95,41 @@ const todayFormatted = computed(() => {
     day: 'numeric',
     month: 'short'
   }).format(new Date())
+})
+
+const shiftChipInfo = computed(() => {
+  if (!props.activeShift) {
+    return {
+      label: 'Belum Buka Shift',
+      shortLabel: 'Buka Shift',
+      badge: 'Tutup',
+      badgeClass: 'bg-slate-100 text-slate-600',
+      chipClass: 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80',
+      dotClass: 'bg-amber-500'
+    }
+  }
+  const timeStr = props.activeShift.openedAt
+    ? new Date(props.activeShift.openedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+    : ''
+  const firstName = String(props.activeShift.cashierName || 'Kasir').trim().split(/\s+/)[0]
+  if (props.isActiveShiftStale) {
+    return {
+      label: `Shift Kemarin • Tutup`,
+      shortLabel: 'Shift Kemarin',
+      badge: 'Kemarin',
+      badgeClass: 'bg-amber-100 text-amber-800',
+      chipClass: 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300',
+      dotClass: 'bg-amber-600 animate-pulse'
+    }
+  }
+  return {
+    label: `Shift ${firstName}${timeStr ? ` · ${timeStr}` : ''}`,
+    shortLabel: `Shift ${timeStr}`,
+    badge: 'Aktif',
+    badgeClass: 'bg-emerald-100 text-emerald-700',
+    chipClass: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80',
+    dotClass: 'bg-emerald-500'
+  }
 })
 
 const triggerAction = (actionEvent) => {
@@ -178,6 +223,16 @@ const drawerGroups = computed(() => [
   {
     title: 'Keuangan & Kasir',
     items: [
+      {
+        event: 'openShift',
+        label: props.activeShift ? 'Tutup / Info Shift' : 'Buka Shift Kasir',
+        icon: Clock,
+        iconBg: props.activeShift
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+          : 'bg-amber-50 text-amber-700 border-amber-100',
+        badge: shiftChipInfo.value.badge,
+        badgeClass: shiftChipInfo.value.badgeClass
+      },
       {
         event: 'openExpense',
         label: 'Kas Keluar',
@@ -284,7 +339,7 @@ const drawerGroups = computed(() => [
         </button>
 
         <div class="min-w-0 text-center md:text-left leading-tight">
-          <div class="flex items-center justify-center md:justify-start gap-1.5">
+          <div class="flex items-center justify-center md:justify-start gap-1.5 flex-wrap">
             <span class="text-[10px] font-bold tracking-[0.14em] uppercase text-[#0284c7]">Kasiry</span>
             <span
               class="hidden xl:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
@@ -293,9 +348,30 @@ const drawerGroups = computed(() => [
               <span aria-hidden="true" class="size-1.5 rounded-full" :class="isGoogleConnected ? 'bg-emerald-500' : isOnline ? 'bg-sky-500' : 'bg-slate-400'"></span>
               {{ isGoogleConnected ? 'Cloud Aktif' : isOnline ? 'Online' : 'Offline' }}
             </span>
+            <button
+              type="button"
+              @click="triggerAction('openShift')"
+              class="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
+              :class="shiftChipInfo.chipClass"
+              :title="activeShift ? 'Lihat Info / Tutup Shift Kasir' : 'Klik untuk Buka Shift & Atur Modal Awal'"
+            >
+              <span aria-hidden="true" class="size-1.5 rounded-full" :class="shiftChipInfo.dotClass"></span>
+              <span class="whitespace-nowrap">{{ shiftChipInfo.label }}</span>
+            </button>
           </div>
           <h1 class="text-sm sm:text-base font-bold text-[#0a193d] tracking-tight truncate max-w-[190px] sm:max-w-[230px]">{{ storeName }}</h1>
-          <p class="text-[11px] text-slate-500 font-medium md:hidden">{{ todayFormatted }}</p>
+          <div class="md:hidden flex items-center justify-center gap-1.5 mt-0.5">
+            <span class="text-[11px] text-slate-500 font-medium">{{ todayFormatted }}</span>
+            <button
+              type="button"
+              @click="triggerAction('openShift')"
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
+              :class="shiftChipInfo.chipClass"
+            >
+              <span aria-hidden="true" class="size-1.5 rounded-full" :class="shiftChipInfo.dotClass"></span>
+              <span>{{ shiftChipInfo.shortLabel }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -463,7 +539,7 @@ const drawerGroups = computed(() => [
                   <p class="text-sm font-semibold text-[#0a193d]">{{ item.label }}</p>
                 </div>
                 <div class="flex items-center gap-1.5">
-                  <span v-if="item.badge > 0" class="px-2 py-0.5 text-xs font-bold rounded-full tabular-nums" :class="item.badgeClass">
+                  <span v-if="item.badge !== 0 && item.badge !== ''" class="px-2 py-0.5 text-xs font-bold rounded-full tabular-nums" :class="item.badgeClass">
                     {{ item.badge }}
                   </span>
                   <ChevronRight aria-hidden="true" class="w-4 h-4 text-slate-400" />

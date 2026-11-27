@@ -298,4 +298,69 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(archiveRes.archivedExpenseCount).toBe(1)
     expect(kasiry.totalExpenseCount.value).toBe(0)
   })
+
+  it('opens shift with unassigned today adoption, tags records, and closes shift with cash reconciliation', async () => {
+    const prod = kasiry.products.value[0]
+    // Simulasikan lupa klik Buka Shift -> jualan & kas keluar berjalan dulu hari ini
+    await kasiry.recordTransaction({
+      invoiceNumber: 'KSR-PRE-1',
+      totalAmount: 25000,
+      paymentMethod: 'TUNAI',
+      cashGiven: 50000,
+      changeAmount: 25000,
+      customer: { id: 1, name: 'Umum' },
+      items: [{ ...prod, sellPrice: 25000, buyPrice: 20000, qty: 1 }]
+    })
+    await kasiry.recordExpense({
+      amount: 5000,
+      category: 'operasional',
+      source: 'TUNAI_LACI',
+      note: 'Plastik pagi'
+    })
+    expect(kasiry.unassignedTodayCount.value).toBe(2)
+
+    // Buka shift sambil mengadopsi 2 catatan hari ini
+    const opened = await kasiry.openShift({
+      cashierName: 'Mbak Siti',
+      openingCash: 200000,
+      adoptUnassignedToday: true
+    })
+    expect(opened.status).toBe('OPEN')
+    expect(opened.shiftCode).toMatch(/^SHF-/)
+    expect(kasiry.activeShift.value?.id).toBe(opened.id)
+    expect(kasiry.lastOpeningCash.value).toBe(200000)
+    expect(kasiry.unassignedTodayCount.value).toBe(0)
+    expect(kasiry.transactions.value[0].shiftCode).toBe(opened.shiftCode)
+    expect(kasiry.expenses.value[0].shiftCode).toBe(opened.shiftCode)
+
+    // Tambah 1 transaksi QRIS saat shift sudah aktif
+    await kasiry.recordTransaction({
+      invoiceNumber: 'QRS-SHIFT-2',
+      totalAmount: 30000,
+      paymentMethod: 'QRIS',
+      cashGiven: 30000,
+      changeAmount: 0,
+      customer: { id: 1, name: 'Umum' },
+      items: [{ ...prod, sellPrice: 30000, buyPrice: 25000, qty: 1 }]
+    })
+    expect(kasiry.transactions.value[0].shiftId).toBe(opened.id)
+
+    // Expected laci = 200.000 modal + 25.000 tunai - 5.000 keluar laci = 220.000 (QRIS tidak masuk laci)
+    const closed = await kasiry.closeShift({
+      shiftId: opened.id,
+      actualCash: 222000,
+      closingNote: 'Lebih dua ribu'
+    })
+    expect(closed.status).toBe('CLOSED')
+    expect(closed.expectedCash).toBe(220000)
+    expect(closed.actualCash).toBe(222000)
+    expect(closed.cashDifference).toBe(2000)
+    expect(closed.summary.todayQrisTotal).toBe(30000)
+    expect(kasiry.activeShift.value).toBeNull()
+
+    // Full backup payload & inspectBackupJSON mendeteksi 1 shift
+    const payload = await kasiry.getFullDatabasePayload()
+    expect(payload.data.shifts).toHaveLength(1)
+    expect(kasiry.inspectBackupJSON(payload).shiftCount).toBe(1)
+  })
 })

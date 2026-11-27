@@ -7,6 +7,7 @@ import DebtBookModal from '../src/components/DebtBookModal.vue'
 import ReceiptModal from '../src/components/ReceiptModal.vue'
 import DailyReportModal from '../src/components/DailyReportModal.vue'
 import ExpenseModal from '../src/components/ExpenseModal.vue'
+import ShiftModal from '../src/components/ShiftModal.vue'
 import FrequentProductsSection from '../src/components/FrequentProductsSection.vue'
 import TopBar from '../src/components/TopBar.vue'
 import CustomerManagementModal from '../src/components/CustomerManagementModal.vue'
@@ -369,6 +370,21 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
         storeName: 'Habiba Store',
         transactions: sampleTransactions,
         expenses: sampleExpenses,
+        shifts: [
+          {
+            id: 91,
+            shiftCode: 'SHF-91',
+            cashierName: 'Habiba',
+            status: 'CLOSED',
+            openedAt: Date.now() - 7200000,
+            closedAt: Date.now() - 3600000,
+            openingCash: 100000,
+            expectedCash: 125000,
+            actualCash: 125000,
+            cashDifference: 0,
+            summary: { todayCashDrawer: 25000, todayExpensesCash: 0, todayQrisTotal: 30000 }
+          }
+        ],
         stats: {
           todaySales: 55000,
           todayCashSales: 25000,
@@ -395,5 +411,82 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     expect(reportWithExpenses.text()).toContain('Beli galon')
     await reportWithExpenses.findAll('button').find(b => b.text().includes('Catat Kas Keluar')).trigger('click')
     expect(reportWithExpenses.emitted('openExpense')).toHaveLength(1)
+
+    await reportWithExpenses.findAll('button').find(b => b.text().includes('Shift (1)')).trigger('click')
+    await nextTick()
+    expect(reportWithExpenses.text()).toContain('SHF-91')
+    expect(reportWithExpenses.text()).toContain('Pas ✓')
+
+    // ShiftModal: Mode Buka Shift, Mode Tutup Shift (selisih), & Mode Summary
+    const shiftOpenModal = mount(ShiftModal, {
+      props: {
+        isOpen: true,
+        activeShift: null,
+        completedShift: null,
+        defaultCashierName: 'Habiba',
+        lastOpeningCash: 100000,
+        unassignedTodayCount: 2,
+        isAutoPrompt: true
+      }
+    })
+    expect(shiftOpenModal.text()).toContain('Sertakan 2 catatan hari ini')
+    await shiftOpenModal.findAll('button').find(b => b.text().trim() === '200rb').trigger('click')
+    await shiftOpenModal.find('form').trigger('submit.prevent')
+    expect(shiftOpenModal.emitted('openShift')?.[0]?.[0]).toEqual({
+      cashierName: 'Habiba',
+      openingCash: 200000,
+      adoptUnassignedToday: true
+    })
+    await shiftOpenModal.findAll('button').find(b => b.text().includes('Nanti Saja')).trigger('click')
+    expect(shiftOpenModal.emitted('dismissPrompt')).toHaveLength(1)
+
+    const runningShift = {
+      id: 92,
+      shiftCode: 'SHF-92',
+      cashierName: 'Habiba',
+      openedAt: Date.now() - 86400000,
+      openingCash: 200000,
+      status: 'OPEN'
+    }
+    const shiftCloseModal = mount(ShiftModal, {
+      props: {
+        isOpen: true,
+        activeShift: runningShift,
+        isActiveShiftStale: true,
+        transactions: sampleTransactions.map(t => ({ ...t, shiftId: 92, shiftCode: 'SHF-92' })),
+        debtPayments: [],
+        expenses: sampleExpenses.map(e => ({ ...e, shiftId: 92, shiftCode: 'SHF-92' }))
+      }
+    })
+    expect(shiftCloseModal.text()).toContain('Shift kemarin masih terbuka!')
+    // Seharusnya di laci = 200.000 modal + 25.000 tunai - 19.000 keluar laci = 206.000
+    expect(shiftCloseModal.text()).toContain('Rp 206.000')
+    await shiftCloseModal.findAll('button').find(b => b.text().includes('Pas (Sesuai Sistem)')).trigger('click')
+    await nextTick()
+    expect(shiftCloseModal.text()).toContain('Pas / Cocok ✓ (Rp 0)')
+    await shiftCloseModal.find('form').trigger('submit.prevent')
+    expect(shiftCloseModal.emitted('closeShift')?.[0]?.[0]).toEqual({
+      shiftId: 92,
+      actualCash: 206000,
+      closingNote: ''
+    })
+
+    // Summary mode setelah ditutup
+    await shiftCloseModal.setProps({
+      activeShift: null,
+      completedShift: {
+        ...runningShift,
+        status: 'CLOSED',
+        closedAt: Date.now(),
+        expectedCash: 206000,
+        actualCash: 206000,
+        cashDifference: 0,
+        summary: { todayCashDrawer: 25000, todayExpensesCash: 19000, todayQrisTotal: 30000, todayProfit: -11000 }
+      }
+    })
+    await nextTick()
+    expect(shiftCloseModal.text()).toContain('Shift Berhasil Ditutup')
+    await shiftCloseModal.findAll('button').find(b => b.text().includes('Buka Shift Baru')).trigger('click')
+    expect(shiftCloseModal.emitted('startNextShift')).toHaveLength(1)
   })
 })

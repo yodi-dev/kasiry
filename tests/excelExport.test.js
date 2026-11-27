@@ -20,10 +20,13 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
-  it('lazily imports xlsx and creates valid 5-sheet workbook including QRIS, expenses, and debts', async () => {
+  it('lazily imports xlsx and creates valid 6-sheet workbook including QRIS, expenses, shifts, and debts', async () => {
     const fileName = await exportKasiryExcel({
       storeProfile: { name: 'Habiba Store', owner: 'Habiba', phone: '081234567890' },
       stats: {
+        isShiftScoped: true,
+        openingCash: 100000,
+        expectedCashDrawer: 125000,
         todaySales: 52000,
         todayCashSales: 22000,
         todayQrisSales: 30000,
@@ -87,6 +90,26 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
           note: 'Beli kresek',
           deleted: false
         }
+      ],
+      shifts: [
+        {
+          id: 9,
+          shiftCode: 'SHF-901',
+          cashierName: 'Habiba',
+          status: 'CLOSED',
+          openedAt: Date.now() - 3600000,
+          closedAt: Date.now(),
+          openingCash: 100000,
+          expectedCash: 125000,
+          actualCash: 125000,
+          cashDifference: 0,
+          summary: {
+            todayCashDrawer: 32000,
+            todayQrisTotal: 30000,
+            todayExpensesCash: 7000
+          },
+          deleted: false
+        }
       ]
     })
 
@@ -100,7 +123,8 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
       'Daftar Transaksi',
       'Barang Terjual',
       'Buku Utang Pelanggan',
-      'Pengeluaran Kas'
+      'Pengeluaran Kas',
+      'Riwayat Shift'
     ])
 
     const summaryRows = XLSX.utils.sheet_to_json(workbook.Sheets['Ringkasan Kas'], { header: 1 })
@@ -110,6 +134,8 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(summaryMap['Total Uang Masuk Kas (Keseluruhan)']).toBe(62000)
     expect(summaryMap['Pengeluaran Dari Laci (Tunai)']).toBe(7000)
     expect(summaryMap['Sisa Tunai Fisik di Laci (Bersih)']).toBe(25000)
+    expect(summaryMap['Modal Awal Laci (Shift Aktif)']).toBe(100000)
+    expect(summaryMap['Total Seharusnya di Laci (Termasuk Modal)']).toBe(125000)
 
     const txRows = XLSX.utils.sheet_to_json(workbook.Sheets['Daftar Transaksi'])
     expect(txRows).toHaveLength(3)
@@ -127,5 +153,12 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(expRows[0]['No. Catatan']).toBe('KLR-101')
     expect(expRows[0]['Nominal (Rp)']).toBe(7000)
     expect(expRows[0]['Keterangan']).toBe('Beli kresek')
+
+    const shiftRows = XLSX.utils.sheet_to_json(workbook.Sheets['Riwayat Shift'])
+    expect(shiftRows).toHaveLength(1)
+    expect(shiftRows[0]['Kode Shift']).toBe('SHF-901')
+    expect(shiftRows[0]['Modal Awal (Rp)']).toBe(100000)
+    expect(shiftRows[0]['Uang Fisik (Rp)']).toBe(125000)
+    expect(shiftRows[0]['Selisih (Rp)']).toBe(0)
   })
 })
