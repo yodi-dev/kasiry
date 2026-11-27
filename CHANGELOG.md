@@ -6,6 +6,22 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.15.0] - 2026-11-27 (Dukungan Printer Thermal USB/OTG & Serial COM + Cetak Iframe Terisolasi)
+
+### Added & Improved
+- **Dukungan Multi-Transport ESC/POS (`src/composables/useThermalPrinter.js`):**
+  - Menambahkan jalur koneksi **`WebUSB` (`navigator.usb`)** untuk printer kabel USB di **HP/Tablet Android (USB OTG)** maupun Desktop (pemilihan otomatis endpoint OUT bulk `interfaceClass === 7` / fallback, deteksi cabut kabel `disconnect`, pemetaan pesan error ramah saat port USB dikunci driver Windows Print Spooler agar pengguna tahu opsi **WinUSB via Zadig** vs **driver POS-58 + Cetak Browser**), serta jalur **`Web Serial` (`navigator.serial`)** lengkap dengan pilihan **Baud Rate** (`9600`–`115200`) untuk printer Port COM / Bluetooth Classic SPP.
+  - Menambahkan **`autoReconnectPrinter()`** di `onMounted` [App.vue](file:///d:/web/kasiryy/src/App.vue) untuk menyambungkan ulang printer USB/Serial yang sudah diizinkan secara otomatis tanpa popup ulang.
+- **Cetak Browser Iframe Terisolasi (`src/utils/thermalPrinter.js`, `src/components/ReceiptModal.vue`, `src/composables/useThermalPrinter.js`):**
+  - Menambahkan `buildReceiptPrintHtml` dan `buildTestPrintHtml` agar jalur fallback **Cetak Browser** mencetak melalui hidden `<iframe>` murni dengan aturan `@page { size: 58mm|80mm auto; margin: 0; }`, bersih dari bentrok CSS `backdrop-blur` maupun `overflow-hidden` modal utama (termasuk pada **Tes Cetak Printer** non-Bluetooth).
+- **Pembaruan UI Pengaturan & Modal Struk (`src/components/SettingsModal.vue`, `src/components/ReceiptModal.vue`):**
+  - Tab **`Printer`** di `SettingsModal.vue` kini menampilkan tombol **`Hubungkan Bluetooth`**, **`Hubungkan USB / OTG`**, **`Port Serial / COM`**, pemilih Baud Rate Serial, dan **Panduan Cepat Kabel USB** (Android OTG vs Laptop Windows).
+  - `ReceiptModal.vue` mendukung badge/tombol dinamis **`Cetak BT`**, **`Cetak USB`**, **`Cetak COM`**, dan pintasan cepat **`BT`** / **`USB`**.
+- **Cakupan Test (`tests/thermalPrinter.test.js`, `tests/uiModals.test.js`):**
+  - Menambah skenario unit/integration untuk `buildReceiptPrintHtml`, `buildTestPrintHtml`, pairing & print **WebUSB** (+ `autoReconnectPrinter` & simulasi blokir Windows `SecurityError`), dan **Web Serial** (**10 file / 42 skenario lulus**).
+
+---
+
 ## [2.14.0] - 2026-11-27 (Roadmap #7: Koneksi Printer Thermal Bluetooth ESC/POS + Hotfix Edit Harga Keranjang)
 
 ### Added

@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue'
-import { X, Printer, Bluetooth, Check, ArrowRight, Share2, CheckCircle, AlertCircle } from '@lucide/vue'
+import { ref, computed } from 'vue'
+import { X, Printer, Bluetooth, Usb, Cable, Check, ArrowRight, Share2, CheckCircle, AlertCircle } from '@lucide/vue'
 import { useThermalPrinter } from '../composables/useThermalPrinter'
 
 const props = defineProps({
@@ -25,23 +25,34 @@ const emit = defineEmits(['close', 'newTransaction'])
 
 const {
   printerSettings,
+  connectionType,
   isBluetoothSupported,
+  isUsbSupported,
   isPrinterConnected,
   isConnectingPrinter,
   isPrinting,
   connectedPrinterName,
   printerError,
   connectBluetoothPrinter,
+  connectUsbPrinter,
   printReceiptThermal
 } = useThermalPrinter()
 
 const printNotice = ref('')
 
+const transportLabel = computed(() => {
+  if (connectionType.value === 'bluetooth') return 'BT'
+  if (connectionType.value === 'usb') return 'USB'
+  if (connectionType.value === 'serial') return 'COM'
+  return ''
+})
+
 const printReceipt = async (forceBrowser = false) => {
   printNotice.value = ''
   const res = await printReceiptThermal(props.receiptData, props.storeProfile, { forceBrowser })
-  if (res?.ok && res.method === 'bluetooth') {
-    printNotice.value = `Struk berhasil dicetak ke ${connectedPrinterName.value || 'Printer Bluetooth'}!`
+  if (res?.ok && res.method !== 'browser') {
+    const labelMap = { bluetooth: 'Bluetooth', usb: 'USB', serial: 'Serial COM' }
+    printNotice.value = `Struk berhasil dicetak ke ${connectedPrinterName.value || `Printer ${labelMap[res.method] || ''}`}!`
     setTimeout(() => {
       printNotice.value = ''
     }, 2800)
@@ -98,10 +109,10 @@ const shareToWhatsApp = () => {
 <template>
   <div 
     v-if="isOpen && receiptData"
-    class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#0a193d]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto print:static print:bg-white print:backdrop-blur-none print:p-0 print:overflow-visible"
   >
     <div
-      class="bg-white rounded-3xl w-full shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]"
+      class="bg-white rounded-3xl w-full shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh] print:rounded-none print:border-0 print:shadow-none print:max-h-none print:overflow-visible print:animate-none"
       :class="printerSettings.paperWidth === '80mm' ? 'max-w-md' : 'max-w-sm'"
     >
       <!-- Header Struk (Clean White & Emerald Check - disembunyikan saat cetak) -->
@@ -120,7 +131,7 @@ const shareToWhatsApp = () => {
         </button>
       </div>
 
-      <!-- Strip Status Printer Thermal Bluetooth (Print hidden) -->
+      <!-- Strip Status Printer Thermal (Bluetooth / USB / Serial / Browser - Print hidden) -->
       <div class="print:hidden px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2 text-[11px] shrink-0">
         <div class="flex items-center gap-1.5 min-w-0">
           <span
@@ -129,24 +140,39 @@ const shareToWhatsApp = () => {
           ></span>
           <span class="font-semibold text-slate-700 truncate">
             <template v-if="isPrinterConnected">
-              BT: {{ connectedPrinterName }} ({{ printerSettings.paperWidth }})
+              {{ transportLabel }}: {{ connectedPrinterName }} ({{ printerSettings.paperWidth }})
             </template>
             <template v-else>
-              Struk {{ printerSettings.paperWidth }} • {{ isBluetoothSupported ? 'Cetak Browser / BT' : 'Cetak Browser' }}
+              Struk {{ printerSettings.paperWidth }} • {{ (isBluetoothSupported || isUsbSupported) ? 'Browser / BT / USB' : 'Cetak Browser' }}
             </template>
           </span>
         </div>
 
-        <button
-          v-if="!isPrinterConnected && isBluetoothSupported"
-          type="button"
-          :disabled="isConnectingPrinter"
-          @click="connectBluetoothPrinter"
-          class="px-2 py-0.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200 font-bold flex items-center gap-1 cursor-pointer shrink-0 disabled:opacity-50"
-        >
-          <Bluetooth class="w-3 h-3" />
-          <span>{{ isConnectingPrinter ? 'Menghubungkan...' : 'Hubungkan BT' }}</span>
-        </button>
+        <div v-if="!isPrinterConnected" class="flex items-center gap-1 shrink-0">
+          <button
+            v-if="isBluetoothSupported"
+            type="button"
+            :disabled="isConnectingPrinter"
+            @click="connectBluetoothPrinter"
+            class="px-2 py-0.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200 font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+            title="Hubungkan printer Bluetooth"
+          >
+            <Bluetooth class="w-3 h-3" />
+            <span>BT</span>
+          </button>
+
+          <button
+            v-if="isUsbSupported"
+            type="button"
+            :disabled="isConnectingPrinter"
+            @click="connectUsbPrinter"
+            class="px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+            title="Hubungkan printer kabel USB / Android OTG"
+          >
+            <Usb class="w-3 h-3" />
+            <span>USB</span>
+          </button>
+        </div>
       </div>
 
       <div
@@ -265,11 +291,13 @@ const shareToWhatsApp = () => {
           :disabled="isPrinting"
           @click="printReceipt(false)"
           class="h-10 px-3 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-slate-200 transition-colors disabled:opacity-50"
-          :title="isPrinterConnected ? 'Cetak langsung ke printer thermal Bluetooth' : 'Cetak struk ke printer thermal/browser'"
+          :title="isPrinterConnected ? 'Cetak langsung ESC/POS ke printer terhubung' : 'Cetak struk ke printer thermal/browser'"
         >
-          <Bluetooth v-if="isPrinterConnected" class="w-3.5 h-3.5 text-emerald-600" />
+          <Bluetooth v-if="connectionType === 'bluetooth'" class="w-3.5 h-3.5 text-emerald-600" />
+          <Usb v-else-if="connectionType === 'usb'" class="w-3.5 h-3.5 text-emerald-600" />
+          <Cable v-else-if="connectionType === 'serial'" class="w-3.5 h-3.5 text-emerald-600" />
           <Printer v-else class="w-3.5 h-3.5 text-slate-500" />
-          <span>{{ isPrinting ? 'Mencetak...' : (isPrinterConnected ? 'Cetak BT' : 'Cetak') }}</span>
+          <span>{{ isPrinting ? 'Mencetak...' : (isPrinterConnected ? `Cetak ${transportLabel}` : 'Cetak') }}</span>
         </button>
 
         <button

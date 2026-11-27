@@ -100,6 +100,7 @@ import { useThermalPrinter } from './composables/useThermalPrinter'
 
 const {
   printerSettings,
+  autoReconnectPrinter,
   printReceiptThermal
 } = useThermalPrinter()
 
@@ -1091,6 +1092,9 @@ onMounted(async () => {
   } else {
     setTimeout(prewarmCheckoutChunks, 1500)
   }
+
+  // Sambungkan diam-diam printer USB/Serial yang sebelumnya sudah diberi izin browser
+  autoReconnectPrinter().catch(() => {})
 
   // Jika akun Google aktif, kirim antrean tertunda lalu lakukan sinkronisasi otomatis diam-diam
   if (isGoogleConnected.value && isOnline.value) {

@@ -216,3 +216,179 @@ export function splitIntoBleChunks(bytes, chunkSize = 80) {
   }
   return chunks
 }
+
+function escapeHtml(str = '') {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function wrapStandaloneThermalDocument({ title, widthMm, bodyHtml }) {
+  const is80 = widthMm === '80mm'
+  const pageWidth = is80 ? '80mm' : '58mm'
+  const fontSize = is80 ? '12px' : '11px'
+
+  return `<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<title>${escapeHtml(title)}</title>
+<style>
+  @page {
+    size: ${pageWidth} auto;
+    margin: 0;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: ${pageWidth};
+    background: #ffffff;
+    color: #000000;
+    font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: ${fontSize};
+    line-height: 1.3;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .paper {
+    width: ${pageWidth};
+    padding: 3mm 2.5mm 6mm;
+  }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .bold { font-weight: 700; }
+  .upper { text-transform: uppercase; }
+  .store-title { font-size: ${is80 ? '15px' : '13px'}; font-weight: 800; letter-spacing: 0.4px; margin: 0; }
+  .muted { font-size: ${is80 ? '11px' : '10px'}; margin: 1px 0; }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin: 2px 0; }
+  .divider { border: 0; border-top: 1px dashed #000000; margin: 6px 0; }
+  .divider-double { border: 0; border-top: 2px solid #000000; margin: 6px 0; }
+  .item { margin: 4px 0; }
+  .item-name { font-weight: 600; word-break: break-word; }
+  .total-row { font-size: ${is80 ? '14px' : '13px'}; font-weight: 800; margin: 4px 0; }
+</style>
+</head>
+<body>
+  <div class="paper">${bodyHtml}</div>
+</body>
+</html>`
+}
+
+/**
+ * Bangun dokumen HTML terisolasi untuk cetak browser (iframe) bebas backdrop/modal Chrome/Edge.
+ */
+export function buildReceiptPrintHtml(receiptData, storeProfile = {}, options = {}) {
+  if (!receiptData) return ''
+  const widthMm = options.paperWidth === '80mm' ? '80mm' : '58mm'
+  const storeName = (storeProfile?.name || 'Warung Kasiry').trim()
+  const storePhone = (storeProfile?.phone || '').trim()
+  const footerText = typeof options.footerText === 'string'
+    ? options.footerText.trim()
+    : PRINTER_DEFAULT_SETTINGS.footerText
+
+  const items = Array.isArray(receiptData.items) ? receiptData.items : []
+  const itemsHtml = items.map((item) => {
+    const qty = Number(item.qty || 1)
+    const unitPrice = Number(item.sellPrice || 0)
+    const tierSuffix = item.priceTier && item.priceTier !== 'ecer'
+      ? ` (${item.priceLabel || item.priceTier})`
+      : ''
+    return `<div class="item">
+      <div class="item-name">${escapeHtml(item.name || 'Barang')}</div>
+      <div class="row muted">
+        <span>${qty} x ${escapeHtml(formatRp(unitPrice))}${escapeHtml(tierSuffix)}</span>
+        <span class="bold right">${escapeHtml(formatRp(unitPrice * qty))}</span>
+      </div>
+    </div>`
+  }).join('')
+
+  let paymentDetailsHtml = ''
+  if (receiptData.paymentMethod === 'TUNAI') {
+    paymentDetailsHtml = `
+      <div class="row"><span>Tunai</span><span>${escapeHtml(formatRp(receiptData.cashGiven))}</span></div>
+      <div class="row bold"><span>Kembali</span><span>${escapeHtml(formatRp(receiptData.changeAmount))}</span></div>`
+  } else if (receiptData.paymentMethod === 'QRIS') {
+    paymentDetailsHtml = `
+      <div class="row"><span>Status</span><span class="bold">LUNAS (QRIS)</span></div>`
+  } else {
+    paymentDetailsHtml = `
+      <div class="row"><span>Status</span><span class="bold">DICATAT DI BUKU UTANG</span></div>`
+  }
+
+  const custHtml = receiptData.customer?.name
+    ? `<span>Plg: ${escapeHtml(receiptData.customer.name)}</span>`
+    : ''
+
+  const bodyHtml = `
+    <div class="center">
+      <p class="store-title upper">${escapeHtml(storeName)}</p>
+      ${storePhone ? `<p class="muted">WA: ${escapeHtml(storePhone)}</p>` : ''}
+    </div>
+    <hr class="divider" />
+    <div class="row muted">
+      <span>No: ${escapeHtml(receiptData.invoiceNumber || '-')}</span>
+      <span>${escapeHtml(receiptData.time || '')}</span>
+    </div>
+    <div class="row muted">
+      <span>Metode: ${escapeHtml(receiptData.paymentMethod || 'TUNAI')}</span>
+      ${custHtml}
+    </div>
+    <hr class="divider-double" />
+    ${itemsHtml}
+    <hr class="divider" />
+    <div class="row total-row">
+      <span>TOTAL</span>
+      <span>${escapeHtml(formatRp(receiptData.totalAmount))}</span>
+    </div>
+    ${paymentDetailsHtml}
+    <hr class="divider" />
+    <div class="center muted">
+      ${footerText ? `<div>${escapeHtml(footerText)}</div>` : ''}
+      <div>Kasiry POS</div>
+    </div>`
+
+  return wrapStandaloneThermalDocument({
+    title: `Struk ${receiptData.invoiceNumber || 'Kasiry'}`,
+    widthMm,
+    bodyHtml
+  })
+}
+
+/**
+ * Bangun dokumen HTML terisolasi untuk Tes Cetak Browser.
+ */
+export function buildTestPrintHtml(storeProfile = {}, options = {}) {
+  const widthMm = options.paperWidth === '80mm' ? '80mm' : '58mm'
+  const cols = getColumnsForPaper(widthMm)
+  const storeName = (storeProfile?.name || 'Warung Kasiry').trim()
+  const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+  const footerText = typeof options.footerText === 'string'
+    ? options.footerText.trim()
+    : PRINTER_DEFAULT_SETTINGS.footerText
+
+  const bodyHtml = `
+    <div class="center">
+      <p class="store-title upper">TES CETAK KASIRY POS</p>
+      <p class="muted bold upper">${escapeHtml(storeName)}</p>
+    </div>
+    <hr class="divider" />
+    <div class="row muted"><span>Kertas Aktif</span><span class="bold">${widthMm} (${cols} kol)</span></div>
+    <div class="row muted"><span>Waktu Tes</span><span>${escapeHtml(nowStr)}</span></div>
+    <hr class="divider" />
+    <div class="center">
+      <p class="bold" style="margin:4px 0;">Layout Cetak Struk Siap!</p>
+      ${footerText ? `<p class="muted">${escapeHtml(footerText)}</p>` : ''}
+    </div>`
+
+  return wrapStandaloneThermalDocument({
+    title: 'Tes Cetak Kasiry POS',
+    widthMm,
+    bodyHtml
+  })
+}

@@ -24,7 +24,7 @@
 - **Sistem Buka & Tutup Shift (Tutup Buku Harian):** 1 shift mewakili 1 hari operasional toko dengan jam buka/tutup fleksibel (termasuk lewat tengah malam), auto-isi modal awal terakhir, adopsi transaksi hari itu yang belum masuk shift, hitung uang fisik laci vs sistem (`Modal Awal + Tunai Masuk - Kas Keluar Laci`) beserta selisih kas, riwayat tutup shift, dan kirim laporan tutup buku ke WhatsApp.
 - **Catatan Kas Keluar / Pengeluaran Harian:** Catat pengeluaran operasional (`Operasional`, `Makan & Transport`, `Lainnya`), `Kulakan Stok`, maupun `Tarik / Setor Owner` (`prive` — mengurangi saldo laci tanpa membuat estimasi laba jualan terlihat rugi) dari laci tunai atau sumber non-tunai.
 - **Laporan Harian/Shift & Ekspor Excel 7-Sheet:** Ringkasan lingkup shift aktif atau hari ini (uang masuk laci & QRIS, kas keluar, sisa/seharusnya laci, perkiraan untung bersih, top 5 terlaris, riwayat harian & riwayat tutup shift), kirim ringkasan via WhatsApp, serta unduh file `.xlsx` 7 sheet (`Ringkasan Kas`, `Daftar Transaksi`, `Barang Terjual`, `Buku Utang Pelanggan`, `Pengeluaran Kas`, `Riwayat Shift`, `Riwayat Kulakan`) dengan SheetJS dinamis.
-- **Cetak Struk Thermal Bluetooth (ESC/POS) & Browser Fallback:** Terhubung langsung via **Web Bluetooth API** ke printer thermal `58mm` (32 kolom) maupun `80mm` (48 kolom) dengan pemecahan chunk MTU aman, tab **Printer** di Pengaturan (*ukuran kertas*, *catatan bawah struk kustom*, *cetak otomatis setelah bayar*, & *Tes Cetak Printer*), serta fallback mulus ke `window.print()` saat printer Bluetooth tidak tersedia.
+- **Cetak Struk Thermal Universal (Bluetooth BLE, USB/OTG, Serial COM & Browser Iframe):** Terhubung langsung ESC/POS ke printer thermal `58mm` (32 kolom) maupun `80mm` (48 kolom) melalui **Web Bluetooth**, **WebUSB** (HP/Tablet Android OTG & PC WinUSB), atau **Web Serial COM** dengan reconnect otomatis, tab **Printer** di Pengaturan (*ukuran kertas*, *catatan bawah struk kustom*, *cetak otomatis setelah bayar*, & *Tes Cetak Printer*), serta fallback bersih via hidden `<iframe>` `@page` `58mm`/`80mm` ke printer Windows/OS biasa.
 - **Cloud Sync $0 (Google Drive & Sheets) + Arsip Tahunan:**
   - Login Google Identity Services (GIS) 1-klik, penulisan transaksi, pelunasan bon, kas keluar, nota kulakan, dan aktivitas buka/tutup shift realtime ke Google Sheets (dengan antrean otomatis saat offline), serta *two-way merge* cadangan Google Drive berbasis timestamp `updatedAt`.
   - **Skalabilitas Multi-Tahun:** Memori Kasa aktif menjaga jendela 90 hari di `shallowRef`, *batching* upload Drive otomatis saat transaksi besar, serta alat **Kesehatan & Arsip Data Tahunan** (`> 3 Bulan`, `> 6 Bulan`, `> 1 Tahun`) yang mengunduh arsip JSON (+ salinan ke Google Drive) sebelum meringankan memori HP tanpa menghapus barang maupun total saldo utang pelanggan.
@@ -54,10 +54,10 @@ kasiryy/
 │   ├── utils/              # customerStats.js, dailyStats.js, expenseConstants.js, pricing.js, productUsage.js, thermalPrinter.js, excelExport.js, sound.js
 │   ├── App.vue             # Orkestrator Kasa, prewarm jalur checkout, auto-print, & state global
 │   └── style.css           # Tailwind CSS v4, Bento container queries & content-visibility
-├── tests/                  # 10 suite test Vitest (40 skenario: DB, migrasi, pricing, printer, usage, sync, stats, Excel, UI)
+├── tests/                  # 10 suite test Vitest (42 skenario: DB, migrasi, pricing, printer BT/USB/Serial, usage, sync, stats, Excel, UI)
 ├── CHANGELOG.md            # Riwayat rilis SemVer (Keep a Changelog)
 ├── DESIGN_SYSTEM.md        # Panduan visual & token warna/komponen
-├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.14)
+├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.15)
 ├── SITEMAP.md              # Alur interaksi & arsitektur komponen
 └── vite.config.js          # Rolldown vendor splitting & PWA Workbox configuration
 ```

@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry POS
 
-**Versi Dokumen:** 2.14 (QRIS, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, 300 Katalog Bersih & Printer Thermal Bluetooth)  
+**Versi Dokumen:** 2.15 (QRIS, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, 300 Katalog Bersih & Printer Thermal Bluetooth/USB/Serial)  
 **Status:** Production-Ready & Terverifikasi Build/Unit-Integration Test  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
 **Identitas Toko Bawaan:** Warung Kasiry (Generik siap pakai — profil disesuaikan pemilik warung di Pengaturan)  
@@ -16,6 +16,7 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
+| **v2.15.0** | 27 November 2026 | **Dukungan Printer USB/OTG (`WebUSB`), Port Serial (`Web Serial`) & Cetak Browser Iframe Terisolasi:** Ekspansi `useThermalPrinter.js` & `thermalPrinter.js` dengan `WebUSB` + `Web Serial` (auto-reconnect di `App.vue`, panduan Android OTG vs Windows `WinUSB`/`POS-58`), cetak HTML `iframe` terisolasi `58mm`/`80mm` bebas backdrop modal, serta tombol **`BT`** / **`USB`** / **`Serial`** di `SettingsModal` & `ReceiptModal`. |
 | **v2.14.0** | 27 November 2026 | **Roadmap #7 (Printer Thermal Bluetooth ESC/POS) + Hotfix Harga Keranjang:** Encoder ESC/POS murni (`thermalPrinter.js`), composable Web Bluetooth (`useThermalPrinter.js`) dg fallback `window.print()`, tab **`Printer`** di `SettingsModal.vue` (`58mm`/`80mm`, *auto-print*, catatan bawah struk, *Tes Cetak*), pembaruan `ReceiptModal.vue` (hide `WA:` kosong, `.thermal-80mm`, `Cetak BT`), serta perbaikan penguncian tier saat simpan Grosir/Agen di mode nota `Ecer`. |
 | **v2.13.1** | 27 November 2026 | **Hotfix Live Sync Multi-Harga Keranjang:** Memastikan perubahan harga Ecer/Grosir/Agen langsung berlaku real-time saat ganti `Harga Nota` tanpa perlu mengosongkan keranjang (`repriceCartItems` + guard `Ecer (Kosong)`). |
 | **v2.13.0** | 27 November 2026 | **Roadmap #6 (Pembersihan Seed Awal, 300 Katalog Warung & Kebersihan Barang Pasif):** Ekspansi ke 300 barang populer warung harga `Rp 0` (`barcode: ''`, *dynamic import* `seedData.js`), pembersihan pelanggan awal menjadi `'Umum'` saja (`0` utang) & profil generik `Warung Kasiry`, fitur filter `Belum Harga`, `Belum Terjual`, & `Sepi ≥30 Hr` + isi harga cepat & hapus massal di `ProductManagementModal`, auto-edit harga barang `Rp 0` di `CartSection`, dan tombol reset `Mulai Toko Kosong` di `SettingsModal`. |
@@ -156,7 +157,7 @@ db.version(5).stores({
    - Konfigurasi Rolldown `codeSplitting.groups` di `vite.config.js` memisahkan `vendor-vue`, `vendor-dexie`, `vendor-xlsx`, dan `vendor-zxing`.
    - Entry bundle `index` terjaga ringan (< target 60 KB gzip per chunk utama), bebas chunk warning `> 500 kB`, dengan 12 modal sekunder terpisah sebagai async chunks (`prewarmCheckoutChunks` menghangatkan `PaymentModal`, `LazyInventoryModal`, dan `ReceiptModal` saat browser luang).
 2. **Offline PWA Precaching:** Workbox men-generate service worker precache di `dist/sw.js` sehingga seluruh chunk pecahan & aset statis tetap berjalan offline 100%.
-3. **Automated Tests:** Dijalankan melalui `npm test` (`Vitest` + `fake-indexeddb` + `@vue/test-utils`/`happy-dom`) mencakup 10 suite & 40 skenario di folder `tests/` (`customerStats`, `dailyStats`, `pricing`, `productUsage`, `thermalPrinter`, `useKasiryDB`, `useGoogleSync`, `dbMigration` `v1 -> v5`, `excelExport`, dan `uiModals`).
+3. **Automated Tests:** Dijalankan melalui `npm test` (`Vitest` + `fake-indexeddb` + `@vue/test-utils`/`happy-dom`) mencakup 10 suite & 42 skenario di folder `tests/` (`customerStats`, `dailyStats`, `pricing`, `productUsage`, `thermalPrinter`, `useKasiryDB`, `useGoogleSync`, `dbMigration` `v1 -> v5`, `excelExport`, dan `uiModals`).
 4. **Penyimpanan Persisten & Render Katalog:** `navigator.storage.persist()` aktif saat inisialisasi DB, dan kartu katalog di bawah lipatan layar (`idx >= 16`) memakai `.offscreen-card-defer` (`content-visibility: auto; contain-intrinsic-size: auto none auto 92px;`).
 
 ---
@@ -165,21 +166,21 @@ db.version(5).stores({
 
 Status terbaru sebelum rilis penuh ke pemilik warung:
 - [x] Build produksi bersih (`npm run build`), 0 error & 0 warning ukuran chunk.
-- [x] Automated tests Vitest lulus (`npm test`: 10 suite, 40 skenario).
+- [x] Automated tests Vitest lulus (`npm test`: 10 suite, 42 skenario).
 - [x] Verifikasi domain Google Search Console aktif (`public/google50a425d7a5de8ecd.html`).
 - [x] Halaman `/privacy.html`, `/terms.html`, ikon OAuth (`kasiry-oauth-120x120.png`), serta COOP header tersedia di `public/`.
 - [ ] **Uji Perangkat Fisik Manual (Final Field Check):**
   - Test hardware barcode scanner USB OTG / Bluetooth di HP Android & PC.
   - Test kamera belakang & depan langsung di HP terhadap barcode kemasan nyata (`CameraScannerModal`).
-  - Test pairing & cetak langsung ke printer thermal Bluetooth 58mm/80mm (Web Bluetooth ESC/POS) dan fallback `window.print()` (`ReceiptModal`), serta alur kirim nota/tagihan WhatsApp.
+  - Test pairing & cetak langsung ke printer thermal Bluetooth BLE, Kabel USB / Android OTG (`WebUSB`), Serial COM (`Web Serial`), maupun fallback browser `iframe` (`ReceiptModal`), serta alur kirim nota/tagihan WhatsApp.
   - Test mode restore **Timpa Total (Reset)**, **Arsip Tahunan + Drive**, dan reload offline PWA (`npm run preview` / `https://kasiry.pages.dev`).
   - Pastikan status **Google OAuth Consent Screen** di Google Cloud Console berstatus *Published / Verified* agar akun Google toko baru tidak terkena batasan *Testing mode*.
 
 ---
 
-## 8. Roadmap Pengembangan (Backlog v2.8–v2.14 Selesai)
+## 8. Roadmap Pengembangan (Backlog v2.8–v2.15 Selesai)
 
-Seluruh fitur utama pada backlog v2.8–v2.14 telah selesai diimplementasikan dan terintegrasi menyeluruh:
+Seluruh fitur utama pada backlog v2.8–v2.15 telah selesai diimplementasikan dan terintegrasi menyeluruh:
 
 | No | Item Fitur | Status | Ringkasan Implementasi Terverifikasi |
 | :-: | :--- | :---: | :--- |
@@ -189,4 +190,4 @@ Seluruh fitur utama pada backlog v2.8–v2.14 telah selesai diimplementasikan da
 | 4 | **Metode Bayar QRIS** | `[x] Selesai (v2.8.0)` | Tab `QRIS` di `PaymentModal.vue` (otomatis uang pas, prefix `QRS-`), opsi `Tunai \| QRIS` di Buku Utang, pemisahan Laci Tunai vs QRIS di Laporan Harian, Struk 58mm, WA, Excel & Google Sheets (upload foto QRIS statis ditunda ke rilis opsional nanti). |
 | 5 | **Fitur Kulakan / Belanja Stok** | `[x] Selesai (v2.12.0)` | Modal `RestockModal.vue` (nota multi-item, sumber dana `Tunai Laci` / `QRIS Rek` / `Dana Luar`, deteksi modal naik & opsi edit jual, centang `Update Stok`), skema Dexie `v5` `restocks`, stok lunak non-blocking (`stock: null` vs `0` tetap bisa dibeli), Excel 7 sheet (`Riwayat Kulakan`), & Google Sync. |
 | 6 | **Pembersihan & Seed Data Awal Baru** | `[x] Selesai (v2.13.0)` | 300 katalog awal warung `Rp 0` (lazy `seedData.js`), pelanggan bersih hanya `'Umum'` (`0` utang), profil generik `Warung Kasiry`, filter `Belum Harga` / `Belum Terjual` / `Sepi ≥30 Hr` + isi harga cepat & hapus massal (`productUsage.js`), auto-prompt harga kasa, & reset toko kosong di Pengaturan. |
-| 7 | **Koneksi Printer Thermal Bluetooth (ESC/POS)** | `[x] Selesai (v2.14.0)` | Encoder ESC/POS murni (`thermalPrinter.js`) + `useThermalPrinter.js` via Web Bluetooth API (retry MTU 20B) & fallback `window.print()`, tab `Printer` di `SettingsModal.vue` (`58mm`/`80mm`, *auto-print*, catatan struk, *Tes Cetak*), serta cetak BT & `58mm`/`80mm` di `ReceiptModal.vue`. |
+| 7 | **Koneksi Printer Thermal Universal (Bluetooth / USB / Serial / Iframe)** | `[x] Selesai (v2.14–v2.15)` | Encoder ESC/POS (`thermalPrinter.js`) + `useThermalPrinter.js` via **Web Bluetooth** (retry MTU 20B), **WebUSB** (Android OTG & WinUSB), **Web Serial COM**, auto-reconnect, serta fallback HTML `iframe` terisolasi `58mm`/`80mm`; tab `Printer` di `SettingsModal.vue` (`*auto-print*`, catatan struk, *Tes Cetak*), & aksi cepat di `ReceiptModal.vue`. |

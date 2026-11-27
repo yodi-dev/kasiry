@@ -21,6 +21,8 @@ import {
   KeyRound,
   Printer,
   Bluetooth,
+  Usb,
+  Cable,
   WifiOff
 } from '@lucide/vue'
 import { useThermalPrinter } from '../composables/useThermalPrinter'
@@ -120,7 +122,7 @@ const emit = defineEmits([
 
 // 3 Tabs: 'profile' (Profil Toko) | 'printer' (Printer Thermal) | 'backup' (Cadangan & Google)
 const activeTab = ref('profile')
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.14.0'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.15.0'
 
 const formName = ref(props.storeProfile?.name || 'Warung Kasiry')
 const formOwner = ref(props.storeProfile?.owner || 'Pemilik Toko')
@@ -132,39 +134,50 @@ const fileInputRef = ref(null)
 const isSaved = ref(false)
 const confirmingResetMode = ref(null) // 'empty' | 'starter' | null
 
-// Pengaturan & Koneksi Printer Thermal (Web Bluetooth ESC/POS + Fallback Browser)
+// Pengaturan & Koneksi Printer Thermal (Bluetooth BLE, Kabel USB/OTG, Port Serial COM + Fallback Browser)
 const {
   printerSettings,
   updatePrinterSettings,
+  connectionType,
   isBluetoothSupported,
+  isUsbSupported,
+  isSerialSupported,
   isPrinterConnected,
   isConnectingPrinter,
   isPrinting,
   connectedPrinterName,
   printerError,
   connectBluetoothPrinter,
-  disconnectBluetoothPrinter,
+  connectUsbPrinter,
+  connectSerialPrinter,
+  disconnectPrinter,
   printTestThermal
 } = useThermalPrinter()
 
 const testPrintNotice = ref(null)
 
-const handleConnectPrinter = async () => {
+const connectPrinterByTransport = async (mode) => {
   testPrintNotice.value = null
-  const ok = await connectBluetoothPrinter()
+  const connectors = {
+    bluetooth: connectBluetoothPrinter,
+    usb: connectUsbPrinter,
+    serial: connectSerialPrinter
+  }
+  const ok = await connectors[mode]?.()
   if (ok) {
+    const label = mode === 'usb' ? 'USB' : mode === 'serial' ? 'Serial COM' : 'Bluetooth'
     testPrintNotice.value = {
       type: 'success',
-      text: `Terhubung ke ${connectedPrinterName.value || 'Printer Thermal'}.`
+      text: `Terhubung ke ${connectedPrinterName.value || `Printer ${label}`} (${label}).`
     }
   }
 }
 
-const handleDisconnectPrinter = () => {
-  disconnectBluetoothPrinter()
+const handleDisconnectPrinter = async () => {
+  await disconnectPrinter()
   testPrintNotice.value = {
     type: 'info',
-    text: 'Koneksi Bluetooth printer diputus.'
+    text: 'Koneksi printer thermal diputus.'
   }
 }
 
@@ -176,11 +189,12 @@ const handleTestPrint = async () => {
     phone: formPhone.value ?? props.storeProfile?.phone ?? ''
   })
   if (res?.ok) {
+    const methodNames = { bluetooth: 'Bluetooth', usb: 'Kabel USB', serial: 'Port Serial/COM' }
     testPrintNotice.value = {
       type: 'success',
-      text: res.method === 'bluetooth'
-        ? `Tes cetak berhasil dikirim via Bluetooth (${connectedPrinterName.value || 'Printer'}).`
-        : 'Dialog cetak browser dibuka (printer Bluetooth belum tersambung).'
+      text: res.method !== 'browser'
+        ? `Tes cetak berhasil dikirim via ${methodNames[res.method] || res.method} (${connectedPrinterName.value || 'Printer'}).`
+        : 'Dialog cetak browser dibuka dengan halaman tes khusus ukuran kertas struk.'
     }
   } else {
     testPrintNotice.value = {
@@ -602,16 +616,16 @@ const cancelImport = () => {
 
         <!-- ==================== TAB 2: PRINTER THERMAL ==================== -->
         <div v-else-if="activeTab === 'printer'" class="space-y-4">
-          <!-- Koneksi Printer Bluetooth -->
+          <!-- Koneksi Printer Thermal (Bluetooth, Kabel USB / OTG, Port Serial COM) -->
           <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-3">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <h4 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                  <Bluetooth class="w-4 h-4 text-[#0a193d]" />
-                  <span>Printer Thermal Bluetooth</span>
+                  <Printer class="w-4 h-4 text-[#0a193d]" />
+                  <span>Koneksi Printer Thermal ESC/POS</span>
                 </h4>
                 <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                  Hubungkan printer thermal ESC/POS (58mm/80mm) langsung via Web Bluetooth.
+                  Sambungkan printer langsung via Bluetooth, Kabel USB (HP OTG / PC), atau Port Serial/COM.
                 </p>
               </div>
               <span
@@ -622,7 +636,9 @@ const cancelImport = () => {
                     : 'bg-white text-slate-600 border-slate-200'
                 ]"
               >
-                {{ isPrinterConnected ? 'Terhubung' : 'Belum Terhubung' }}
+                {{ isPrinterConnected
+                  ? (connectionType === 'usb' ? 'Terhubung (USB)' : connectionType === 'serial' ? 'Terhubung (COM)' : 'Terhubung (BT)')
+                  : 'Belum Terhubung' }}
               </span>
             </div>
 
@@ -634,33 +650,63 @@ const cancelImport = () => {
             </div>
 
             <div
-              v-if="!isBluetoothSupported"
-              class="px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 leading-relaxed"
-            >
-              Browser/perangkat ini belum mendukung Web Bluetooth. Saat mencetak struk atau tes cetak, Kasiry akan otomatis memakai <strong>Cetak Browser</strong> (<code>window.print</code>).
-            </div>
-
-            <div
               v-if="printerError"
-              class="px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-[11px] text-rose-700 font-medium"
+              class="px-3 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-[11px] text-rose-700 font-medium leading-relaxed"
             >
               {{ printerError }}
             </div>
 
-            <div class="flex gap-2">
-              <button
-                v-if="!isPrinterConnected"
-                type="button"
-                @click="handleConnectPrinter"
-                :disabled="!isBluetoothSupported || isConnectingPrinter"
-                class="flex-1 py-2.5 px-3 rounded-xl bg-[#0a193d] hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <Bluetooth class="w-4 h-4" />
-                <span>{{ isConnectingPrinter ? 'Menghubungkan...' : 'Hubungkan Printer Bluetooth' }}</span>
-              </button>
+            <div v-if="!isPrinterConnected" class="space-y-2">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  @click="connectPrinterByTransport('bluetooth')"
+                  :disabled="!isBluetoothSupported || isConnectingPrinter"
+                  class="py-2.5 px-3 rounded-xl bg-[#0a193d] hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Bluetooth class="w-4 h-4 shrink-0" />
+                  <span>{{ isConnectingPrinter ? 'Menghubungkan...' : 'Hubungkan Bluetooth' }}</span>
+                </button>
 
+                <button
+                  type="button"
+                  @click="connectPrinterByTransport('usb')"
+                  :disabled="!isUsbSupported || isConnectingPrinter"
+                  class="py-2.5 px-3 rounded-xl bg-sky-700 hover:bg-sky-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Usb class="w-4 h-4 shrink-0" />
+                  <span>Hubungkan USB / OTG</span>
+                </button>
+
+                <button
+                  type="button"
+                  @click="connectPrinterByTransport('serial')"
+                  :disabled="!isSerialSupported || isConnectingPrinter"
+                  class="py-2.5 px-3 rounded-xl bg-slate-700 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Cable class="w-4 h-4 shrink-0" />
+                  <span>Port Serial / COM</span>
+                </button>
+              </div>
+
+              <div v-if="isSerialSupported" class="flex items-center justify-between gap-2 pt-1 text-[11px] text-slate-500">
+                <label for="serial-baud-rate" class="font-medium">Baud Rate Port Serial / COM:</label>
+                <select
+                  id="serial-baud-rate"
+                  :value="printerSettings.serialBaudRate || 9600"
+                  @change="updatePrinterSettings({ serialBaudRate: Number($event.target.value) })"
+                  class="px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 font-mono text-[11px]"
+                >
+                  <option :value="9600">9600 (Umum)</option>
+                  <option :value="19200">19200</option>
+                  <option :value="38400">38400</option>
+                  <option :value="115200">115200 (Cepat)</option>
+                </select>
+              </div>
+            </div>
+
+            <div v-else class="flex gap-2">
               <button
-                v-else
                 type="button"
                 @click="handleDisconnectPrinter"
                 class="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
@@ -668,6 +714,19 @@ const cancelImport = () => {
                 <WifiOff class="w-4 h-4" />
                 <span>Putus Koneksi Printer</span>
               </button>
+            </div>
+
+            <div class="px-3 py-2.5 rounded-xl bg-sky-50/80 border border-sky-200 text-[11px] text-slate-700 leading-relaxed space-y-1">
+              <p><strong>Panduan Cepat Kabel USB:</strong></p>
+              <p>• <strong>HP / Tablet Android:</strong> Colok kabel USB OTG lalu ketuk <strong>Hubungkan USB / OTG</strong>.</p>
+              <p>• <strong>Laptop Windows:</strong> Jika koneksi USB ditolak karena dikunci Print Spooler, ubah driver USB-nya ke <strong>WinUSB</strong> (via Zadig) untuk cetak langsung ESC/POS, atau install driver <strong>POS-58</strong> dan pakai <strong>Cetak Browser</strong>.</p>
+            </div>
+
+            <div
+              v-if="!isBluetoothSupported && !isUsbSupported && !isSerialSupported"
+              class="px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 leading-relaxed"
+            >
+              Browser/perangkat ini belum mendukung koneksi printer langsung. Kasiry otomatis memakai <strong>Cetak Browser</strong> terisolasi ukuran struk.
             </div>
           </div>
 

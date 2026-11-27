@@ -99,7 +99,7 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
 └── 12 Modal Dialog (Lazy Loaded via defineAsyncComponent + watcher { immediate: true }):
     ├── PaymentModal.vue (Prewarmed: Tunai, QRIS uang pas, & Utang/Bon + dropdown loyalitas O(N))
     ├── LazyInventoryModal.vue (Prewarmed: Input kilat barcode baru + tambah kategori inline)
-    ├── ReceiptModal.vue (Prewarmed: Pratinjau struk thermal 58mm/80mm, Cetak Bluetooth ESC/POS + Fallback Browser, & Kirim WA)
+    ├── ReceiptModal.vue (Prewarmed: Pratinjau struk thermal 58mm/80mm, Cetak Bluetooth/USB/Serial ESC/POS + Iframe Browser, & Kirim WA)
     ├── CameraScannerModal.vue (Lazy + vendor-zxing: Hybrid BarcodeDetector & ZXing + Switch Kamera/Flash/Zoom)
     ├── ProductManagementModal.vue (Kelola Barang CRUD + Filter Belum Harga / Belum Terjual / Sepi ≥30 Hr + Isi Harga Cepat + Hapus Massal)
     ├── RestockModal.vue (Catat Nota Kulakan Multi-Item, 3 Sumber Dana, Deteksi Modal Naik, & Riwayat Rollback)
@@ -108,7 +108,7 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
     ├── ExpenseModal.vue (Catatan Kas Keluar: Kategori cepat, Dari Laci vs Non-Tunai, KPI sisa laci & hapus 2-tap)
     ├── ShiftModal.vue (Buka Shift dg auto-modal awal & adopsi catatan hari ini, Tutup Buku + hitung selisih laci, Share WA)
     ├── DailyReportModal.vue (Ringkasan Shift Aktif/Harian, Kas Keluar, Riwayat Transaksi, Riwayat Shift, WA & Excel 7-sheet via vendor-xlsx)
-    └── SettingsModal.vue (Profil Toko + Versi App, Tab Printer Thermal Bluetooth 58mm/80mm & Auto-Print, Google Drive/Sheets Sync, Backup JSON, Arsip Tahunan & Reset Toko)
+    └── SettingsModal.vue (Profil Toko + Versi App, Tab Printer ESC/POS Bluetooth/USB-OTG/Serial 58mm/80mm & Auto-Print, Google Drive/Sheets Sync, Backup JSON, Arsip Tahunan & Reset Toko)
 ```
 
 ---
