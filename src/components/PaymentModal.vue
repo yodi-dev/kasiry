@@ -39,9 +39,11 @@ const emit = defineEmits([
 // Active Tab: 'cash' | 'debt'
 const activeTab = ref('cash')
 
-// Cash Mode State
+// Cash & QRIS Mode State
 const cashGiven = ref(0)
 const cashInputStr = ref('')
+const isQrisPartialMode = ref(false)
+const qrisPaidInput = ref('')
 const selectedCashCustomer = ref(null)
 const cashCustomerQuery = ref('')
 const isCustomerDropdownOpen = ref(false)
@@ -108,6 +110,8 @@ watch(() => props.isOpen, (newVal) => {
     activeTab.value = 'cash'
     cashGiven.value = props.totalAmount
     cashInputStr.value = String(props.totalAmount)
+    isQrisPartialMode.value = false
+    qrisPaidInput.value = String(props.totalAmount)
     selectedCustomer.value = null
     customerQuery.value = ''
 
@@ -126,6 +130,9 @@ watch(() => props.totalAmount, (newTotal, oldTotal) => {
   if (props.isOpen && cashGiven.value === oldTotal) {
     cashGiven.value = newTotal
     cashInputStr.value = String(newTotal)
+  }
+  if (props.isOpen && !isQrisPartialMode.value) {
+    qrisPaidInput.value = String(newTotal)
   }
 })
 
@@ -162,7 +169,7 @@ const roundedSuggestions = computed(() => {
   return suggestions.slice(0, 3)
 })
 
-// Hitung Uang Kembalian
+// Hitung Uang Kembalian & Mode Kurang Bayar Masuk Buku Utang
 const changeAmount = computed(() => {
   return Math.max(0, cashGiven.value - props.totalAmount)
 })
@@ -170,6 +177,56 @@ const changeAmount = computed(() => {
 const isCashSufficient = computed(() => {
   return cashGiven.value >= props.totalAmount
 })
+
+const isPartialCash = computed(() => {
+  return cashGiven.value > 0 && cashGiven.value < props.totalAmount
+})
+
+const shortfallCash = computed(() => {
+  return Math.max(0, props.totalAmount - cashGiven.value)
+})
+
+const qrisPaidAmount = computed(() => {
+  if (!isQrisPartialMode.value) return props.totalAmount
+  const num = parseInt(String(qrisPaidInput.value).replace(/\D/g, '') || '0', 10)
+  return Number.isFinite(num) ? Math.min(props.totalAmount, Math.max(0, num)) : 0
+})
+
+const isPartialQris = computed(() => {
+  return isQrisPartialMode.value && qrisPaidAmount.value > 0 && qrisPaidAmount.value < props.totalAmount
+})
+
+const shortfallQris = computed(() => {
+  return Math.max(0, props.totalAmount - qrisPaidAmount.value)
+})
+
+const isCashCustomerUmum = computed(() => {
+  const name = selectedCashCustomer.value?.name?.trim().toLowerCase() || 'umum'
+  return name === 'umum'
+})
+
+const activeShortfall = computed(() => {
+  if (activeTab.value === 'cash' && isPartialCash.value) return shortfallCash.value
+  if (activeTab.value === 'qris' && isPartialQris.value) return shortfallQris.value
+  return 0
+})
+
+const isPartialModeNeedingCustomer = computed(() => activeShortfall.value > 0 && isCashCustomerUmum.value)
+
+const canSubmitCash = computed(() => {
+  return isCashSufficient.value || (isPartialCash.value && !isCashCustomerUmum.value)
+})
+
+const canSubmitQris = computed(() => {
+  if (!isQrisPartialMode.value) return true
+  if (qrisPaidAmount.value <= 0) return false
+  return qrisPaidAmount.value >= props.totalAmount || !isCashCustomerUmum.value
+})
+
+const onManualQrisInput = (e) => {
+  const num = parseInt(e.target.value.replace(/\D/g, '') || '0', 10)
+  qrisPaidInput.value = num > 0 ? String(Math.min(props.totalAmount, num)) : ''
+}
 
 // Set Cash
 const setExactCash = () => {
@@ -374,16 +431,23 @@ const createAndSelectCustomer = () => {
 // Konfirmasi Pembayaran
 const submitPayment = () => {
   if (activeTab.value === 'cash') {
-    if (!isCashSufficient.value) return
+    if (!canSubmitCash.value) return
+    const partial = isPartialCash.value
     emit('processCashPayment', {
       totalAmount: props.totalAmount,
       cashGiven: cashGiven.value,
-      changeAmount: changeAmount.value,
+      paidAmount: partial ? cashGiven.value : props.totalAmount,
+      debtAmount: partial ? shortfallCash.value : 0,
+      changeAmount: partial ? 0 : changeAmount.value,
       customer: selectedCashCustomer.value || getUmumCustomer()
     })
   } else if (activeTab.value === 'qris') {
+    if (!canSubmitQris.value) return
+    const partial = isPartialQris.value
     emit('processQrisPayment', {
       totalAmount: props.totalAmount,
+      paidAmount: partial ? qrisPaidAmount.value : props.totalAmount,
+      debtAmount: partial ? shortfallQris.value : 0,
       customer: selectedCashCustomer.value || getUmumCustomer()
     })
   } else {
@@ -501,21 +565,23 @@ const submitPayment = () => {
             'min-w-0 p-3 sm:p-3.5 rounded-2xl border shadow-xs flex flex-col justify-center transition-colors',
             isCashSufficient
               ? 'bg-emerald-50 border-emerald-200'
-              : 'bg-rose-50 border-rose-200'
+              : isPartialCash
+                ? 'bg-amber-50 border-amber-200'
+                : 'bg-rose-50 border-rose-200'
           ]"
         >
           <span
             :class="[
               'text-[10px] sm:text-xs font-bold uppercase tracking-wider leading-tight',
-              isCashSufficient ? 'text-emerald-800' : 'text-rose-700'
+              isCashSufficient ? 'text-emerald-800' : isPartialCash ? 'text-amber-800' : 'text-rose-700'
             ]"
           >
-            {{ isCashSufficient ? 'Uang Kembalian:' : 'Uang Masih Kurang:' }}
+            {{ isCashSufficient ? 'Uang Kembalian:' : isPartialCash ? 'Masuk Buku Utang:' : 'Uang Masih Kurang:' }}
           </span>
           <span
             :class="[
               'text-base sm:text-xl lg:text-2xl font-extrabold font-mono mt-0.5 leading-tight break-words',
-              isCashSufficient ? 'text-emerald-700' : 'text-rose-600'
+              isCashSufficient ? 'text-emerald-700' : isPartialCash ? 'text-amber-800' : 'text-rose-600'
             ]"
           >
             Rp {{ isCashSufficient ? changeAmount.toLocaleString('id-ID') : (totalAmount - cashGiven).toLocaleString('id-ID') }}
@@ -524,14 +590,29 @@ const submitPayment = () => {
 
         <div
           v-else-if="activeTab === 'qris'"
-          class="min-w-0 p-3 sm:p-3.5 rounded-2xl border border-sky-200 bg-sky-50/90 shadow-xs flex flex-col justify-center"
+          :class="[
+            'min-w-0 p-3 sm:p-3.5 rounded-2xl border shadow-xs flex flex-col justify-center transition-colors',
+            isPartialQris ? 'bg-amber-50 border-amber-200' : 'border-sky-200 bg-sky-50/90'
+          ]"
         >
-          <span class="text-[10px] sm:text-xs font-bold text-[#0284c7] uppercase tracking-wider leading-tight">Metode QRIS</span>
-          <span class="text-base sm:text-xl font-extrabold text-[#0a193d] mt-0.5 leading-tight">
-            Uang Pas ✓
+          <span
+            :class="[
+              'text-[10px] sm:text-xs font-bold uppercase tracking-wider leading-tight',
+              isPartialQris ? 'text-amber-800' : 'text-[#0284c7]'
+            ]"
+          >
+            {{ isPartialQris ? 'Masuk Buku Utang:' : 'Metode QRIS' }}
           </span>
-          <span class="text-[11px] font-semibold text-sky-700 leading-tight mt-0.5">
-            Non-Tunai (Otomatis Pas)
+          <span class="text-base sm:text-xl font-extrabold text-[#0a193d] mt-0.5 leading-tight font-mono">
+            {{ isPartialQris ? `Rp ${shortfallQris.toLocaleString('id-ID')}` : 'Uang Pas ✓' }}
+          </span>
+          <span
+            :class="[
+              'text-[11px] font-semibold leading-tight mt-0.5',
+              isPartialQris ? 'text-amber-700' : 'text-sky-700'
+            ]"
+          >
+            {{ isPartialQris ? `QRIS Dibayar Rp ${qrisPaidAmount.toLocaleString('id-ID')}` : 'Non-Tunai (Otomatis Pas)' }}
           </span>
         </div>
 
@@ -736,6 +817,35 @@ const submitPayment = () => {
                 </button>
               </div>
             </div>
+
+            <!-- Guard Wajib Pilih Pelanggan Saat Bayar Kurang -->
+            <div
+              v-if="activeShortfall > 0"
+              :class="[
+                'p-2.5 rounded-xl border text-[11px] leading-snug flex items-start justify-between gap-2',
+                isPartialModeNeedingCustomer
+                  ? 'bg-rose-50 border-rose-200 text-rose-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-900'
+              ]"
+            >
+              <div class="flex items-start gap-1.5">
+                <AlertCircle class="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span v-if="isPartialModeNeedingCustomer">
+                  Kurang <strong>Rp {{ activeShortfall.toLocaleString('id-ID') }}</strong> akan masuk Buku Utang. Pilih atau tambah pelanggan selain <strong>"Umum"</strong>!
+                </span>
+                <span v-else>
+                  Sisa kurang <strong>Rp {{ activeShortfall.toLocaleString('id-ID') }}</strong> otomatis masuk bon <strong>{{ selectedCashCustomer?.name }}</strong>.
+                </span>
+              </div>
+              <button
+                v-if="isPartialModeNeedingCustomer && !isCustomerDropdownOpen"
+                type="button"
+                @click="openCustomerDropdown"
+                class="px-2 py-1 rounded-lg bg-rose-600 text-white font-bold text-[10px] shrink-0 cursor-pointer"
+              >
+                Pilih
+              </button>
+            </div>
           </div>
 
           <div class="md:col-span-7 space-y-3">
@@ -794,7 +904,7 @@ const submitPayment = () => {
               </div>
             </template>
 
-            <!-- MODE QRIS (Otomatis Uang Pas Non-Tunai) -->
+            <!-- MODE QRIS (Otomatis Uang Pas Non-Tunai + Opsi Bayar Kurang) -->
             <div
               v-else-if="activeTab === 'qris'"
               class="p-4 rounded-2xl bg-sky-50/80 border border-sky-200/80 space-y-2.5"
@@ -809,13 +919,36 @@ const submitPayment = () => {
                     <p class="text-[11px] text-slate-600">Pastikan pembeli sudah scan &amp; konfirmasi berhasil.</p>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  @click="isQrisPartialMode = !isQrisPartialMode; qrisPaidInput = String(totalAmount)"
+                  class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-sky-100 text-[#0284c7] font-bold text-[11px] border border-sky-200 cursor-pointer shrink-0 transition-colors"
+                >
+                  {{ isQrisPartialMode ? 'Kembali Pas' : 'Bayar Sebagian?' }}
+                </button>
               </div>
 
-              <div class="p-3 bg-white rounded-xl border border-sky-100 flex items-center justify-between">
+              <div v-if="!isQrisPartialMode" class="p-3 bg-white rounded-xl border border-sky-100 flex items-center justify-between">
                 <span class="text-xs font-semibold text-slate-600">Nominal Pas Non-Tunai:</span>
                 <span class="text-lg sm:text-xl font-extrabold font-mono text-[#0284c7]">
                   Rp {{ totalAmount.toLocaleString('id-ID') }}
                 </span>
+              </div>
+
+              <div v-else class="p-3 bg-white rounded-xl border border-sky-200 space-y-2">
+                <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Nominal QRIS yang Dibayar (Kurang masuk Bon):
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400 text-sm">Rp</span>
+                  <input
+                    type="text"
+                    :value="qrisPaidInput ? parseInt(qrisPaidInput).toLocaleString('id-ID') : ''"
+                    @input="onManualQrisInput"
+                    placeholder="0"
+                    class="w-full h-11 pl-10 pr-3 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] rounded-xl text-lg font-bold font-mono text-[#0a193d] text-right outline-hidden"
+                  />
+                </div>
               </div>
 
               <p class="text-[11px] text-slate-500 flex items-center gap-1.5">
@@ -924,7 +1057,7 @@ const submitPayment = () => {
         </button>
 
         <button 
-          :disabled="activeTab === 'cash' ? !isCashSufficient : (activeTab === 'debt' ? !isDebtReady : false)"
+          :disabled="activeTab === 'cash' ? !canSubmitCash : (activeTab === 'qris' ? !canSubmitQris : !isDebtReady)"
           @click="submitPayment"
           :class="[
             'flex-1 h-12 px-6 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-sm cursor-pointer disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-98',
@@ -936,9 +1069,9 @@ const submitPayment = () => {
           <span>
             {{
               activeTab === 'cash'
-                ? 'Selesaikan Pembayaran'
+                ? (isPartialCash ? `Bayar Sebagian & Catat Bon (Rp ${shortfallCash.toLocaleString('id-ID')})` : 'Selesaikan Pembayaran')
                 : activeTab === 'qris'
-                ? 'Konfirmasi Bayar QRIS'
+                ? (isPartialQris ? `Konfirmasi QRIS & Catat Bon (Rp ${shortfallQris.toLocaleString('id-ID')})` : 'Konfirmasi Bayar QRIS')
                 : 'Catat ke Buku Utang'
             }}
           </span>

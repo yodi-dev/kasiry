@@ -412,11 +412,14 @@ export function useGoogleSync() {
     return null
   }
 
-  // Format baris standar untuk pencatatan Google Sheets (Tunai, Bon Baru, & Pelunasan Bon)
+  // Format baris standar untuk pencatatan Google Sheets (Tunai, QRIS, Bon Baru, Sebagian Bon, & Pelunasan Bon)
   const formatSheetRow = (txData) => {
-    const itemsText = txData.itemsText || (txData.items || [])
+    const baseItemsText = txData.itemsText || (txData.items || [])
       .map(i => `${i.qty}x ${i.name}`)
       .join(', ')
+    const debtSuffix = Number(txData.debtAmount || 0) > 0 && String(txData.paymentMethod || '').includes('SEBAGIAN BON')
+      ? ` • Masuk Bon: Rp ${Number(txData.debtAmount).toLocaleString('id-ID')}`
+      : ''
 
     return [
       new Date(txData.createdAt || Date.now()).toLocaleString('id-ID'),
@@ -424,9 +427,9 @@ export function useGoogleSync() {
       txData.paymentMethod || 'TUNAI',
       txData.customerName || (txData.paymentMethod === 'UTANG / BON' ? '-' : 'Umum'),
       txData.totalAmount || 0,
-      txData.cashGiven ?? txData.totalAmount ?? 0,
+      txData.paymentMethod === 'UTANG / BON' ? 0 : (txData.paidAmount ?? txData.cashGiven ?? txData.totalAmount ?? 0),
       txData.changeAmount || 0,
-      itemsText || '-'
+      (baseItemsText || '-') + debtSuffix
     ]
   }
 

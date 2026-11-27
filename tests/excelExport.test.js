@@ -72,6 +72,18 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
           customerName: 'Bu Tejo',
           totalAmount: 15000,
           items: [{ id: 2, name: 'Minyakita 1L', sellPrice: 15000, buyPrice: 13000, qty: 1 }]
+        },
+        {
+          invoiceNumber: 'KSR-PART',
+          createdAt: Date.now(),
+          paymentMethod: 'TUNAI (SEBAGIAN BON)',
+          customerName: 'Bu Tejo',
+          totalAmount: 50000,
+          paidAmount: 30000,
+          debtAmount: 20000,
+          cashGiven: 30000,
+          changeAmount: 0,
+          items: [{ id: 4, name: 'Beras 5kg', sellPrice: 50000, buyPrice: 44000, qty: 1 }]
         }
       ],
       customers: [
@@ -192,10 +204,13 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(summaryMap['Total Seharusnya di Laci (Termasuk Modal)']).toBe(125000)
 
     const txRows = XLSX.utils.sheet_to_json(workbook.Sheets['Daftar Transaksi'])
-    expect(txRows).toHaveLength(3)
-    expect(txRows.map(r => r['No. Nota / Invoice'])).toEqual(['KSR-1001', 'QRS-1002', 'BON-1000'])
+    expect(txRows).toHaveLength(4)
+    expect(txRows.map(r => r['No. Nota / Invoice'])).toEqual(['KSR-1001', 'QRS-1002', 'BON-1000', 'KSR-PART'])
     expect(txRows[1]['Metode Bayar']).toBe('QRIS')
     expect(txRows[1]['Nama Pelanggan']).toBe('Pelanggan Umum')
+    expect(txRows[3]['Metode Bayar']).toBe('TUNAI (SEBAGIAN BON)')
+    expect(txRows[3]['Uang Diberikan (Rp)']).toBe(30000)
+    expect(txRows[3]['Rincian Barang']).toContain('Sisa Masuk Bon: Rp 20.000')
 
     const debtRows = XLSX.utils.sheet_to_json(workbook.Sheets['Buku Utang Pelanggan'])
     expect(debtRows).toHaveLength(1)

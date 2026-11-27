@@ -77,7 +77,9 @@ const shareToWhatsApp = () => {
     ? `Tunai: Rp ${r.cashGiven.toLocaleString('id-ID')}\nKembali: Rp ${r.changeAmount.toLocaleString('id-ID')}`
     : r.paymentMethod === 'QRIS'
       ? `Metode: QRIS (Lunas Non-Tunai)`
-      : (r.paymentMethod === 'TARIK TUNAI' || r.serviceMeta?.type === 'TARIK_TUNAI')
+      : (r.paymentMethod === 'TUNAI (SEBAGIAN BON)' || r.paymentMethod === 'QRIS (SEBAGIAN BON)' || Number(r.debtAmount || 0) > 0)
+        ? `Dibayar (${String(r.paymentMethod || '').startsWith('QRIS') ? 'QRIS' : 'Tunai'}): Rp ${Number(r.paidAmount ?? r.cashGiven ?? 0).toLocaleString('id-ID')}\nSisa Masuk Buku Utang: Rp ${Number(r.debtAmount ?? Math.max(0, Number(r.totalAmount || 0) - Number(r.paidAmount ?? r.cashGiven ?? 0))).toLocaleString('id-ID')}\nPelanggan: ${r.customer?.name || '-'}`
+        : (r.paymentMethod === 'TARIK TUNAI' || r.serviceMeta?.type === 'TARIK_TUNAI')
         ? `Via QRIS/Transfer: Rp ${r.totalAmount.toLocaleString('id-ID')}\nUang Tunai Diserahkan: Rp ${Number(r.serviceMeta?.amount ?? r.cashGiven ?? r.totalAmount).toLocaleString('id-ID')}\nStatus: SELESAI (Tarik Tunai)`
         : (r.paymentMethod === 'TRANSFER / TOP-UP' || r.serviceMeta?.type === 'TRANSFER')
           ? `Bayar Tunai: Rp ${Number(r.cashGiven ?? r.totalAmount).toLocaleString('id-ID')}\nNominal Dikirim: Rp ${Number(r.serviceMeta?.amount ?? r.totalAmount).toLocaleString('id-ID')}\nStatus: SELESAI (Transfer / Top-Up)`
@@ -304,6 +306,21 @@ const shareToWhatsApp = () => {
             <div class="flex justify-between font-semibold text-[#0284c7] text-xs">
               <span>STATUS:</span>
               <span>LUNAS (NON-TUNAI)</span>
+            </div>
+          </template>
+
+          <template v-else-if="receiptData.paymentMethod === 'TUNAI (SEBAGIAN BON)' || receiptData.paymentMethod === 'QRIS (SEBAGIAN BON)' || Number(receiptData.debtAmount || 0) > 0">
+            <div class="flex justify-between text-slate-600">
+              <span>Dibayar ({{ String(receiptData.paymentMethod || '').startsWith('QRIS') ? 'QRIS' : 'Tunai' }}):</span>
+              <span>Rp {{ (receiptData.paidAmount ?? receiptData.cashGiven ?? 0).toLocaleString('id-ID') }}</span>
+            </div>
+            <div class="flex justify-between font-semibold text-red-600 text-xs sm:text-sm">
+              <span>MASUK BUKU UTANG:</span>
+              <span>Rp {{ (receiptData.debtAmount ?? Math.max(0, receiptData.totalAmount - (receiptData.paidAmount ?? receiptData.cashGiven ?? 0))).toLocaleString('id-ID') }}</span>
+            </div>
+            <div class="flex justify-between font-semibold text-amber-700 text-xs">
+              <span>STATUS:</span>
+              <span>BAYAR SEBAGIAN (BON)</span>
             </div>
           </template>
 

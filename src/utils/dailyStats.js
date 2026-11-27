@@ -34,7 +34,16 @@ function aggregateRecords(
 
   periodTx.forEach(t => {
     const amount = Number(t.totalAmount || 0)
-    if (t.paymentMethod === 'TUNAI') {
+    const debtAmt = Number(t.debtAmount || 0)
+    if (t.paymentMethod === 'TUNAI (SEBAGIAN BON)' || (t.paymentMethod === 'TUNAI' && debtAmt > 0)) {
+      const paid = Math.max(0, Math.min(amount, Number(t.paidAmount ?? t.cashGiven ?? 0)))
+      cashSales += paid
+      debt += debtAmt > 0 ? debtAmt : Math.max(0, amount - paid)
+    } else if (t.paymentMethod === 'QRIS (SEBAGIAN BON)' || (t.paymentMethod === 'QRIS' && debtAmt > 0)) {
+      const paid = Math.max(0, Math.min(amount, Number(t.paidAmount ?? t.cashGiven ?? 0)))
+      qrisSales += paid
+      debt += debtAmt > 0 ? debtAmt : Math.max(0, amount - paid)
+    } else if (t.paymentMethod === 'TUNAI') {
       cashSales += amount
     } else if (t.paymentMethod === 'QRIS') {
       qrisSales += amount

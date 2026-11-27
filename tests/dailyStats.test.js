@@ -384,4 +384,37 @@ describe('computeDailyStats (Separation of Cash Drawer, QRIS Non-Cash, and Bon)'
     expect(waText).toContain('Pulsa & Token (Tunai): Rp 12.000')
     expect(waText).toContain('Total Pulsa & Token: Rp 71.500 (Laba +Rp 5.000)')
   })
+
+  it('splits partial Tunai and QRIS payments into paid drawer/QRIS and unpaid Buku Utang shortfall', () => {
+    const now = Date.now()
+    const transactions = [
+      {
+        invoiceNumber: 'KSR-PART1',
+        createdAt: now,
+        paymentMethod: 'TUNAI (SEBAGIAN BON)',
+        totalAmount: 50000,
+        paidAmount: 30000,
+        debtAmount: 20000,
+        cashGiven: 30000,
+        items: [{ name: 'Beras', sellPrice: 50000, buyPrice: 42000, qty: 1 }]
+      },
+      {
+        invoiceNumber: 'QRS-PART2',
+        createdAt: now,
+        paymentMethod: 'QRIS (SEBAGIAN BON)',
+        totalAmount: 40000,
+        paidAmount: 15000,
+        debtAmount: 25000,
+        cashGiven: 15000,
+        items: [{ name: 'Minyak', sellPrice: 40000, buyPrice: 35000, qty: 1 }]
+      }
+    ]
+
+    const stats = computeDailyStats(transactions, [], [], now)
+    expect(stats.todayCashDrawer).toBe(30000)
+    expect(stats.todayQrisTotal).toBe(15000)
+    expect(stats.todayNewDebt).toBe(45000)
+    expect(stats.todayNetCashDrawer).toBe(30000)
+    expect(stats.todayGrossProfit).toBe(13000)
+  })
 })

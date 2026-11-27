@@ -520,8 +520,8 @@ const saveAndAddToCart = async (newProduct) => {
   triggerCloudAutoBackup()
 }
 
-// Helper bersama untuk menyelesaikan pembayaran langsung (Tunai maupun QRIS)
-const finalizeDirectSale = async ({ paymentMethod, invoicePrefix, totalAmount, cashGiven, changeAmount, customer }) => {
+// Helper bersama untuk menyelesaikan pembayaran langsung (Tunai, QRIS, maupun Bayar Kurang Sebagian Bon)
+const finalizeDirectSale = async ({ paymentMethod, invoicePrefix, totalAmount, cashGiven, paidAmount, debtAmount, changeAmount, customer }) => {
   const now = new Date()
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
   const invoice = `${invoicePrefix}-${Date.now().toString().slice(-6)}`
@@ -540,10 +540,14 @@ const finalizeDirectSale = async ({ paymentMethod, invoicePrefix, totalAmount, c
     }
   }
 
+  const cleanDebt = Math.max(0, Math.round(Number(debtAmount || 0)))
+  const cleanPaid = Number.isFinite(Number(paidAmount)) ? Math.round(Number(paidAmount)) : totalAmount
   const txPayload = {
     invoiceNumber: invoice,
     totalAmount,
     paymentMethod,
+    paidAmount: cleanPaid,
+    debtAmount: cleanDebt,
     cashGiven,
     changeAmount,
     customer: custObj,
@@ -552,7 +556,13 @@ const finalizeDirectSale = async ({ paymentMethod, invoicePrefix, totalAmount, c
     items: [...cart.value]
   }
 
-  await recordTransaction(txPayload)
+  try {
+    await recordTransaction(txPayload)
+  } catch (err) {
+    playBeepSound('warning')
+    alert(err.message)
+    return
+  }
   playBeepSound('success')
 
   // Catat ke Google Sheets (atau antrean offline) & jadwalkan auto-backup Google Drive
@@ -564,6 +574,8 @@ const finalizeDirectSale = async ({ paymentMethod, invoicePrefix, totalAmount, c
     time: timeStr,
     totalAmount,
     paymentMethod,
+    paidAmount: cleanPaid,
+    debtAmount: cleanDebt,
     cashGiven,
     changeAmount,
     customer: custObj,
@@ -573,22 +585,29 @@ const finalizeDirectSale = async ({ paymentMethod, invoicePrefix, totalAmount, c
 
 // Payment Handlers (Menyimpan riwayat transaksi ke Dexie.js)
 const handleProcessCashPayment = async (data) => {
+  const debtAmt = Math.max(0, Math.round(Number(data.debtAmount || 0)))
   await finalizeDirectSale({
-    paymentMethod: 'TUNAI',
+    paymentMethod: debtAmt > 0 ? 'TUNAI (SEBAGIAN BON)' : 'TUNAI',
     invoicePrefix: 'KSR',
     totalAmount: data.totalAmount,
     cashGiven: data.cashGiven,
-    changeAmount: data.changeAmount,
+    paidAmount: data.paidAmount ?? (debtAmt > 0 ? data.cashGiven : data.totalAmount),
+    debtAmount: debtAmt,
+    changeAmount: debtAmt > 0 ? 0 : data.changeAmount,
     customer: data.customer
   })
 }
 
 const handleProcessQrisPayment = async (data) => {
+  const debtAmt = Math.max(0, Math.round(Number(data.debtAmount || 0)))
+  const paidAmt = Number.isFinite(Number(data.paidAmount)) ? Math.round(Number(data.paidAmount)) : data.totalAmount
   await finalizeDirectSale({
-    paymentMethod: 'QRIS',
+    paymentMethod: debtAmt > 0 ? 'QRIS (SEBAGIAN BON)' : 'QRIS',
     invoicePrefix: 'QRS',
     totalAmount: data.totalAmount,
-    cashGiven: data.totalAmount,
+    cashGiven: paidAmt,
+    paidAmount: paidAmt,
+    debtAmount: debtAmt,
     changeAmount: 0,
     customer: data.customer
   })

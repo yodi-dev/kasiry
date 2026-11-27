@@ -6,6 +6,19 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.18.0] - 2026-11-27 (Backlog Fase 2 #3: Pembayaran Kurang / Sebagian Otomatis Masuk Buku Utang)
+
+### Added
+- **Bayar Kurang / Sebagian Masuk Buku Utang (`PaymentModal.vue`, `useKasiryDB.js`, `dailyStats.js`, `App.vue`):**
+  - Pada mode pembayaran **Tunai** dan **QRIS** (toggle **`Bayar Sebagian?`**), kasir kini dapat memproses pembayaran yang nominalnya lebih kecil dari `totalAmount` (`0 < paidAmount < totalAmount`).
+  - **Proteksi Akun `"Umum"`:** Baik di UI `PaymentModal.vue` maupun di `recordTransaction()`, transaksi kurang bayar otomatis memblokir `"Umum"` dan mewajibkan pemilihan/pendaftaran pelanggan terlebih dahulu.
+  - Menyimpan `paidAmount` & `debtAmount` dengan label **`TUNAI (SEBAGIAN BON)`** atau **`QRIS (SEBAGIAN BON)`**, mengakumulasikan sisa kekurangan ke `customers.totalDebt` secara atomik, serta memisahkan pencatatan uang masuk kas (hanya sebesar yang dibayar) dengan Bon Baru (sebesar kekurangannya) di `computeDailyStats` & Shift Closing.
+- **Struk, Buku Utang, Laporan, Excel & Google Sync (`thermalPrinter.js`, `ReceiptModal.vue`, `DebtBookModal.vue`, `DailyReportModal.vue`, `CustomerManagementModal.vue`, `excelExport.js`, `useGoogleSync.js`):**
+  - Struk thermal ESC/POS (`58mm`/`80mm`), browser Iframe, preview `ReceiptModal.vue`, & pesan WhatsApp menampilkan rincian **Dibayar**, **Masuk Buku Utang**, dan status **`BAYAR SEBAGIAN (BON)`**.
+  - `DebtBookModal.vue` menampilkan transaksi sebagian bon di daftar *Rincian Bon Belanja Terakhir*, sementara Sheet `Daftar Transaksi` Excel dan Google Sheets mencatat nominal bayar bersih beserta keterangan `[Sisa Masuk Bon]`.
+
+---
+
 ## [2.17.0] - 2026-11-27 (Backlog Fase 2 #2: Penjualan Pulsa, Paket Data, Token Listrik PLN & Reorganisasi Menu TopBar)
 
 ### Added

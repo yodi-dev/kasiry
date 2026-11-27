@@ -489,4 +489,29 @@ describe('useThermalPrinter Composable (Bluetooth, WebUSB, Web Serial & Fallback
     expect(html).toContain('541200889911')
     expect(html).toContain('1234 5678 9012 3456 7890')
   })
+
+  it('prints partial cash/QRIS paid amount and Buku Utang shortfall in ESC/POS and HTML receipts', () => {
+    const partialReceipt = {
+      invoiceNumber: 'KSR-PART',
+      time: '19:30',
+      paymentMethod: 'TUNAI (SEBAGIAN BON)',
+      totalAmount: 50000,
+      paidAmount: 30000,
+      debtAmount: 20000,
+      cashGiven: 30000,
+      changeAmount: 0,
+      customer: { name: 'Bu Siti' },
+      items: [{ id: 1, name: 'Beras 5kg', qty: 1, sellPrice: 50000 }]
+    }
+
+    const esc = decodeAscii(buildReceiptEscPosBytes(partialReceipt, { name: 'Warung Kasiry', phone: '' }))
+    expect(esc).toContain('Bayar Tunai')
+    expect(esc).toContain('Masuk Bon')
+    expect(esc).toContain('SEBAGIAN BON')
+
+    const html = buildReceiptPrintHtml(partialReceipt, { name: 'Warung Kasiry', phone: '' })
+    expect(html).toContain('Dibayar Tunai')
+    expect(html).toContain('Masuk Buku Utang')
+    expect(html).toContain('BAYAR SEBAGIAN (BON)')
+  })
 })

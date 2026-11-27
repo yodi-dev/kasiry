@@ -737,6 +737,8 @@ const confirmDeleteExpense = (id) => {
                       ? 'bg-emerald-50 text-emerald-800 border-emerald-200/60' 
                       : tx.paymentMethod === 'QRIS'
                       ? 'bg-sky-50 text-[#0284c7] border-sky-200/70'
+                      : String(tx.paymentMethod || '').includes('SEBAGIAN BON')
+                      ? 'bg-amber-50 text-amber-800 border-amber-200/70'
                       : 'bg-rose-50 text-rose-800 border-rose-200/60'
                   ]"
                 >

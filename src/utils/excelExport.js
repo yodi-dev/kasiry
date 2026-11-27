@@ -134,10 +134,12 @@ export async function exportKasiryExcel({
       t.paymentMethod || 'TUNAI',
       t.customerName || (t.paymentMethod === 'UTANG / BON' ? '-' : 'Pelanggan Umum'),
       t.totalAmount || 0,
-      t.cashGiven || t.totalAmount || 0,
+      t.paymentMethod === 'UTANG / BON' ? 0 : (t.paidAmount ?? t.cashGiven ?? t.totalAmount ?? 0),
       t.changeAmount || 0,
       (t.items || []).reduce((acc, i) => acc + (i.qty || 1), 0),
-      itemsSummary
+      Number(t.debtAmount || 0) > 0 && String(t.paymentMethod || '').includes('SEBAGIAN BON')
+        ? `${itemsSummary} [Sisa Masuk Bon: Rp ${Number(t.debtAmount).toLocaleString('id-ID')}]`
+        : itemsSummary
     ]
   })
   const wsTx = XLSX.utils.aoa_to_sheet([txHeader, ...txRows])

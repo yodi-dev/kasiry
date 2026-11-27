@@ -718,6 +718,8 @@ const openWhatsAppChat = (c) => {
                       'text-[10px] font-bold px-2 py-0.2 rounded-full border',
                       tx.paymentMethod === 'TUNAI' 
                         ? 'bg-emerald-50 text-emerald-800 border-emerald-200/60' 
+                        : String(tx.paymentMethod || '').includes('SEBAGIAN BON')
+                        ? 'bg-amber-50 text-amber-800 border-amber-200/70'
                         : 'bg-rose-50 text-rose-800 border-rose-200/60'
                     ]"
                   >

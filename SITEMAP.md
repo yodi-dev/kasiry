@@ -97,7 +97,7 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
 │   └── StickyBottomBar.vue (Bar total & tombol Pembayaran khusus mobile saat cart > 0)
 │
 └── 14 Modal Dialog (Lazy Loaded via defineAsyncComponent + watcher { immediate: true }):
-    ├── PaymentModal.vue (Prewarmed: Tunai, QRIS uang pas, & Utang/Bon + dropdown loyalitas O(N))
+    ├── PaymentModal.vue (Prewarmed: Tunai, QRIS uang pas/sebagian, & Utang/Bon + guard Umum saat kurang bayar + dropdown loyalitas O(N))
     ├── LazyInventoryModal.vue (Prewarmed: Input kilat barcode baru + tambah kategori inline)
     ├── ReceiptModal.vue (Prewarmed: Pratinjau struk thermal 58mm/80mm, Cetak Bluetooth/USB/Serial ESC/POS + Iframe Browser, Token PLN/SN & Kirim WA)
     ├── CameraScannerModal.vue (Lazy + vendor-zxing: Hybrid BarcodeDetector & ZXing + Switch Kamera/Flash/Zoom)

@@ -18,9 +18,9 @@
 - **Kulakan / Belanja Stok & Manajemen Stok Lunak:** Mencatat nota kulakan multi-item (`RestockModal.vue`) untuk otomatis memperbarui harga beli/modal, opsi update harga jual, serta menambah stok produk (opsional/lunak: barang stok `0` tetap bebas dibeli tanpa memblokir kasa), lengkap dengan pilihan sumber dana **Tunai Laci**, **QRIS/Rek**, atau **Dana Luar**.
 - **Pembayaran & Multi Harga Cerdas (Ecer / Grosir / Agen):**
   - **Multi Harga Fleksibel:** Harga Ecer wajib sebagai default; tiap barang opsional memiliki **Harga Grosir**, **Min. Qty Grosir** (otomatis turun harga saat jumlah beli tercapai), dan **Harga Agen**. Kasir dapat berpindah tier untuk seluruh nota di `CartSection`, memilih pelanggan berlevel `Grosir`/`Agen`, atau mengetuk harga barang untuk ubah/simpan harga manual secara langsung.
-  - **Tunai:** Pelanggan default **"Umum"**, nominal cepat & pembulatan ke atas otomatis, hitung kembalian real-time, serta daftar pelanggan diurutkan berdasarkan loyalitas ($O(N)$ `buildCustomerStatsMap`).
-  - **QRIS:** Pembayaran non-tunai uang pas otomatis (`QRS-...`) terpisah bersih dari uang tunai laci.
-  - **Utang / Bon:** Cari atau daftarkan pelanggan baru secara cepat (akun `"Umum"` otomatis diblokir agar tidak mencatat piutang), catat cicilan atau pelunasan Tunai/QRIS dengan kembalian presisi, dan kirim pengingat tagihan via WhatsApp.
+  - **Tunai:** Pelanggan default **"Umum"**, nominal cepat & pembulatan ke atas otomatis, hitung kembalian real-time, serta dukungan **bayar kurang / sebagian** (`0 < bayar < total`) yang otomatis memasukkan kekurangannya ke Buku Utang pelanggan non-Umum.
+  - **QRIS:** Pembayaran non-tunai uang pas otomatis (`QRS-...`) atau **bayar sebagian QRIS** (`QRIS (SEBAGIAN BON)`) dengan pemisahan uang laci & rekening.
+  - **Utang / Bon:** Cari atau daftarkan pelanggan baru secara cepat (akun `"Umum"` otomatis diblokir agar tidak mencatat piutang maupun bayar kurang), catat cicilan atau pelunasan Tunai/QRIS dengan kembalian presisi, dan kirim pengingat tagihan via WhatsApp.
 - **Sistem Buka & Tutup Shift (Tutup Buku Harian):** 1 shift mewakili 1 hari operasional toko dengan jam buka/tutup fleksibel (termasuk lewat tengah malam), auto-isi modal awal terakhir, adopsi transaksi hari itu yang belum masuk shift, hitung uang fisik laci vs sistem (`Modal Awal + Tunai Masuk - Kas Keluar Laci`) beserta selisih kas, riwayat tutup shift, dan kirim laporan tutup buku ke WhatsApp.
 - **Catatan Kas Keluar / Pengeluaran Harian:** Catat pengeluaran operasional (`Operasional`, `Makan & Transport`, `Lainnya`), `Kulakan Stok`, maupun `Tarik / Setor Owner` (`prive` — mengurangi saldo laci tanpa membuat estimasi laba jualan terlihat rugi) dari laci tunai atau sumber non-tunai.
 - **Layanan Tarik Tunai & Transfer / Top-Up (`CashServiceModal.vue`):** Mencatat layanan tarik tunai (QRIS/transfer masuk, uang fisik keluar dari laci) maupun transfer/top-up (tunai masuk laci, saldo dikirim) dengan perhitungan biaya admin **Cara A** (`Total Dibayar = Pokok + Admin`), penjagaan ketat agar tarik tunai tidak melebihi sisa tunai di laci, cetak struk bukti thermal/WA, serta rekonsiliasi otomatis ke Shift & Untung Jasa Admin.
@@ -56,10 +56,10 @@ kasiryy/
 │   ├── utils/              # customerStats.js, dailyStats.js, expenseConstants.js, pricing.js, productUsage.js, thermalPrinter.js, excelExport.js, sound.js
 │   ├── App.vue             # Orkestrator Kasa, prewarm jalur checkout, auto-print, & state global
 │   └── style.css           # Tailwind CSS v4, Bento container queries & content-visibility
-├── tests/                  # 10 suite test Vitest (51 skenario: DB, migrasi v1->v7, pricing, printer BT/USB/Serial, tarik/transfer, pulsa/PLN, usage, sync, stats, Excel, UI)
+├── tests/                  # 10 suite test Vitest (55 skenario: DB, migrasi v1->v7, pricing, printer BT/USB/Serial, tarik/transfer, pulsa/PLN, bayar kurang bon, usage, sync, stats, Excel, UI)
 ├── CHANGELOG.md            # Riwayat rilis SemVer (Keep a Changelog)
 ├── DESIGN_SYSTEM.md        # Panduan visual & token warna/komponen
-├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.17.0)
+├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.18.0)
 ├── SITEMAP.md              # Alur interaksi & arsitektur komponen
 └── vite.config.js          # Rolldown vendor splitting & PWA Workbox configuration
 ```

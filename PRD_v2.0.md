@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry POS
 
-**Versi Dokumen:** 2.17 (QRIS, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, Layanan Tarik Tunai & Transfer, Pulsa & Token PLN, 300 Katalog Bersih & Printer Thermal Bluetooth/USB/Serial)  
+**Versi Dokumen:** 2.18 (QRIS, Bayar Sebagian Bon, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, Layanan Tarik Tunai & Transfer, Pulsa & Token PLN, 300 Katalog Bersih & Printer Thermal)  
 **Status:** Production-Ready & Terverifikasi Build/Unit-Integration Test  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
 **Identitas Toko Bawaan:** Warung Kasiry (Generik siap pakai — profil disesuaikan pemilik warung di Pengaturan)  
@@ -16,6 +16,7 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
+| **v2.18.0** | 27 November 2026 | **Backlog Fase 2 #3 (Bayar Kurang / Sebagian Otomatis Masuk Buku Utang):** Dukungan pembayaran kurang (`0 < bayar < total`) pada mode Tunai & QRIS di `PaymentModal.vue`, blokir akun `"Umum"` di UI & `recordTransaction()`, pencatatan `paidAmount` & `debtAmount` (`TUNAI/QRIS (SEBAGIAN BON)`), pemisahan laci/QRIS vs `todayNewDebt` di `dailyStats.js`, struk ESC/POS & WA, `DebtBookModal`, Excel, & Google Sheets. |
 | **v2.17.0** | 27 November 2026 | **Backlog Fase 2 #2 (Penjualan Pulsa, Paket Data, Token PLN & Reorganisasi TopBar):** Modal `DigitalProductModal.vue` (`Pulsa`, `Paket Data`, `Token PLN`, preset harga diingat via `localStorage`, input No. HP/ID PLN & Token SN 20 digit + edit ulang, bayar Tunai/QRIS/Utang dg rollback), skema Dexie `v7` `digitalProducts`, cetak nota & WA Token PLN, reorganisasi TopBar dropdown `Layanan ▾`, Google Sync, & Excel 9 sheet (`Pulsa & Token Listrik`). |
 | **v2.16.0** | 27 November 2026 | **Backlog Fase 2 #1 (Layanan Tarik Tunai & Transfer / Top-Up):** Modal `CashServiceModal.vue` (`Tarik Tunai` keluar laci vs `Transfer / Top-Up` masuk laci dg skema biaya admin Cara A + guard saldo laci ketat), skema Dexie `v6` `cashServices`, cetak struk `ReceiptModal.vue` & ESC/POS, tombol `Tarik & Tf` di `TopBar.vue`, rekonsiliasi Shift/Laporan/WA, Excel 8 sheet (`Tarik Tunai & Transfer`), JSON Backup/Arsip, & Google Sync. |
 | **v2.15.3–v2.15.5** | 27 November 2026 | **Custom Domain, OAuth Non-Sensitive & Grid Terlaris 24 Produk:** Migrasi `https://kasiry.awanbeo.my.id`, penghapusan scope sensitif (`drive.file` saja), perluasan `frequentProducts` desktop ke 24 item beranking pemakaian, serta perbaikan UI/verifikasi Google Auth Platform. |
@@ -97,8 +98,8 @@ flowchart TD
 - Pemindaian atau pencarian barcode yang belum terdaftar membuka `LazyInventoryModal.vue` dengan barcode terisi otomatis.
 - Kasir dapat memilih kategori atau membuat **kategori baru secara inline** tanpa keluar modal, mengisi harga jual & estimasi modal (default 80%), lalu barang langsung masuk katalog IndexedDB sekaligus keranjang belanja.
 
-### 4.3 Pembayaran Tunai, Utang/Bon & Manajemen Pelanggan
-- **Tunai:** Pelanggan default **"Umum"** (dapat diganti via dropdown pencarian yang otomatis diurutkan berdasarkan frekuensi belanja $O(N)$ lewat `buildCustomerStatsMap`), nominal uang pas, saran pembulatan, dan pecahan rupiah standar.
+### 4.3 Pembayaran Tunai, QRIS, Bayar Kurang Masuk Bon & Manajemen Pelanggan
+- **Tunai & QRIS (Penuh maupun Bayar Sebagian):** Pelanggan default **"Umum"** untuk bayar penuh. Saat pembayaran kurang dari tagihan (`0 < bayar < total`), sisa kekurangan otomatis masuk Buku Utang (`TUNAI (SEBAGIAN BON)` / `QRIS (SEBAGIAN BON)`) dan sistem otomatis mewajibkan pelanggan non-`"Umum"`; laci kas / QRIS hanya bertambah sebesar `paidAmount`, sedangkan `todayNewDebt` bertambah sebesar `debtAmount`.
 - **Utang / Bon:** Akun `"Umum"` otomatis diblokir baik di UI (`PaymentModal.vue`) maupun di lapisan database (`useKasiryDB.js`) agar utang selalu terikat ke pelanggan nyata. Pencarian nama atau daftar pelanggan baru berlangsung instan tanpa formulir panjang.
 - **Manajemen Pelanggan (`CustomerManagementModal.vue`) & Buku Utang (`DebtBookModal.vue`):** Dilengkapi riwayat belanja penuh per pelanggan lewat query indeks on-demand (`getCustomerTransactions`), cicilan utang dengan pembatasan nominal lunas vs uang kembalian (`Math.min(amount, currentDebt)`), serta tombol pengingat WhatsApp sopan.
 

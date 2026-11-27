@@ -156,7 +156,7 @@ const customerDebtTransactions = computed(() => {
   return source
     .filter(t => 
       (t.customerId === selectedCustomer.value.id || t.customerName === selectedCustomer.value.name) &&
-      t.paymentMethod === 'UTANG / BON'
+      (t.paymentMethod === 'UTANG / BON' || Number(t.debtAmount || 0) > 0 || String(t.paymentMethod || '').includes('SEBAGIAN BON'))
     )
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 })
@@ -715,7 +715,12 @@ const shareWhatsAppReminder = (c) => {
               class="p-2 bg-white rounded-xl border border-slate-200/60 text-xs"
             >
               <div class="flex items-center justify-between font-semibold text-[#0a193d] mb-1">
-                <span>{{ tx.invoiceNumber }}</span>
+                <span>
+                  {{ tx.invoiceNumber }}
+                  <span v-if="Number(tx.debtAmount || 0) > 0 && Number(tx.paidAmount || 0) > 0" class="text-[10px] text-amber-700 font-bold ml-1">
+                    (Bon Rp {{ tx.debtAmount.toLocaleString('id-ID') }})
+                  </span>
+                </span>
                 <span class="font-mono">Rp {{ tx.totalAmount.toLocaleString('id-ID') }}</span>
               </div>
               <ul class="text-[11px] text-slate-500 space-y-0.5 pl-1">

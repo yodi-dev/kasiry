@@ -77,14 +77,16 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     })
     expect(kasiry.totalTransactionCount.value).toBe(1)
 
-    // Guard UTANG atas nama Umum tidak membuat utang
-    await kasiry.recordTransaction({
-      invoiceNumber: 'BON-BAD',
-      totalAmount: 10000,
-      paymentMethod: 'UTANG / BON',
-      customer: { id: 1, name: 'Umum' },
-      items: [{ ...prod, qty: 1 }]
-    })
+    // Guard UTANG atas nama Umum diblokir dan tidak membuat utang
+    await expect(
+      kasiry.recordTransaction({
+        invoiceNumber: 'BON-BAD',
+        totalAmount: 10000,
+        paymentMethod: 'UTANG / BON',
+        customer: { id: 1, name: 'Umum' },
+        items: [{ ...prod, qty: 1 }]
+      })
+    ).rejects.toThrow(/Umum/)
     const umum = kasiry.customers.value.find(c => c.name === 'Umum')
     expect(umum.totalDebt).toBe(0)
 
@@ -689,5 +691,43 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(delOk).toBe(true)
     const andiAfterDelete = kasiry.customers.value.find(c => c.name === 'Mas Andi')
     expect(andiAfterDelete.totalDebt).toBe(0)
+  })
+
+  it('splits partial Tunai/QRIS checkout into paid cash/QRIS and unpaid Buku Utang debt while blocking Umum', async () => {
+    const prod = kasiry.products.value[0]
+    await kasiry.saveProduct({ ...prod, sellPrice: 25000, buyPrice: 20000 })
+
+    // 1. Blokir bayar kurang menggunakan akun Umum
+    await expect(
+      kasiry.recordTransaction({
+        invoiceNumber: 'KSR-PART-FAIL',
+        totalAmount: 50000,
+        paymentMethod: 'TUNAI (SEBAGIAN BON)',
+        paidAmount: 30000,
+        debtAmount: 20000,
+        cashGiven: 30000,
+        customer: { id: 1, name: 'Umum' },
+        items: [{ ...prod, sellPrice: 25000, buyPrice: 20000, qty: 2 }]
+      })
+    ).rejects.toThrow(/Umum/)
+
+    // 2. Belanja 50.000 bayar Tunai 30.000 atas nama pelanggan -> sisa 20.000 otomatis masuk totalDebt
+    await kasiry.recordTransaction({
+      invoiceNumber: 'KSR-PART-OK',
+      totalAmount: 50000,
+      paymentMethod: 'TUNAI (SEBAGIAN BON)',
+      paidAmount: 30000,
+      debtAmount: 20000,
+      cashGiven: 30000,
+      changeAmount: 0,
+      customer: { name: 'Bu Siti' },
+      items: [{ ...prod, sellPrice: 25000, buyPrice: 20000, qty: 2 }]
+    })
+
+    const siti = kasiry.customers.value.find(c => c.name === 'Bu Siti')
+    expect(siti.totalDebt).toBe(20000)
+    expect(kasiry.transactions.value[0].paymentMethod).toBe('TUNAI (SEBAGIAN BON)')
+    expect(kasiry.transactions.value[0].paidAmount).toBe(30000)
+    expect(kasiry.transactions.value[0].debtAmount).toBe(20000)
   })
 })

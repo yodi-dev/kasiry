@@ -1104,18 +1104,58 @@ export function useKasiryDB() {
     return updatedShift
   }
 
-  // Pencatatan Transaksi Baru (update state inkremental agar checkout selalu instan <5ms)
-  const recordTransaction = async ({ invoiceNumber, totalAmount, paymentMethod, cashGiven, changeAmount, customer, items }) => {
+  // Pencatatan Transaksi Baru (update state inkremental agar checkout selalu instan <5ms; mendukung bayar kurang masuk Buku Utang)
+  const recordTransaction = async ({
+    invoiceNumber,
+    totalAmount,
+    paymentMethod,
+    cashGiven,
+    paidAmount,
+    debtAmount,
+    changeAmount,
+    customer,
+    items
+  }) => {
     const now = Date.now()
     const currentShift = activeShift.value
+    const cleanTotal = Math.round(Number(totalAmount || 0))
+    const rawExplicitDebt = Math.max(0, Math.round(Number(debtAmount || 0)))
+    const isFullDebt = paymentMethod === 'UTANG / BON'
+    const isPartialCash = paymentMethod === 'TUNAI (SEBAGIAN BON)' || (paymentMethod === 'TUNAI' && rawExplicitDebt > 0)
+    const isPartialQris = paymentMethod === 'QRIS (SEBAGIAN BON)' || (paymentMethod === 'QRIS' && rawExplicitDebt > 0)
+
+    const resolvedPaid = isFullDebt
+      ? 0
+      : (isPartialCash || isPartialQris)
+        ? Math.max(0, Math.min(cleanTotal, Math.round(Number(paidAmount ?? cashGiven ?? 0))))
+        : cleanTotal
+    const resolvedDebt = isFullDebt
+      ? cleanTotal
+      : (isPartialCash || isPartialQris)
+        ? (rawExplicitDebt > 0 ? rawExplicitDebt : Math.max(0, cleanTotal - resolvedPaid))
+        : 0
+
+    const isCustomerUmum = !customer || !customer.name || customer.name.trim().toLowerCase() === 'umum'
+    if (resolvedDebt > 0 && isCustomerUmum) {
+      throw new Error('Transaksi kurang bayar atau bon tidak boleh menggunakan pelanggan "Umum". Pilih pelanggan terlebih dahulu.')
+    }
+
+    const resolvedPaymentMethod = isPartialCash
+      ? 'TUNAI (SEBAGIAN BON)'
+      : isPartialQris
+        ? 'QRIS (SEBAGIAN BON)'
+        : paymentMethod
+
     const txRecord = toPlain({
       id: generateUniqueId(),
       invoiceNumber,
       createdAt: now,
-      totalAmount,
-      paymentMethod,
-      cashGiven: cashGiven || totalAmount,
-      changeAmount: changeAmount || 0,
+      totalAmount: cleanTotal,
+      paymentMethod: resolvedPaymentMethod,
+      paidAmount: resolvedPaid,
+      debtAmount: resolvedDebt,
+      cashGiven: isFullDebt ? 0 : (cashGiven ?? resolvedPaid),
+      changeAmount: resolvedDebt > 0 ? 0 : (changeAmount || 0),
       customerId: customer ? customer.id : null,
       customerName: customer ? customer.name : null,
       shiftId: currentShift?.id || null,
@@ -1134,23 +1174,21 @@ export function useKasiryDB() {
       updatedAt: now
     })
 
-    // 1. Simpan transaksi, akumulasi utang pelanggan (bila Bon), & kurangi stok lunak (bila dilacak) secara atomik
+    // 1. Simpan transaksi, akumulasi utang pelanggan (penuh maupun sebagian), & kurangi stok lunak secara atomik
     let txId = null
     let customerMutated = false
     let productMutated = false
 
     await db.transaction('rw', [db.transactions, db.customers, db.products], async () => {
-      txId = await db.transactions.add(txRecord)
-
-      // 2. Jika Metode Utang, akumulasikan saldo utang pelanggan (kecuali akun sistem "Umum")
-      if (paymentMethod === 'UTANG / BON' && customer && customer.name?.trim().toLowerCase() !== 'umum') {
+      // 2. Jika ada sisa utang (penuh atau bayar kurang), akumulasikan saldo utang pelanggan (kecuali akun sistem "Umum")
+      if (resolvedDebt > 0 && !isCustomerUmum) {
         let cust = customer.id ? await db.customers.get(customer.id) : null
         if (!cust && customer.name) {
           const cleanName = customer.name.trim().toLowerCase()
           cust = await db.customers.filter(c => !c.deleted && c.name?.toLowerCase() === cleanName).first()
         }
         if (cust) {
-          cust.totalDebt = (cust.totalDebt || 0) + totalAmount
+          cust.totalDebt = (cust.totalDebt || 0) + resolvedDebt
           cust.lastDate = 'Hari ini'
           cust.updatedAt = now
           await db.customers.put(toPlain(cust))
@@ -1159,15 +1197,19 @@ export function useKasiryDB() {
             id: customer.id || generateUniqueId(),
             name: customer.name,
             phone: customer.phone || '',
-            totalDebt: totalAmount,
+            totalDebt: resolvedDebt,
             lastDate: 'Hari ini',
             updatedAt: now,
             deleted: false
           })
           await db.customers.add(cust)
         }
+        txRecord.customerId = cust.id
+        txRecord.customerName = cust.name
         customerMutated = true
       }
+
+      txId = await db.transactions.add(txRecord)
 
       // 3. Kurangi stok secara lunak hanya untuk barang yang melacak stok (stock != null; 0 tetap boleh dibeli)
       const qtyByProductId = new Map()

@@ -165,6 +165,17 @@ export function buildReceiptEscPosBytes(receiptData, storeProfile = {}, options 
     pushLine(formatTwoColumnLine('Kembali', formatRp(receiptData.changeAmount), cols))
   } else if (receiptData.paymentMethod === 'QRIS') {
     pushLine(formatTwoColumnLine('Status', 'LUNAS (QRIS)', cols))
+  } else if (
+    receiptData.paymentMethod === 'TUNAI (SEBAGIAN BON)' ||
+    receiptData.paymentMethod === 'QRIS (SEBAGIAN BON)' ||
+    Number(receiptData.debtAmount || 0) > 0
+  ) {
+    const isQrisPart = String(receiptData.paymentMethod || '').startsWith('QRIS')
+    const paidAmt = receiptData.paidAmount ?? receiptData.cashGiven ?? 0
+    const debtAmt = receiptData.debtAmount ?? Math.max(0, Number(receiptData.totalAmount || 0) - Number(paidAmt || 0))
+    pushLine(formatTwoColumnLine(isQrisPart ? 'Bayar QRIS' : 'Bayar Tunai', formatRp(paidAmt), cols))
+    pushLine(formatTwoColumnLine('Masuk Bon', formatRp(debtAmt), cols))
+    pushLine(formatTwoColumnLine('Status', 'SEBAGIAN BON', cols))
   } else if (receiptData.paymentMethod === 'TARIK TUNAI' || receiptData.serviceMeta?.type === 'TARIK_TUNAI') {
     const svcAmt = receiptData.serviceMeta?.amount ?? receiptData.cashGiven ?? receiptData.totalAmount
     pushLine(formatTwoColumnLine('Via QRIS/Tf', formatRp(receiptData.totalAmount), cols))
@@ -355,6 +366,18 @@ export function buildReceiptPrintHtml(receiptData, storeProfile = {}, options = 
   } else if (receiptData.paymentMethod === 'QRIS') {
     paymentDetailsHtml = `
       <div class="row"><span>Status</span><span class="bold">LUNAS (QRIS)</span></div>`
+  } else if (
+    receiptData.paymentMethod === 'TUNAI (SEBAGIAN BON)' ||
+    receiptData.paymentMethod === 'QRIS (SEBAGIAN BON)' ||
+    Number(receiptData.debtAmount || 0) > 0
+  ) {
+    const isQrisPart = String(receiptData.paymentMethod || '').startsWith('QRIS')
+    const paidAmt = receiptData.paidAmount ?? receiptData.cashGiven ?? 0
+    const debtAmt = receiptData.debtAmount ?? Math.max(0, Number(receiptData.totalAmount || 0) - Number(paidAmt || 0))
+    paymentDetailsHtml = `
+      <div class="row"><span>${isQrisPart ? 'Dibayar QRIS' : 'Dibayar Tunai'}</span><span>${escapeHtml(formatRp(paidAmt))}</span></div>
+      <div class="row bold"><span>Masuk Buku Utang</span><span>${escapeHtml(formatRp(debtAmt))}</span></div>
+      <div class="row"><span>Status</span><span class="bold">BAYAR SEBAGIAN (BON)</span></div>`
   } else if (receiptData.paymentMethod === 'TARIK TUNAI' || receiptData.serviceMeta?.type === 'TARIK_TUNAI') {
     const svcAmt = receiptData.serviceMeta?.amount ?? receiptData.cashGiven ?? receiptData.totalAmount
     paymentDetailsHtml = `

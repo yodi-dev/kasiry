@@ -71,11 +71,16 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     expect(wrapper.text()).toContain('Umum')
     expect(wrapper.text()).toContain('Uang Kembalian:')
 
-    // Ketik nominal kurang -> KPI berubah ke Uang Masih Kurang; ketik lebih -> Uang Kembalian akurat
+    // Ketik 0 -> KPI berubah ke Uang Masih Kurang; ketik kurang (>0) -> Masuk Buku Utang; ketik lebih -> Uang Kembalian
     const cashInput = wrapper.find('input[placeholder="0"]')
-    await cashInput.setValue('20000')
+    await cashInput.setValue('0')
     await nextTick()
     expect(wrapper.text()).toContain('Uang Masih Kurang:')
+    expect(wrapper.text()).toContain('Rp 29.000')
+
+    await cashInput.setValue('20000')
+    await nextTick()
+    expect(wrapper.text()).toContain('Masuk Buku Utang:')
     expect(wrapper.text()).toContain('Rp 9.000')
 
     await cashInput.setValue('50000')
@@ -1068,5 +1073,65 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     })
     expect(digitalReceipt.text()).toContain('541200889911')
     expect(digitalReceipt.text()).toContain('1234 5678 9012 3456 7890')
+  })
+
+  it('allows partial Tunai/QRIS payment into Buku Utang when non-Umum customer is selected, and shows shortfall in ReceiptModal', async () => {
+    const payModal = mount(PaymentModal, {
+      props: {
+        isOpen: true,
+        totalAmount: 50000,
+        savedCustomers: sampleCustomers,
+        transactions: sampleTransactions
+      }
+    })
+
+    // Masukkan nominal kurang (30.000 < 50.000) saat pelanggan masih "Umum" -> tombol disabled & peringatan tampil
+    const cashInput = payModal.find('input[placeholder="0"]')
+    await cashInput.setValue('30000')
+    await nextTick()
+    expect(payModal.text()).toContain('Masuk Buku Utang:')
+    expect(payModal.text()).toContain('Rp 20.000')
+    expect(payModal.text()).toContain('selain "Umum"')
+    const submitBtn = payModal.findAll('button').find(b => b.text().includes('Bayar Sebagian & Catat Bon'))
+    expect(submitBtn.attributes('disabled')).toBeDefined()
+
+    // Pilih pelanggan "Bu Tejo" -> tombol langsung aktif dan emit paidAmount 30000 + debtAmount 20000
+    await payModal.find('div[title="Sentuh untuk ganti pelanggan"]').trigger('click')
+    await nextTick()
+    await payModal.findAll('button').find(b => b.text().includes('Bu Tejo')).trigger('click')
+    await nextTick()
+    expect(submitBtn.attributes('disabled')).toBeUndefined()
+
+    await submitBtn.trigger('click')
+    expect(payModal.emitted('processCashPayment')?.[0]?.[0]).toMatchObject({
+      totalAmount: 50000,
+      cashGiven: 30000,
+      paidAmount: 30000,
+      debtAmount: 20000,
+      changeAmount: 0,
+      customer: expect.objectContaining({ id: 2, name: 'Bu Tejo' })
+    })
+
+    // ReceiptModal menampilkan rincian Dibayar + Masuk Buku Utang
+    const partReceipt = mount(ReceiptModal, {
+      props: {
+        isOpen: true,
+        storeProfile: { name: 'Warung Kasiry', phone: '' },
+        receiptData: {
+          invoiceNumber: 'KSR-PART-1',
+          time: '19:40',
+          paymentMethod: 'TUNAI (SEBAGIAN BON)',
+          totalAmount: 50000,
+          paidAmount: 30000,
+          debtAmount: 20000,
+          cashGiven: 30000,
+          changeAmount: 0,
+          customer: { id: 2, name: 'Bu Tejo' },
+          items: [{ id: 1, name: 'Beras 5kg', qty: 1, sellPrice: 50000 }]
+        }
+      }
+    })
+    expect(partReceipt.text()).toContain('MASUK BUKU UTANG')
+    expect(partReceipt.text()).toContain('BAYAR SEBAGIAN (BON)')
   })
 })
