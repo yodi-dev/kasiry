@@ -6,6 +6,17 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.15.2] - 2026-11-27 (Konsistensi Branding Kasiry by Awanbeo, Tautan Portofolio & Auto-Refresh SW)
+
+### Changed
+- **Konsistensi Branding `Kasiry by Awanbeo` & SEO Portofolio (`index.html`, `src/App.vue`, `src/components/ReceiptModal.vue`, `src/components/DailyReportModal.vue`, `src/utils/dailyStats.js`, `src/utils/thermalPrinter.js`):**
+  - Menghilangkan sisa label `'TES CETAK KASIRY POS'` menjadi `'TES CETAK KASIRY'` serta menyatukan footer **`Kasiry by Awanbeo`** ke pesan WhatsApp nota (`shareToWhatsApp`), rekap harian/tutup shift WA, dan footer desktop (`https://awanbeo.my.id`).
+  - Memperbarui `<title>`, meta `author`, JSON-LD Schema (`Kasiry by Awanbeo` -> `https://awanbeo.my.id`) pada `index.html`.
+- **Auto-Refresh Service Worker PWA (`src/main.js`):**
+  - Menambahkan listener `controllerchange` pada `navigator.serviceWorker` (hanya saat sebelumnya sudah ada SW aktif) agar tab/PWA pengguna tidak terjebak di cache versi lama setelah deploy baru.
+
+---
+
 ## [2.15.1] - 2026-11-27 (Branding Keterangan Bawah Struk: Kasiry by Awanbeo)
 
 ### Changed

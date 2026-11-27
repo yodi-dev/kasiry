@@ -1194,7 +1194,17 @@ onUnmounted(() => {
       <!-- Bar Info Workstation & Tautan Kepatuhan (Khusus Desktop agar Mobile & Tablet Bebas Gangguan) -->
       <footer class="hidden lg:flex shrink-0 pt-2.5 items-center justify-between gap-3 text-[11px] text-slate-500">
         <div class="flex items-center gap-3">
-          <span><strong class="font-semibold text-[#0a193d]/80">Kasiry</strong> — Kasir Warung &amp; Buku Utang</span>
+          <span>
+            <strong class="font-semibold text-[#0a193d]/80">Kasiry</strong>
+            by
+            <a
+              href="https://awanbeo.my.id"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="font-semibold text-[#0284c7] hover:underline"
+            >Awanbeo</a>
+            — Kasir Warung &amp; Buku Utang
+          </span>
           <span aria-hidden="true" class="text-slate-300">•</span>
           <span class="text-slate-400">Pintasan: <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">/</kbd> Cari • <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">F2</kbd> Bayar</span>
         </div>

@@ -103,7 +103,7 @@ describe('ESC/POS Thermal Printer Formatter & Encoder', () => {
   it('builds test print bytes/HTML and splits payloads into BLE MTU chunks', () => {
     const testBytes = buildTestPrintEscPosBytes({ name: 'Warung Tes' }, { paperWidth: '80mm', footerText: 'Mantap!' })
     const decoded = decodeAscii(testBytes)
-    expect(decoded).toContain('TES CETAK KASIRY POS')
+    expect(decoded).toContain('TES CETAK KASIRY')
     expect(decoded).toContain('WARUNG TES')
     expect(decoded).toContain('80mm (48 kol)')
     expect(decoded).toContain('Mantap!')
@@ -112,7 +112,7 @@ describe('ESC/POS Thermal Printer Formatter & Encoder', () => {
 
     const testHtml = buildTestPrintHtml({ name: 'Warung Tes' }, { paperWidth: '80mm', footerText: 'Mantap!' })
     expect(testHtml).toContain('size: 80mm auto;')
-    expect(testHtml).toContain('TES CETAK KASIRY POS')
+    expect(testHtml).toContain('TES CETAK KASIRY')
     expect(testHtml).toContain('80mm (48 kol)')
     expect(testHtml).toContain('Kasiry by Awanbeo')
 

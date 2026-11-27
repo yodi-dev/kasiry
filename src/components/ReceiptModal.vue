@@ -92,7 +92,8 @@ const shareToWhatsApp = () => {
     `*TOTAL: Rp ${r.totalAmount.toLocaleString('id-ID')}*\n` +
     bayarText + `\n` +
     `--------------------------------\n` +
-    cleanFooter
+    cleanFooter + `\n` +
+    RECEIPT_BRAND_FOOTER
 
   const encoded = encodeURIComponent(text)
   const phone = prompt('Nomor WhatsApp Pembeli (Boleh kosong untuk pilih kontak di WA):', '')

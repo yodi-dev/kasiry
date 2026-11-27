@@ -186,7 +186,7 @@ export function buildTestPrintEscPosBytes(storeProfile = {}, options = {}) {
   pushBytes(CMD_INIT)
   pushBytes(CMD_ALIGN_CENTER)
   pushBytes(CMD_BOLD_ON)
-  pushLine('TES CETAK KASIRY POS')
+  pushLine('TES CETAK KASIRY')
   pushBytes(CMD_BOLD_OFF)
   pushLine(storeName)
   pushLine(dash)
@@ -377,7 +377,7 @@ export function buildTestPrintHtml(storeProfile = {}, options = {}) {
 
   const bodyHtml = `
     <div class="center">
-      <p class="store-title upper">TES CETAK KASIRY POS</p>
+      <p class="store-title upper">TES CETAK KASIRY</p>
       <p class="muted bold upper">${escapeHtml(storeName)}</p>
     </div>
     <hr class="divider" />
@@ -391,7 +391,7 @@ export function buildTestPrintHtml(storeProfile = {}, options = {}) {
     </div>`
 
   return wrapStandaloneThermalDocument({
-    title: 'Tes Cetak Kasiry POS',
+    title: 'Tes Cetak Kasiry by Awanbeo',
     widthMm,
     bodyHtml
   })

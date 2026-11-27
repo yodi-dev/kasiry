@@ -221,7 +221,7 @@ const generateWhatsAppText = () => {
     text += `(Belum ada data barang terjual hari ini)\n`
   }
   text += `--------------------------------\n`
-  text += `Dicatat otomatis via Kasiry POS.`
+  text += `Dicatat otomatis via Kasiry by Awanbeo.`
   return text
 }
 

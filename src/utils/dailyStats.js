@@ -281,6 +281,6 @@ export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
     text += `📝 Catatan: ${shift.closingNote}\n`
   }
   text += `--------------------------------\n`
-  text += `Dicatat otomatis via Kasiry POS.`
+  text += `Dicatat otomatis via Kasiry by Awanbeo.`
   return text
 }
