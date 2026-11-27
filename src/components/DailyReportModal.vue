@@ -13,7 +13,8 @@ import {
   Wallet,
   Plus,
   Trash2,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Zap
 } from '@lucide/vue'
 import { getExpenseCategoryMeta, getExpenseSourceMeta } from '../utils/expenseConstants'
 import { recordBelongsToShift, formatShiftWhatsAppText } from '../utils/dailyStats'
@@ -69,7 +70,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'downloadExcel', 'openExpense', 'openCashService', 'deleteExpense', 'openShift'])
+const emit = defineEmits(['close', 'downloadExcel', 'openExpense', 'openCashService', 'openDigitalProduct', 'deleteExpense', 'openShift'])
 
 // Active Tab: 'summary' | 'expenses' | 'history'
 const activeTab = ref('summary')
@@ -178,6 +179,8 @@ const generateWhatsAppText = () => {
   const cashServiceIn = props.stats.todayCashServiceIn || 0
   const cashServiceOut = props.stats.todayCashServiceOut || 0
   const cashServiceAdminProfit = props.stats.todayCashServiceAdminProfit || 0
+  const digitalSales = props.stats.todayDigitalSales || 0
+  const digitalProfit = props.stats.todayDigitalProfit || 0
   const priveTotal = props.stats.todayPriveTotal || 0
 
   let text = `*📊 LAPORAN KASIR ${props.storeName.toUpperCase()}*\n`
@@ -196,6 +199,9 @@ const generateWhatsAppText = () => {
   }
   if ((props.stats.todayDebtPaid || 0) > 0) {
     text += `   • Termasuk Pelunasan Bon: Rp ${props.stats.todayDebtPaid.toLocaleString('id-ID')}\n`
+  }
+  if (digitalSales > 0) {
+    text += `⚡ *Pulsa & Token PLN:* Rp ${digitalSales.toLocaleString('id-ID')} (Laba +Rp ${digitalProfit.toLocaleString('id-ID')})\n`
   }
   if (cashServiceIn > 0 || cashServiceOut > 0) {
     text += `🏧 *Layanan Tarik Tunai & Transfer:*\n`
@@ -394,12 +400,12 @@ const confirmDeleteExpense = (id) => {
             <div class="min-w-0 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-2xs">
               <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Total Kas Masuk</span>
               <p class="text-xl sm:text-2xl font-bold font-mono text-[#0a193d] mt-1 leading-tight break-words">
-                Rp {{ ((stats.todaySales || 0) + (stats.todayDebtPaid || 0)).toLocaleString('id-ID') }}
+                Rp {{ ((stats.todaySales || 0) + (stats.todayDebtPaid || 0) + (stats.todayDigitalSalesCash || 0) + (stats.todayDigitalSalesQris || 0)).toLocaleString('id-ID') }}
               </p>
               <p class="text-[11px] text-slate-500 font-medium mt-1 leading-snug break-words">
                 <template v-if="(stats.todayExpensesCash || 0) > 0 || (stats.todayCashServiceIn || 0) > 0 || (stats.todayCashServiceOut || 0) > 0">
                   Sisa Laci: Rp {{ netCashDrawer.toLocaleString('id-ID') }}
-                  (Jual/Bon Rp {{ grossCashDrawer.toLocaleString('id-ID') }})
+                  (Masuk Rp {{ grossCashDrawer.toLocaleString('id-ID') }})
                 </template>
                 <template v-else>
                   Laci Tunai: Rp {{ grossCashDrawer.toLocaleString('id-ID') }}
@@ -416,8 +422,9 @@ const confirmDeleteExpense = (id) => {
                 Rp {{ (stats.todayProfit || 0).toLocaleString('id-ID') }}
               </p>
               <p class="text-[11px] text-slate-500 font-medium mt-1 leading-snug">
-                <template v-if="(stats.todayOperationalExpenses || 0) > 0 || (stats.todayCashServiceAdminProfit || 0) > 0">
+                <template v-if="(stats.todayOperationalExpenses || 0) > 0 || (stats.todayCashServiceAdminProfit || 0) > 0 || (stats.todayDigitalProfit || 0) > 0">
                   Laba jual Rp {{ (stats.todayGrossProfit || 0).toLocaleString('id-ID') }}
+                  <span v-if="(stats.todayDigitalProfit || 0) > 0"> + Pulsa/PLN Rp {{ stats.todayDigitalProfit.toLocaleString('id-ID') }}</span>
                   <span v-if="(stats.todayCashServiceAdminProfit || 0) > 0"> + Admin Rp {{ stats.todayCashServiceAdminProfit.toLocaleString('id-ID') }}</span>
                   <span v-if="(stats.todayOperationalExpenses || 0) > 0"> - Biaya Rp {{ stats.todayOperationalExpenses.toLocaleString('id-ID') }}</span>
                 </template>
@@ -504,6 +511,36 @@ const confirmDeleteExpense = (id) => {
             >
               <Plus class="w-3.5 h-3.5 text-sky-400" />
               <span>Catat Layanan</span>
+            </button>
+          </div>
+
+          <!-- Strip Ringkas Penjualan Pulsa, Paket Data & Token PLN -->
+          <div class="p-3.5 rounded-2xl bg-emerald-50/65 border border-emerald-200/80 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <Zap class="w-4 h-4 text-emerald-700 shrink-0" />
+                <span class="text-xs font-bold text-[#0a193d]">
+                  Pulsa &amp; Token PLN ({{ stats.todayDigitalCount || 0 }}x)
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                <template v-if="(stats.todayDigitalCount || 0) > 0">
+                  Omzet: Rp {{ (stats.todayDigitalSales || 0).toLocaleString('id-ID') }}
+                  • Modal Agen: Rp {{ (stats.todayDigitalCost || 0).toLocaleString('id-ID') }}
+                  • Laba: <strong class="text-emerald-700">+Rp {{ (stats.todayDigitalProfit || 0).toLocaleString('id-ID') }}</strong>
+                </template>
+                <template v-else>
+                  Catat pulsa, paket data &amp; token listrik agar omzet konter &amp; bon masuk rekap.
+                </template>
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="emit('openDigitalProduct')"
+              class="h-9 px-3 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95 shadow-2xs"
+            >
+              <Plus class="w-3.5 h-3.5 text-emerald-400" />
+              <span>Jual Pulsa/PLN</span>
             </button>
           </div>
 

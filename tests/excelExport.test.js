@@ -142,6 +142,25 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
           note: 'QRIS lancar',
           deleted: false
         }
+      ],
+      digitalProducts: [
+        {
+          id: 41,
+          digitalNumber: 'PLN-401',
+          createdAt: Date.now(),
+          category: 'TOKEN_LISTRIK',
+          productName: 'Token PLN 50.000',
+          provider: 'PLN',
+          targetNumber: '541200889911',
+          tokenCode: '1234 5678 9012 3456 7890',
+          costPrice: 50500,
+          sellPrice: 52500,
+          profit: 2000,
+          paymentMethod: 'TUNAI',
+          customerName: 'Bu Sari',
+          shiftCode: 'SHF-901',
+          deleted: false
+        }
       ]
     })
 
@@ -158,7 +177,8 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
       'Pengeluaran Kas',
       'Riwayat Shift',
       'Riwayat Kulakan',
-      'Tarik Tunai & Transfer'
+      'Tarik Tunai & Transfer',
+      'Pulsa & Token Listrik'
     ])
 
     const summaryRows = XLSX.utils.sheet_to_json(workbook.Sheets['Ringkasan Kas'], { header: 1 })
@@ -208,5 +228,12 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(cashServiceRows[0]['Nominal Pokok (Rp)']).toBe(50000)
     expect(cashServiceRows[0]['Biaya Admin (Rp)']).toBe(5000)
     expect(cashServiceRows[0]['Total Dibayar (Rp)']).toBe(55000)
+
+    const digitalRows = XLSX.utils.sheet_to_json(workbook.Sheets['Pulsa & Token Listrik'])
+    expect(digitalRows).toHaveLength(1)
+    expect(digitalRows[0]['No. Nota']).toBe('PLN-401')
+    expect(digitalRows[0]['No. HP / ID PLN']).toBe('541200889911')
+    expect(digitalRows[0]['No. Token / SN']).toBe('1234 5678 9012 3456 7890')
+    expect(digitalRows[0]['Laba (Rp)']).toBe(2000)
   })
 })

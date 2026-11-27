@@ -24,6 +24,7 @@ export async function exportKasiryExcel({
   expenses = [],
   restocks = [],
   cashServices = [],
+  digitalProducts = [],
   shifts = []
 }) {
   const XLSX = await import('xlsx')
@@ -49,6 +50,9 @@ export async function exportKasiryExcel({
   const cashServiceIn = stats.todayCashServiceIn ?? 0
   const cashServiceOut = stats.todayCashServiceOut ?? 0
   const cashServiceAdminProfit = stats.todayCashServiceAdminProfit ?? 0
+  const digitalSales = stats.todayDigitalSales ?? 0
+  const digitalCost = stats.todayDigitalCost ?? 0
+  const digitalProfit = stats.todayDigitalProfit ?? 0
   const netCashDrawer = stats.todayNetCashDrawer ?? (cashDrawerTotal - expensesCash + cashServiceIn - cashServiceOut)
 
   const summaryData = [
@@ -64,6 +68,9 @@ export async function exportKasiryExcel({
     ['Penjualan QRIS (Non-Tunai)', qrisSales],
     ['Pelunasan Utang - Tunai', debtPaidCash],
     ['Pelunasan Utang - QRIS', debtPaidQris],
+    ['Penjualan Pulsa & Token PLN (Omzet)', digitalSales],
+    ['Modal Saldo Agen Pulsa & Token', digitalCost],
+    ['Laba Pulsa & Token PLN', digitalProfit],
     ['Transfer / Top-Up Masuk Laci (Pokok + Admin)', cashServiceIn],
     ['Tarik Tunai Keluar Dari Laci (Pokok)', cashServiceOut],
     ['Jasa Admin Tarik Tunai & Transfer', cashServiceAdminProfit],
@@ -453,6 +460,73 @@ export async function exportKasiryExcel({
     { wch: 28 }
   ]
   XLSX.utils.book_append_sheet(wb, wsCashService, 'Tarik Tunai & Transfer')
+
+  // ==========================================
+  // SHEET 9: PULSA, PAKET DATA & TOKEN LISTRIK
+  // ==========================================
+  const digitalHeader = [
+    'No',
+    'No. Nota',
+    'Tanggal & Jam',
+    'Kategori',
+    'Produk',
+    'Provider / Operator',
+    'No. HP / ID PLN',
+    'No. Token / SN',
+    'Modal Agen (Rp)',
+    'Harga Jual (Rp)',
+    'Laba (Rp)',
+    'Metode Bayar',
+    'Pelanggan',
+    'Kode Shift',
+    'Catatan'
+  ]
+  const activeDigitals = (digitalProducts || []).filter(d => d && !d.deleted)
+  const digitalRows = activeDigitals.map((d, idx) => {
+    const catLabel = d.category === 'TOKEN_LISTRIK'
+      ? 'Token Listrik PLN'
+      : d.category === 'PAKET_DATA'
+        ? 'Paket Data'
+        : d.category === 'TAGIHAN'
+          ? 'Tagihan PPOB'
+          : 'Pulsa'
+    return [
+      idx + 1,
+      d.digitalNumber || `#${d.id || ''}`,
+      formatShiftDate(d.createdAt),
+      catLabel,
+      d.productName || catLabel,
+      d.provider || '-',
+      d.targetNumber || '-',
+      d.tokenCode || '-',
+      Number(d.costPrice || 0),
+      Number(d.sellPrice || 0),
+      Number(d.profit ?? (Number(d.sellPrice || 0) - Number(d.costPrice || 0))),
+      d.paymentMethod || 'TUNAI',
+      d.customerName || 'Umum',
+      d.shiftCode || '-',
+      d.note || '-'
+    ]
+  })
+  const wsDigital = XLSX.utils.aoa_to_sheet([digitalHeader, ...digitalRows])
+  wsDigital['!cols'] = [
+    { wch: 6 },
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 24 },
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 24 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 24 }
+  ]
+  XLSX.utils.book_append_sheet(wb, wsDigital, 'Pulsa & Token Listrik')
 
   // Eksekusi download file .xlsx
   const fileDate = new Date().toISOString().slice(0, 10)

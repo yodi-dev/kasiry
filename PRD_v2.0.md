@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry POS
 
-**Versi Dokumen:** 2.16 (QRIS, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, Layanan Tarik Tunai & Transfer, 300 Katalog Bersih & Printer Thermal Bluetooth/USB/Serial)  
+**Versi Dokumen:** 2.17 (QRIS, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, Layanan Tarik Tunai & Transfer, Pulsa & Token PLN, 300 Katalog Bersih & Printer Thermal Bluetooth/USB/Serial)  
 **Status:** Production-Ready & Terverifikasi Build/Unit-Integration Test  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
 **Identitas Toko Bawaan:** Warung Kasiry (Generik siap pakai — profil disesuaikan pemilik warung di Pengaturan)  
@@ -16,6 +16,7 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
+| **v2.17.0** | 27 November 2026 | **Backlog Fase 2 #2 (Penjualan Pulsa, Paket Data, Token PLN & Reorganisasi TopBar):** Modal `DigitalProductModal.vue` (`Pulsa`, `Paket Data`, `Token PLN`, preset harga diingat via `localStorage`, input No. HP/ID PLN & Token SN 20 digit + edit ulang, bayar Tunai/QRIS/Utang dg rollback), skema Dexie `v7` `digitalProducts`, cetak nota & WA Token PLN, reorganisasi TopBar dropdown `Layanan ▾`, Google Sync, & Excel 9 sheet (`Pulsa & Token Listrik`). |
 | **v2.16.0** | 27 November 2026 | **Backlog Fase 2 #1 (Layanan Tarik Tunai & Transfer / Top-Up):** Modal `CashServiceModal.vue` (`Tarik Tunai` keluar laci vs `Transfer / Top-Up` masuk laci dg skema biaya admin Cara A + guard saldo laci ketat), skema Dexie `v6` `cashServices`, cetak struk `ReceiptModal.vue` & ESC/POS, tombol `Tarik & Tf` di `TopBar.vue`, rekonsiliasi Shift/Laporan/WA, Excel 8 sheet (`Tarik Tunai & Transfer`), JSON Backup/Arsip, & Google Sync. |
 | **v2.15.3–v2.15.5** | 27 November 2026 | **Custom Domain, OAuth Non-Sensitive & Grid Terlaris 24 Produk:** Migrasi `https://kasiry.awanbeo.my.id`, penghapusan scope sensitif (`drive.file` saja), perluasan `frequentProducts` desktop ke 24 item beranking pemakaian, serta perbaikan UI/verifikasi Google Auth Platform. |
 | **v2.15.1–v2.15.2** | 27 November 2026 | **Branding `Kasiry by Awanbeo`, Tautan Portofolio & PWA Auto-Reload:** Penyeragaman footer **`Kasiry by Awanbeo`** + tautan `https://awanbeo.my.id` di struk fisik/HTML/preview, WhatsApp nota/laporan/shift, footer desktop, & SEO `index.html`, serta reload otomatis saat Service Worker memperbarui cache lama (`src/main.js`). |
@@ -118,7 +119,7 @@ flowchart TD
 
 ---
 
-## 5. Model Data Lokal (Dexie.js `KasiryDB` v6)
+## 5. Model Data Lokal (Dexie.js `KasiryDB` v7)
 
 ```javascript
 // src/db/index.js — KasiryDatabase
@@ -155,8 +156,13 @@ db.version(5).stores({
 db.version(6).stores({
   cashServices: '++id, serviceNumber, createdAt, type, cashSource, shiftId, updatedAt, deleted'
 })
+
+// Migrasi v7: penjualan pulsa, paket data & token listrik PLN
+db.version(7).stores({
+  digitalProducts: '++id, digitalNumber, createdAt, category, paymentMethod, customerId, shiftId, updatedAt, deleted'
+})
 ```
-*Catatan `settings` keys:* `storeProfile`, `categories`, `archiveState` (`{ cutoffAt }`), `lastOpeningCash`. Format backup JSON eksternal mempertahankan `version: '2.4'` (kompatibel lintas versi dengan node opsional `expenses`, `restocks`, `cashServices`, & `shifts`).
+*Catatan `settings` keys:* `storeProfile`, `categories`, `archiveState` (`{ cutoffAt }`), `lastOpeningCash`. Format backup JSON eksternal mempertahankan `version: '2.4'` (kompatibel lintas versi dengan node opsional `expenses`, `restocks`, `cashServices`, `digitalProducts`, & `shifts`).
 
 ---
 

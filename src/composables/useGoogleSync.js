@@ -622,6 +622,46 @@ export function useGoogleSync() {
     }, storeName)
   }
 
+  // Catat Penjualan Pulsa, Paket Data, & Token Listrik ke Google Sheets melalui pipeline antrean yang sama
+  const appendDigitalProductToSheet = async ({
+    digitalNumber,
+    createdAt = Date.now(),
+    category = 'PULSA',
+    productName = '',
+    provider = '',
+    targetNumber = '',
+    tokenCode = '',
+    costPrice = 0,
+    sellPrice = 0,
+    paymentMethod = 'TUNAI',
+    customerName = '',
+    note = ''
+  } = {}, storeName = 'Toko') => {
+    const cleanSell = Math.round(Number(sellPrice || 0))
+    const cleanCost = Math.max(0, Math.round(Number(costPrice || 0)))
+    const profit = cleanSell - cleanCost
+    const methodSuffix = paymentMethod === 'QRIS' ? 'QRIS' : paymentMethod === 'UTANG / BON' ? 'UTANG' : 'TUNAI'
+    const catLabel = category === 'TOKEN_LISTRIK' ? 'TOKEN PLN' : category === 'PAKET_DATA' ? 'PAKET DATA' : category === 'TAGIHAN' ? 'PPOB' : 'PULSA'
+    const parts = [
+      `${productName || catLabel} (${provider || 'Umum'})`,
+      targetNumber ? `No: ${targetNumber}` : '',
+      tokenCode ? `Token/SN: ${tokenCode}` : '',
+      `Modal Rp ${cleanCost.toLocaleString('id-ID')} • Laba +Rp ${profit.toLocaleString('id-ID')}`,
+      note || ''
+    ].filter(Boolean)
+
+    return appendTransactionToSheet({
+      invoiceNumber: digitalNumber || `PLS-${String(createdAt).slice(-6)}`,
+      createdAt,
+      paymentMethod: `${catLabel} (${methodSuffix})`,
+      customerName: customerName || 'Pelanggan Umum',
+      totalAmount: cleanSell,
+      cashGiven: paymentMethod === 'UTANG / BON' ? 0 : cleanSell,
+      changeAmount: profit,
+      itemsText: parts.join(' • ')
+    }, storeName)
+  }
+
   // ==============================================================
   // ENGINE TWO-WAY SYNC MULTI-DEVICE (Berdasarkan Timestamp updatedAt)
   // ==============================================================
@@ -811,6 +851,24 @@ export function useGoogleSync() {
       const mergedCashServices = Array.from(cashServiceMap.values())
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 
+      // 10. Merge Penjualan Pulsa, Paket Data, & Token Listrik PLN (LWW per updatedAt & hormati cutoff arsip)
+      const digitalMap = new Map()
+      ;(lData.digitalProducts || []).forEach(dig => {
+        if (archiveCutoff > 0 && toTimestamp(dig.createdAt) < archiveCutoff) return
+        const key = dig.digitalNumber || dig.id
+        digitalMap.set(key, dig)
+      })
+      ;(rData.digitalProducts || []).forEach(rd => {
+        if (archiveCutoff > 0 && toTimestamp(rd.createdAt) < archiveCutoff) return
+        const key = rd.digitalNumber || rd.id
+        const ld = digitalMap.get(key)
+        if (!ld || (rd.updatedAt || 0) > (ld.updatedAt || 0)) {
+          digitalMap.set(key, rd)
+        }
+      })
+      const mergedDigitalProducts = Array.from(digitalMap.values())
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+
       const mergedPayload = {
         app: 'Kasiry POS',
         version: '2.4',
@@ -824,6 +882,7 @@ export function useGoogleSync() {
           expenses: mergedExpenses,
           restocks: mergedRestocks,
           cashServices: mergedCashServices,
+          digitalProducts: mergedDigitalProducts,
           shifts: mergedShifts,
           settings: mergedSettings
         }
@@ -937,6 +996,7 @@ export function useGoogleSync() {
     appendExpenseToSheet,
     appendRestockToSheet,
     appendCashServiceToSheet,
+    appendDigitalProductToSheet,
     appendShiftEventToSheet,
     ensureSpreadsheet
   }

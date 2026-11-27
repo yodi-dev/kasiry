@@ -17,6 +17,7 @@ import LazyInventoryModal from '../src/components/LazyInventoryModal.vue'
 import ProductManagementModal from '../src/components/ProductManagementModal.vue'
 import SettingsModal from '../src/components/SettingsModal.vue'
 import CashServiceModal from '../src/components/CashServiceModal.vue'
+import DigitalProductModal from '../src/components/DigitalProductModal.vue'
 
 const sampleCustomers = [
   { id: 1, name: 'Umum', phone: '', totalDebt: 0, updatedAt: 1000 },
@@ -306,15 +307,21 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await manageBarangBtn.trigger('click')
     expect(topBar.emitted('openProductManage')).toHaveLength(1)
 
-    // Tombol Kas Keluar 1-klik tetap berada di bar utama TopBar
-    const kasKeluarBtn = topBar.find('button[title="Kas Keluar"]')
-    await kasKeluarBtn.trigger('click')
+    // Dropdown Layanan Konter & Kas di TopBar membuka Pulsa/PLN, Tarik Tunai, & Kas Keluar
+    const layananDropdownBtn = topBar.find('button[title="Layanan Konter, Tarik Tunai & Kas Keluar"]')
+    await layananDropdownBtn.trigger('click')
+    await nextTick()
+    expect(topBar.text()).toContain('Pulsa & Token PLN')
+    expect(topBar.text()).toContain('Tarik Tunai & Transfer')
+    const kasKeluarItem = topBar.findAll('button[role="menuitem"]').find(b => b.text().includes('Kas Keluar'))
+    await kasKeluarItem.trigger('click')
     expect(topBar.emitted('openExpense')).toHaveLength(1)
 
     // Mobile drawer menampilkan grup rapi tanpa dropdown
     await topBar.find('button[aria-label="Buka Menu"]').trigger('click')
     await nextTick()
-    expect(topBar.text()).toContain('Keuangan & Kasir')
+    expect(topBar.text()).toContain('Layanan Konter & Kas')
+    expect(topBar.text()).toContain('Keuangan & Laporan')
     expect(topBar.text()).toContain('Stok & Pelanggan')
 
     // ExpenseModal: submit kas keluar baru + tampilkan daftar + konfirmasi hapus 2-tap
@@ -873,9 +880,12 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
         todayCashServiceCount: 3
       }
     })
-    const navBtn = topBar.findAll('button').find(b => b.text().includes('Tarik'))
+    const navBtn = topBar.find('button[title="Layanan Konter, Tarik Tunai & Kas Keluar"]')
     expect(navBtn).toBeTruthy()
     await navBtn.trigger('click')
+    await nextTick()
+    const cashSvcItem = topBar.findAll('button[role="menuitem"]').find(b => b.text().includes('Tarik Tunai & Transfer'))
+    await cashSvcItem.trigger('click')
     expect(topBar.emitted('openCashService')).toBeTruthy()
 
     const modal = mount(CashServiceModal, {
@@ -954,5 +964,109 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     })
     expect(serviceReceipt.text()).toContain('SELESAI (TARIK TUNAI)')
     expect(serviceReceipt.text()).not.toContain('DICATAT DI BUKU UTANG')
+  })
+
+  it('handles DigitalProductModal PLN Token SN, remembered preset pricing, Utang customer guard, and ReceiptModal display', async () => {
+    localStorage.removeItem('kasiry_digital_presets_v1')
+
+    const topBar = mount(TopBar, {
+      props: {
+        storeName: 'Warung Kasiry',
+        todayDigitalCount: 2
+      }
+    })
+    await topBar.find('button[title="Layanan Konter, Tarik Tunai & Kas Keluar"]').trigger('click')
+    await nextTick()
+    await topBar.findAll('button[role="menuitem"]').find(b => b.text().includes('Pulsa & Token PLN')).trigger('click')
+    expect(topBar.emitted('openDigitalProduct')).toBeTruthy()
+
+    const modal = mount(DigitalProductModal, {
+      props: {
+        isOpen: true,
+        digitalProducts: [],
+        customers: sampleCustomers,
+        stats: {
+          todayDigitalSales: 52500,
+          todayDigitalProfit: 2000
+        }
+      }
+    })
+
+    // Pindah ke kategori Token PLN, isi No. Meter + 20 digit Token Listrik
+    await modal.findAll('button').find(b => b.text().includes('Token PLN')).trigger('click')
+    await nextTick()
+    await modal.findAll('button').find(b => b.text().trim() === '50rb').trigger('click')
+    await nextTick()
+
+    const targetInput = modal.find('input[placeholder*="541200889911"]')
+    const tokenInput = modal.find('input[placeholder*="20 digit token"]')
+    await targetInput.setValue('541200889911')
+    await tokenInput.setValue('1234 5678 9012 3456 7890')
+
+    // Ubah harga jual preset 50rb dari 52500 ke 53000 agar diingat otomatis
+    const sellInput = modal.find('input[placeholder="12000"]')
+    await sellInput.setValue('53000')
+    await nextTick()
+    expect(modal.text()).toContain('+Rp 2.500')
+
+    await modal.find('form').trigger('submit')
+    expect(modal.emitted('recordDigitalProduct')?.[0]?.[0]).toMatchObject({
+      category: 'TOKEN_LISTRIK',
+      targetNumber: '541200889911',
+      tokenCode: '1234 5678 9012 3456 7890',
+      sellPrice: 53000,
+      paymentMethod: 'TUNAI',
+      costSource: 'SALDO_AGEN'
+    })
+
+    // Verifikasi preset 50rb tersimpan di localStorage dan tampil saat mount ulang
+    const modalAgain = mount(DigitalProductModal, {
+      props: { isOpen: true, customers: sampleCustomers }
+    })
+    await modalAgain.findAll('button').find(b => b.text().includes('Token PLN')).trigger('click')
+    await nextTick()
+    await modalAgain.findAll('button').find(b => b.text().trim() === '50rb').trigger('click')
+    await nextTick()
+    expect(modalAgain.find('input[placeholder="12000"]').element.value).toBe('53000')
+
+    // Uji metode Utang / Bon memblokir Umum hingga pelanggan dipilih
+    await modalAgain.findAll('button').find(b => b.text().includes('Utang / Bon')).trigger('click')
+    await nextTick()
+    const submitBtn = modalAgain.findAll('button').find(b => b.text().includes('Simpan Transaksi'))
+    expect(submitBtn.attributes('disabled')).toBeDefined()
+
+    await modalAgain.findAll('button').find(b => b.text().trim() === 'Bu Tejo').trigger('click')
+    await nextTick()
+    expect(submitBtn.attributes('disabled')).toBeUndefined()
+    await modalAgain.find('form').trigger('submit')
+    expect(modalAgain.emitted('recordDigitalProduct')?.[0]?.[0]).toMatchObject({
+      paymentMethod: 'UTANG / BON',
+      customer: expect.objectContaining({ id: 2, name: 'Bu Tejo' })
+    })
+
+    // ReceiptModal menampilkan Token / SN PLN & No. Meter secara jelas
+    const digitalReceipt = mount(ReceiptModal, {
+      props: {
+        isOpen: true,
+        storeProfile: { name: 'Warung Kasiry', phone: '' },
+        receiptData: {
+          invoiceNumber: 'PLN-8801',
+          time: '19:05',
+          paymentMethod: 'TUNAI',
+          totalAmount: 53000,
+          cashGiven: 53000,
+          changeAmount: 0,
+          digitalMeta: {
+            category: 'TOKEN_LISTRIK',
+            provider: 'PLN',
+            targetNumber: '541200889911',
+            tokenCode: '1234 5678 9012 3456 7890'
+          },
+          items: [{ id: 1, name: 'Token PLN 50.000', qty: 1, sellPrice: 53000 }]
+        }
+      }
+    })
+    expect(digitalReceipt.text()).toContain('541200889911')
+    expect(digitalReceipt.text()).toContain('1234 5678 9012 3456 7890')
   })
 })

@@ -83,6 +83,7 @@ const DebtBookModal = lazyModal(() => import('./components/DebtBookModal.vue'))
 const DailyReportModal = lazyModal(() => import('./components/DailyReportModal.vue'))
 const ExpenseModal = lazyModal(() => import('./components/ExpenseModal.vue'))
 const CashServiceModal = lazyModal(() => import('./components/CashServiceModal.vue'))
+const DigitalProductModal = lazyModal(() => import('./components/DigitalProductModal.vue'))
 const RestockModal = lazyModal(() => import('./components/RestockModal.vue'))
 const ShiftModal = lazyModal(() => import('./components/ShiftModal.vue'))
 const SettingsModal = lazyModal(() => import('./components/SettingsModal.vue'))
@@ -132,6 +133,7 @@ const {
   expenses,
   restocks,
   cashServices,
+  digitalProducts,
   shifts,
   activeShift,
   isActiveShiftStale,
@@ -159,6 +161,9 @@ const {
   deleteRestock,
   recordCashService,
   deleteCashService,
+  recordDigitalProduct,
+  updateDigitalTokenCode,
+  deleteDigitalProduct,
   openShift,
   closeShift,
   recordTransaction,
@@ -197,6 +202,7 @@ const {
   appendExpenseToSheet,
   appendRestockToSheet,
   appendCashServiceToSheet,
+  appendDigitalProductToSheet,
   appendShiftEventToSheet,
   ensureSpreadsheet
 } = useGoogleSync()
@@ -243,6 +249,7 @@ const isDebtBookOpen = ref(false)
 const isDailyReportOpen = ref(false)
 const isExpenseOpen = ref(false)
 const isCashServiceOpen = ref(false)
+const isDigitalProductOpen = ref(false)
 const isRestockOpen = ref(false)
 const isShiftOpen = ref(false)
 const isShiftAutoPrompt = ref(false)
@@ -264,6 +271,7 @@ const isAnyModalOpen = computed(() => {
     isDailyReportOpen.value ||
     isExpenseOpen.value ||
     isCashServiceOpen.value ||
+    isDigitalProductOpen.value ||
     isRestockOpen.value ||
     isShiftOpen.value ||
     isSettingsOpen.value ||
@@ -284,7 +292,8 @@ const unpaidDebtCount = computed(() => {
 const stats = computed(() =>
   computeDailyStats(transactions.value, debtPayments.value, expenses.value, {
     activeShift: activeShift.value,
-    cashServices: cashServices.value
+    cashServices: cashServices.value,
+    digitalProducts: digitalProducts.value
   })
 )
 
@@ -781,6 +790,87 @@ const handleOpenCashServiceReceipt = (svc) => {
   isReceiptOpen.value = true
 }
 
+const buildDigitalReceiptData = (rec) => {
+  const sellPrice = Math.round(Number(rec.sellPrice || 0))
+  const matchedCustomer = rec.customerId
+    ? customers.value.find(c => c.id === rec.customerId)
+    : null
+  const itemName = rec.provider && !String(rec.productName || '').toLowerCase().includes(String(rec.provider).toLowerCase())
+    ? `${rec.productName} (${rec.provider})`
+    : (rec.productName || 'Produk Digital')
+
+  return {
+    invoiceNumber: rec.digitalNumber || '-',
+    time: rec.createdAt
+      ? new Date(rec.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      : new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+    paymentMethod: rec.paymentMethod || 'TUNAI',
+    totalAmount: sellPrice,
+    cashGiven: rec.paymentMethod === 'UTANG / BON' ? 0 : sellPrice,
+    changeAmount: 0,
+    customer: rec.customerName && rec.customerName !== 'Umum'
+      ? { id: rec.customerId, name: rec.customerName, phone: matchedCustomer?.phone || '' }
+      : { id: 1, name: 'Umum', phone: '' },
+    digitalMeta: {
+      category: rec.category,
+      provider: rec.provider,
+      targetNumber: rec.targetNumber || '',
+      tokenCode: rec.tokenCode || '',
+      nominal: rec.nominal || 0
+    },
+    items: [
+      {
+        id: rec.id,
+        name: itemName,
+        qty: 1,
+        sellPrice
+      }
+    ]
+  }
+}
+
+// Record, Update Token/SN, & Hapus Penjualan Pulsa/Token (IndexedDB + Sheets + Nota + Cloud)
+const handleRecordDigitalProduct = async (payload) => {
+  try {
+    const saved = await recordDigitalProduct(payload)
+    if (saved) {
+      playBeepSound('success')
+      appendDigitalProductToSheet(saved, storeProfile.value?.name)
+      triggerCloudAutoBackup(true)
+      if (payload?.openReceipt) {
+        receiptData.value = buildDigitalReceiptData(saved)
+        isDigitalProductOpen.value = false
+        isReceiptOpen.value = true
+      }
+    }
+  } catch (err) {
+    playBeepSound('warning')
+    alert(err.message)
+  }
+}
+
+const handleUpdateDigitalTokenCode = async ({ id, tokenCode }) => {
+  const updated = await updateDigitalTokenCode(id, tokenCode)
+  if (updated) {
+    playBeepSound('success')
+    triggerCloudAutoBackup(true)
+  }
+}
+
+const handleDeleteDigitalProduct = async (digitalId) => {
+  const ok = await deleteDigitalProduct(digitalId)
+  if (ok) {
+    triggerCloudAutoBackup(true)
+  }
+}
+
+const handleOpenDigitalReceipt = (rec) => {
+  if (!rec) return
+  receiptData.value = buildDigitalReceiptData(rec)
+  isDigitalProductOpen.value = false
+  isReceiptOpen.value = true
+}
+
 // Buka & Tutup Shift Kasir
 const openShiftModalManual = () => {
   completedShiftSummary.value = null
@@ -952,6 +1042,7 @@ const handleDownloadExcel = async () => {
       expenses: allExpenses,
       restocks: allRestocks,
       cashServices: allCashServices,
+      digitalProducts: allDigitalProducts,
       shifts: allShifts
     } = await getAllTransactionsForExport()
     await exportKasiryExcel({
@@ -963,6 +1054,7 @@ const handleDownloadExcel = async () => {
       expenses: allExpenses,
       restocks: allRestocks,
       cashServices: allCashServices,
+      digitalProducts: allDigitalProducts,
       shifts: allShifts
     })
     playBeepSound('success')
@@ -1085,6 +1177,7 @@ const modalFlagKeys = [
   'dailyReport',
   'expense',
   'cashService',
+  'digitalProduct',
   'restock',
   'shift',
   'settings',
@@ -1100,6 +1193,7 @@ const activatedModals = reactive({
   dailyReport: false,
   expense: false,
   cashService: false,
+  digitalProduct: false,
   restock: false,
   shift: false,
   settings: false,
@@ -1117,6 +1211,7 @@ watch(
     isDailyReportOpen,
     isExpenseOpen,
     isCashServiceOpen,
+    isDigitalProductOpen,
     isRestockOpen,
     isShiftOpen,
     isSettingsOpen,
@@ -1222,6 +1317,7 @@ onUnmounted(() => {
       :todayTxCount="stats.transactionCount"
       :todayExpenseCount="stats.todayExpenseCount"
       :todayCashServiceCount="stats.todayCashServiceCount"
+      :todayDigitalCount="stats.todayDigitalCount"
       :activeShift="activeShift"
       :isActiveShiftStale="isActiveShiftStale"
       :isGoogleConnected="isGoogleConnected"
@@ -1230,6 +1326,7 @@ onUnmounted(() => {
       @openDailyReport="isDailyReportOpen = true"
       @openExpense="isExpenseOpen = true"
       @openCashService="isCashServiceOpen = true"
+      @openDigitalProduct="isDigitalProductOpen = true"
       @openRestock="isRestockOpen = true"
       @openShift="openShiftModalManual"
       @openSettings="isSettingsOpen = true"
@@ -1421,6 +1518,7 @@ onUnmounted(() => {
       @downloadExcel="handleDownloadExcel"
       @openExpense="isDailyReportOpen = false; isExpenseOpen = true"
       @openCashService="isDailyReportOpen = false; isCashServiceOpen = true"
+      @openDigitalProduct="isDailyReportOpen = false; isDigitalProductOpen = true"
       @openShift="isDailyReportOpen = false; openShiftModalManual()"
       @deleteExpense="handleDeleteExpense"
     />
@@ -1450,6 +1548,21 @@ onUnmounted(() => {
       @openReceipt="handleOpenCashServiceReceipt"
     />
 
+    <!-- Modal Penjualan Pulsa, Paket Data & Token Listrik PLN -->
+    <DigitalProductModal
+      v-if="activatedModals.digitalProduct || isDigitalProductOpen"
+      :isOpen="isDigitalProductOpen"
+      :digitalProducts="digitalProducts"
+      :customers="customers"
+      :activeShift="activeShift"
+      :stats="stats"
+      @close="isDigitalProductOpen = false"
+      @recordDigitalProduct="handleRecordDigitalProduct"
+      @updateTokenCode="handleUpdateDigitalTokenCode"
+      @deleteDigitalProduct="handleDeleteDigitalProduct"
+      @openReceipt="handleOpenDigitalReceipt"
+    />
+
     <!-- Modal Kulakan / Belanja Stok & Manajemen Stok Lunak -->
     <RestockModal
       v-if="activatedModals.restock || isRestockOpen"
@@ -1477,6 +1590,7 @@ onUnmounted(() => {
       :debtPayments="debtPayments"
       :expenses="expenses"
       :cashServices="cashServices"
+      :digitalProducts="digitalProducts"
       :storeName="storeProfile.name"
       :isAutoPrompt="isShiftAutoPrompt"
       @close="isShiftOpen = false; completedShiftSummary = null"

@@ -136,6 +136,23 @@ export function buildReceiptEscPosBytes(receiptData, storeProfile = {}, options 
     const subRight = formatRp((Number(item.sellPrice || 0)) * (Number(item.qty || 1)))
     pushLine(formatTwoColumnLine(qtyLeft, subRight, cols))
   }
+
+  if (receiptData.digitalMeta) {
+    if (receiptData.digitalMeta.targetNumber) {
+      pushLine(dash)
+      for (const tLine of formatWrapText(`No. Tujuan: ${receiptData.digitalMeta.targetNumber}`, cols)) {
+        pushLine(tLine)
+      }
+    }
+    if (receiptData.digitalMeta.tokenCode) {
+      pushLine('TOKEN / SN:')
+      pushBytes(CMD_BOLD_ON)
+      for (const tokLine of formatWrapText(receiptData.digitalMeta.tokenCode, cols)) {
+        pushLine(tokLine)
+      }
+      pushBytes(CMD_BOLD_OFF)
+    }
+  }
   pushLine(dash)
 
   // 4. Total, Tunai/QRIS & Kembalian
@@ -321,6 +338,15 @@ export function buildReceiptPrintHtml(receiptData, storeProfile = {}, options = 
     </div>`
   }).join('')
 
+  let digitalMetaHtml = ''
+  if (receiptData.digitalMeta && (receiptData.digitalMeta.targetNumber || receiptData.digitalMeta.tokenCode)) {
+    digitalMetaHtml = `
+      <hr class="divider" />
+      ${receiptData.digitalMeta.targetNumber ? `<div class="row"><span>No. Tujuan / ID</span><span class="bold">${escapeHtml(receiptData.digitalMeta.targetNumber)}</span></div>` : ''}
+      ${receiptData.digitalMeta.tokenCode ? `<div class="item" style="margin-top:4px;"><div class="muted">TOKEN / SN:</div><div class="bold" style="font-size:12px;letter-spacing:0.06em;word-break:break-all;">${escapeHtml(receiptData.digitalMeta.tokenCode)}</div></div>` : ''}
+    `
+  }
+
   let paymentDetailsHtml = ''
   if (receiptData.paymentMethod === 'TUNAI') {
     paymentDetailsHtml = `
@@ -366,6 +392,7 @@ export function buildReceiptPrintHtml(receiptData, storeProfile = {}, options = 
     </div>
     <hr class="divider-double" />
     ${itemsHtml}
+    ${digitalMetaHtml}
     <hr class="divider" />
     <div class="row total-row">
       <span>TOTAL</span>

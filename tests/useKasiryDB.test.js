@@ -634,4 +634,60 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(deleted).toBe(true)
     expect(kasiry.cashServices.value).toHaveLength(1)
   })
+
+  it('records Pulsa & Token PLN across Tunai/QRIS/Utang (guarding Umum), updates Token SN, and rolls back debt on soft-delete', async () => {
+    // 1. Blokir Utang atas nama "Umum"
+    await expect(
+      kasiry.recordDigitalProduct({
+        category: 'PULSA',
+        productName: 'Pulsa 10.000',
+        costPrice: 10500,
+        sellPrice: 12000,
+        paymentMethod: 'UTANG / BON',
+        customer: { id: 1, name: 'Umum' }
+      })
+    ).rejects.toThrow(/selain "Umum"/)
+
+    // 2. Jual Token PLN via Tunai tanpa SN dulu, lalu update nomor token 20 digit belakangan
+    const pln = await kasiry.recordDigitalProduct({
+      category: 'TOKEN_LISTRIK',
+      productName: 'Token PLN 50.000',
+      provider: 'PLN',
+      targetNumber: '541200889911',
+      nominal: 50000,
+      costPrice: 50500,
+      sellPrice: 52500,
+      paymentMethod: 'TUNAI'
+    })
+    expect(pln.digitalNumber).toMatch(/^PLN-/)
+    expect(pln.profit).toBe(2000)
+
+    const updatedPln = await kasiry.updateDigitalTokenCode(pln.id, '1234 5678 9012 3456 7890')
+    expect(updatedPln.tokenCode).toBe('1234 5678 9012 3456 7890')
+
+    // 3. Jual Pulsa via Utang ke pelanggan baru -> saldo utang otomatis bertambah
+    const bonPulsa = await kasiry.recordDigitalProduct({
+      category: 'PULSA',
+      productName: 'Pulsa 20.000',
+      provider: 'Telkomsel',
+      targetNumber: '081234567890',
+      nominal: 20000,
+      costPrice: 20500,
+      sellPrice: 22000,
+      paymentMethod: 'UTANG / BON',
+      customer: { name: 'Mas Andi' }
+    })
+    const andiAfterSale = kasiry.customers.value.find(c => c.name === 'Mas Andi')
+    expect(andiAfterSale.totalDebt).toBe(22000)
+
+    const payload = await kasiry.getFullDatabasePayload()
+    expect(payload.data.digitalProducts).toHaveLength(2)
+    expect(kasiry.inspectBackupJSON(payload).digitalProductCount).toBe(2)
+
+    // 4. Hapus catatan Pulsa Utang -> soft-delete & saldo utang pelanggan otomatis ter-rollback ke 0
+    const delOk = await kasiry.deleteDigitalProduct(bonPulsa.id)
+    expect(delOk).toBe(true)
+    const andiAfterDelete = kasiry.customers.value.find(c => c.name === 'Mas Andi')
+    expect(andiAfterDelete.totalDebt).toBe(0)
+  })
 })

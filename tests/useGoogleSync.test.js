@@ -200,6 +200,10 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
           { id: 90, serviceNumber: 'TT-OLD', createdAt: 1500000, type: 'TARIK_TUNAI', amount: 50000, adminFee: 5000, updatedAt: 1500000 },
           { id: 91, serviceNumber: 'TF-SYNC', createdAt: 2680000, type: 'TRANSFER', amount: 100000, adminFee: 5000, channel: 'BRI', updatedAt: 9600 }
         ],
+        digitalProducts: [
+          { id: 92, digitalNumber: 'PLS-OLD', createdAt: 1500000, sellPrice: 12000, updatedAt: 1500000 },
+          { id: 93, digitalNumber: 'PLN-SYNC', createdAt: 2690000, category: 'TOKEN_LISTRIK', tokenCode: '1111 2222 3333 4444 5555', sellPrice: 52500, updatedAt: 9700 }
+        ],
         shifts: [
           { id: 80, shiftCode: 'SHF-OLD-CLOSED', status: 'CLOSED', openedAt: 1500000, updatedAt: 1500000 },
           { id: 81, shiftCode: 'SHF-SYNC', status: 'CLOSED', openedAt: 2500000, actualCash: 300000, updatedAt: 9000 }
@@ -245,6 +249,9 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
         cashServices: [
           { id: 91, serviceNumber: 'TF-SYNC', createdAt: 2680000, type: 'TRANSFER', amount: 100000, adminFee: 3000, channel: 'DANA', updatedAt: 4500 }
         ],
+        digitalProducts: [
+          { id: 93, digitalNumber: 'PLN-SYNC', createdAt: 2690000, category: 'TOKEN_LISTRIK', tokenCode: '', sellPrice: 52500, updatedAt: 4600 }
+        ],
         shifts: [
           { id: 81, shiftCode: 'SHF-SYNC', status: 'OPEN', openedAt: 2500000, updatedAt: 5000 }
         ],
@@ -280,6 +287,9 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(appliedPayload.data.cashServices).toHaveLength(1)
     expect(appliedPayload.data.cashServices[0].serviceNumber).toBe('TF-SYNC')
     expect(appliedPayload.data.cashServices[0].channel).toBe('BRI')
+    expect(appliedPayload.data.digitalProducts).toHaveLength(1)
+    expect(appliedPayload.data.digitalProducts[0].digitalNumber).toBe('PLN-SYNC')
+    expect(appliedPayload.data.digitalProducts[0].tokenCode).toBe('1111 2222 3333 4444 5555')
     expect(appliedPayload.data.shifts).toHaveLength(1)
     expect(appliedPayload.data.shifts[0].shiftCode).toBe('SHF-SYNC')
     expect(appliedPayload.data.shifts[0].status).toBe('CLOSED')

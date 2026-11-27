@@ -314,4 +314,74 @@ describe('computeDailyStats (Separation of Cash Drawer, QRIS Non-Cash, and Bon)'
     expect(waText).toContain('Tarik Tunai Dari Laci: -Rp 50.000')
     expect(waText).toContain('Jasa Admin Tarik/Transfer: +Rp 10.000')
   })
+
+  it('reconciles Pulsa & Token PLN across Tunai (adds to Laci), QRIS, and Utang/Bon without deducting Laci for agent balance cost', () => {
+    const now = Date.now()
+    const shift = { id: 9, shiftCode: 'SHF-DIG1', status: 'OPEN', openingCash: 100000, openedAt: now - 10000 }
+    const digitalProducts = [
+      {
+        id: 1,
+        digitalNumber: 'PLS-101',
+        createdAt: now,
+        shiftId: 9,
+        category: 'PULSA',
+        costPrice: 10500,
+        sellPrice: 12000,
+        paymentMethod: 'TUNAI',
+        deleted: false
+      },
+      {
+        id: 2,
+        digitalNumber: 'PLN-102',
+        createdAt: now,
+        shiftId: 9,
+        category: 'TOKEN_LISTRIK',
+        costPrice: 50500,
+        sellPrice: 52500,
+        paymentMethod: 'QRIS',
+        deleted: false
+      },
+      {
+        id: 3,
+        digitalNumber: 'PLS-103',
+        createdAt: now,
+        shiftId: 9,
+        category: 'PULSA',
+        costPrice: 5500,
+        sellPrice: 7000,
+        paymentMethod: 'UTANG / BON',
+        deleted: false
+      }
+    ]
+
+    const stats = computeDailyStats([], [], [], { activeShift: shift, nowTs: now, digitalProducts })
+    expect(stats.todayDigitalSales).toBe(71500)
+    expect(stats.todayDigitalCost).toBe(66500)
+    expect(stats.todayDigitalProfit).toBe(5000) // (1500 + 2000 + 1500)
+    expect(stats.todayDigitalSalesCash).toBe(12000)
+    expect(stats.todayCashDrawer).toBe(12000) // tidak terpotong modal agen
+    expect(stats.expectedCashDrawer).toBe(112000)
+    expect(stats.todayQrisTotal).toBe(52500)
+    expect(stats.todayNewDebt).toBe(7000)
+    expect(stats.todayProfit).toBe(5000)
+
+    const preview = computeShiftClosingPreview({
+      shift: { ...shift, closedAt: now + 5000 },
+      transactions: [],
+      debtPayments: [],
+      expenses: [],
+      digitalProducts,
+      actualCash: 112000
+    })
+    const waText = formatShiftWhatsAppText({
+      ...shift,
+      closedAt: now + 5000,
+      expectedCash: preview.expectedCash,
+      actualCash: 112000,
+      cashDifference: 0,
+      summary: preview
+    }, 'Warung Kasiry')
+    expect(waText).toContain('Pulsa & Token (Tunai): Rp 12.000')
+    expect(waText).toContain('Total Pulsa & Token: Rp 71.500 (Laba +Rp 5.000)')
+  })
 })

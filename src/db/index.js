@@ -41,6 +41,11 @@ export class KasiryDatabase extends Dexie {
       cashServices: '++id, serviceNumber, createdAt, type, cashSource, shiftId, updatedAt, deleted'
     })
 
+    // Schema Version 7: Tabel digitalProducts untuk penjualan Pulsa, Paket Data & Token Listrik PLN
+    this.version(7).stores({
+      digitalProducts: '++id, digitalNumber, createdAt, category, paymentMethod, customerId, shiftId, updatedAt, deleted'
+    })
+
     this.products = this.table('products')
     this.transactions = this.table('transactions')
     this.customers = this.table('customers')
@@ -49,6 +54,7 @@ export class KasiryDatabase extends Dexie {
     this.shifts = this.table('shifts')
     this.restocks = this.table('restocks')
     this.cashServices = this.table('cashServices')
+    this.digitalProducts = this.table('digitalProducts')
     this.settings = this.table('settings')
   }
 }

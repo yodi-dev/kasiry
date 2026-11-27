@@ -23,7 +23,8 @@ function aggregateRecords(
   periodDebtPays = [],
   periodExpenses = [],
   openingCash = 0,
-  periodCashServices = []
+  periodCashServices = [],
+  periodDigitalProducts = []
 ) {
   let cashSales = 0
   let qrisSales = 0
@@ -135,12 +136,40 @@ function aggregateRecords(
     }
   })
 
+  let todayDigitalSales = 0
+  let todayDigitalSalesCash = 0
+  let todayDigitalSalesQris = 0
+  let todayDigitalSalesDebt = 0
+  let todayDigitalCost = 0
+  let todayDigitalProfit = 0
+  let todayDigitalCount = 0
+
+  ;(periodDigitalProducts || []).forEach(dig => {
+    if (!dig || dig.deleted) return
+    const sellPrice = Math.round(Number(dig.sellPrice || 0))
+    const costPrice = Math.max(0, Math.round(Number(dig.costPrice || 0)))
+    if (!Number.isFinite(sellPrice) || sellPrice <= 0) return
+
+    todayDigitalCount += 1
+    todayDigitalSales += sellPrice
+    todayDigitalCost += costPrice
+    todayDigitalProfit += sellPrice - costPrice
+
+    if (dig.paymentMethod === 'QRIS') {
+      todayDigitalSalesQris += sellPrice
+    } else if (dig.paymentMethod === 'UTANG / BON') {
+      todayDigitalSalesDebt += sellPrice
+    } else {
+      todayDigitalSalesCash += sellPrice
+    }
+  })
+
   const topProducts = Object.values(productCountMap)
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 5)
 
-  const todayCashDrawer = cashSales + todayDebtPaidCash
-  const todayQrisTotal = qrisSales + todayDebtPaidQris
+  const todayCashDrawer = cashSales + todayDebtPaidCash + todayDigitalSalesCash
+  const todayQrisTotal = qrisSales + todayDebtPaidQris + todayDigitalSalesQris
   const todayGrossProfit = Math.round(profit)
   const cleanOpening = Math.max(0, Number(openingCash || 0))
   const todayNonCashServiceNet = todayNonCashServiceIn - todayNonCashServiceOut
@@ -174,13 +203,24 @@ function aggregateRecords(
     todayNonCashServiceNet,
     todayCashServiceAdminProfit,
     todayCashServiceCount,
+    todayDigitalSales,
+    todayDigitalSalesCash,
+    todayDigitalSalesQris,
+    todayDigitalSalesDebt,
+    todayDigitalCost,
+    todayDigitalProfit,
+    todayDigitalCount,
     todayNetCashDrawer,
     expectedCashDrawer: cleanOpening + todayNetCashDrawer,
     todayNetQris: todayQrisTotal - todayExpensesNonCash + todayNonCashServiceNet,
     todayGrossProfit,
-    todayProfit: todayGrossProfit + todayCashServiceAdminProfit - todayOperationalExpenses,
+    todayProfit:
+      todayGrossProfit +
+      todayCashServiceAdminProfit +
+      todayDigitalProfit -
+      todayOperationalExpenses,
     transactionCount: periodTx.length,
-    todayNewDebt: debt,
+    todayNewDebt: debt + todayDigitalSalesDebt,
     topProducts
   }
 }
@@ -204,6 +244,7 @@ export function computeDailyStats(
   let nowTs = Date.now()
   let activeShift = null
   let cashServices = []
+  let digitalProducts = []
 
   if (typeof expensesOrNow === 'number') {
     nowTs = expensesOrNow
@@ -213,18 +254,21 @@ export function computeDailyStats(
     nowTs = Number(maybeNowOrOptions.nowTs || Date.now())
     activeShift = maybeNowOrOptions.activeShift || null
     cashServices = Array.isArray(maybeNowOrOptions.cashServices) ? maybeNowOrOptions.cashServices : []
+    digitalProducts = Array.isArray(maybeNowOrOptions.digitalProducts) ? maybeNowOrOptions.digitalProducts : []
   }
 
   let periodTx
   let periodPays
   let periodExpenses
   let periodCashServices
+  let periodDigitalProducts
 
   if (activeShift && activeShift.status === 'OPEN') {
     periodTx = (transactions || []).filter(t => recordBelongsToShift(t, activeShift, 'createdAt'))
     periodPays = (debtPayments || []).filter(p => recordBelongsToShift(p, activeShift, 'paymentDate'))
     periodExpenses = (expenses || []).filter(e => !e?.deleted && recordBelongsToShift(e, activeShift, 'createdAt'))
     periodCashServices = cashServices.filter(s => !s?.deleted && recordBelongsToShift(s, activeShift, 'createdAt'))
+    periodDigitalProducts = digitalProducts.filter(d => !d?.deleted && recordBelongsToShift(d, activeShift, 'createdAt'))
   } else {
     const startOfDay = new Date(nowTs)
     startOfDay.setHours(0, 0, 0, 0)
@@ -234,6 +278,7 @@ export function computeDailyStats(
     periodPays = (debtPayments || []).filter(p => (p?.paymentDate || 0) >= todayTimestamp)
     periodExpenses = (expenses || []).filter(e => !e?.deleted && (e?.createdAt || 0) >= todayTimestamp)
     periodCashServices = cashServices.filter(s => !s?.deleted && (s?.createdAt || 0) >= todayTimestamp)
+    periodDigitalProducts = digitalProducts.filter(d => !d?.deleted && (d?.createdAt || 0) >= todayTimestamp)
   }
 
   const agg = aggregateRecords(
@@ -241,7 +286,8 @@ export function computeDailyStats(
     periodPays,
     periodExpenses,
     activeShift?.openingCash || 0,
-    periodCashServices
+    periodCashServices,
+    periodDigitalProducts
   )
 
   return {
@@ -263,6 +309,7 @@ export function computeShiftClosingPreview({
   debtPayments = [],
   expenses = [],
   cashServices = [],
+  digitalProducts = [],
   actualCash = 0
 } = {}) {
   if (!shift) return null
@@ -270,8 +317,16 @@ export function computeShiftClosingPreview({
   const periodPays = (debtPayments || []).filter(p => recordBelongsToShift(p, shift, 'paymentDate'))
   const periodExpenses = (expenses || []).filter(e => !e?.deleted && recordBelongsToShift(e, shift, 'createdAt'))
   const periodCashServices = (cashServices || []).filter(s => !s?.deleted && recordBelongsToShift(s, shift, 'createdAt'))
+  const periodDigitalProducts = (digitalProducts || []).filter(d => !d?.deleted && recordBelongsToShift(d, shift, 'createdAt'))
 
-  const stats = aggregateRecords(periodTx, periodPays, periodExpenses, shift.openingCash || 0, periodCashServices)
+  const stats = aggregateRecords(
+    periodTx,
+    periodPays,
+    periodExpenses,
+    shift.openingCash || 0,
+    periodCashServices,
+    periodDigitalProducts
+  )
   const cleanActualCash = Math.round(Number(actualCash || 0))
   const expectedCash = stats.expectedCashDrawer
   const cashDifference = cleanActualCash - expectedCash
@@ -310,6 +365,9 @@ export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
   const openingCash = Number(shift.openingCash || s.openingCash || 0)
   const cashSales = Number(s.todayCashSales || 0)
   const debtPaidCash = Number(s.todayDebtPaidCash || 0)
+  const digitalSalesCash = Number(s.todayDigitalSalesCash || 0)
+  const digitalSales = Number(s.todayDigitalSales || 0)
+  const digitalProfit = Number(s.todayDigitalProfit || 0)
   const cashServiceIn = Number(s.todayCashServiceIn || 0)
   const cashServiceOut = Number(s.todayCashServiceOut || 0)
   const cashServiceAdminProfit = Number(s.todayCashServiceAdminProfit || 0)
@@ -334,6 +392,9 @@ export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
   text += `--------------------------------\n`
   text += `💼 Modal Awal Laci: Rp ${openingCash.toLocaleString('id-ID')}\n`
   text += `💵 Penjualan Tunai: Rp ${cashSales.toLocaleString('id-ID')}\n`
+  if (digitalSalesCash > 0) {
+    text += `⚡ Pulsa & Token (Tunai): Rp ${digitalSalesCash.toLocaleString('id-ID')}\n`
+  }
   if (debtPaidCash > 0) {
     text += `🧾 Pelunasan Bon (Tunai): Rp ${debtPaidCash.toLocaleString('id-ID')}\n`
   }
@@ -352,6 +413,9 @@ export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
   text += `--------------------------------\n`
   if (qrisTotal > 0) {
     text += `📱 QRIS (Non-Tunai): Rp ${qrisTotal.toLocaleString('id-ID')}\n`
+  }
+  if (digitalSales > 0) {
+    text += `📲 Total Pulsa & Token: Rp ${digitalSales.toLocaleString('id-ID')} (Laba +Rp ${digitalProfit.toLocaleString('id-ID')})\n`
   }
   if (cashServiceAdminProfit > 0) {
     text += `💳 Jasa Admin Tarik/Transfer: +Rp ${cashServiceAdminProfit.toLocaleString('id-ID')}\n`

@@ -58,6 +58,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  digitalProducts: {
+    type: Array,
+    default: () => []
+  },
   storeName: {
     type: String,
     default: 'Warung Kasiry'
@@ -124,6 +128,7 @@ const closingPreview = computed(() => {
     debtPayments: props.debtPayments,
     expenses: props.expenses,
     cashServices: props.cashServices,
+    digitalProducts: props.digitalProducts,
     actualCash: hasActualCashEntered.value ? parsedActualCash.value : 0
   })
 })
@@ -367,6 +372,10 @@ const shareClosedShiftToWA = () => {
             <template v-if="(closingPreview.todayCashServiceAdminProfit || 0) > 0">
               <span>•</span>
               <span>Admin Tarik/Tf: <strong class="font-mono text-[#0284c7]">+Rp {{ closingPreview.todayCashServiceAdminProfit.toLocaleString('id-ID') }}</strong></span>
+            </template>
+            <template v-if="(closingPreview.todayDigitalProfit || 0) > 0">
+              <span>•</span>
+              <span>Laba Pulsa/PLN: <strong class="font-mono text-emerald-700">+Rp {{ closingPreview.todayDigitalProfit.toLocaleString('id-ID') }}</strong></span>
             </template>
             <span>•</span>
             <span>Untung: <strong class="font-mono text-emerald-700">Rp {{ closingPreview.todayProfit.toLocaleString('id-ID') }}</strong></span>

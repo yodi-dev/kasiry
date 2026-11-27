@@ -85,6 +85,16 @@ const shareToWhatsApp = () => {
 
   const cleanPhone = (store?.phone || '').trim()
   const cleanFooter = (printerSettings.value?.footerText || '').trim() || 'Matur nuwun atas kunjungannya!'
+  let digitalText = ''
+  if (r.digitalMeta) {
+    if (r.digitalMeta.targetNumber) {
+      digitalText += `No. Tujuan / ID: ${r.digitalMeta.targetNumber}\n`
+    }
+    if (r.digitalMeta.tokenCode) {
+      digitalText += `*TOKEN / SN:* \`${r.digitalMeta.tokenCode}\`\n`
+    }
+    digitalText += `--------------------------------\n`
+  }
   const text = `*NOTA ${store.name.toUpperCase()}*\n` +
     (cleanPhone ? `WA: ${cleanPhone}\n` : '') +
     `--------------------------------\n` +
@@ -93,6 +103,7 @@ const shareToWhatsApp = () => {
     `--------------------------------\n` +
     itemsText +
     `--------------------------------\n` +
+    digitalText +
     `*TOTAL: Rp ${r.totalAmount.toLocaleString('id-ID')}*\n` +
     bayarText + `\n` +
     `--------------------------------\n` +
@@ -100,7 +111,11 @@ const shareToWhatsApp = () => {
     RECEIPT_BRAND_FOOTER
 
   const encoded = encodeURIComponent(text)
-  const phone = prompt('Nomor WhatsApp Pembeli (Boleh kosong untuk pilih kontak di WA):', '')
+  const rawCustomerPhone = r.customer?.phone || (r.digitalMeta?.category !== 'TOKEN_LISTRIK' ? r.digitalMeta?.targetNumber : '') || ''
+  const defaultWaPrompt = /^(\+?62|0)8\d{6,}$/.test(String(rawCustomerPhone).replace(/\D/g, ''))
+    ? String(rawCustomerPhone).trim()
+    : ''
+  const phone = prompt('Nomor WhatsApp Pembeli (Boleh kosong untuk pilih kontak di WA):', defaultWaPrompt)
   if (phone !== null) {
     let targetWa = phone.trim().replace(/\D/g, '')
     if (targetWa.startsWith('0')) {
@@ -241,6 +256,23 @@ const shareToWhatsApp = () => {
             <div class="text-right shrink-0 font-medium">
               Rp {{ (item.sellPrice * item.qty).toLocaleString('id-ID') }}
             </div>
+          </div>
+        </div>
+
+        <!-- Info Produk Digital (No. HP / ID PLN & Token / SN) -->
+        <div
+          v-if="receiptData.digitalMeta && (receiptData.digitalMeta.targetNumber || receiptData.digitalMeta.tokenCode)"
+          class="p-2.5 rounded-xl bg-sky-50/75 border border-sky-200/80 space-y-1 text-[11px]"
+        >
+          <div v-if="receiptData.digitalMeta.targetNumber" class="flex justify-between gap-2">
+            <span class="text-slate-600">No. Tujuan / ID:</span>
+            <span class="font-bold text-[#0a193d]">{{ receiptData.digitalMeta.targetNumber }}</span>
+          </div>
+          <div v-if="receiptData.digitalMeta.tokenCode" class="pt-1 border-t border-dashed border-sky-200">
+            <span class="text-[10px] font-bold text-[#0284c7] uppercase block">Token / SN:</span>
+            <p class="font-bold text-xs sm:text-sm text-[#0a193d] tracking-wider break-all select-all">
+              {{ receiptData.digitalMeta.tokenCode }}
+            </p>
           </div>
         </div>
 

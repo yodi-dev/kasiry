@@ -6,6 +6,25 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.17.0] - 2026-11-27 (Backlog Fase 2 #2: Penjualan Pulsa, Paket Data, Token Listrik PLN & Reorganisasi Menu TopBar)
+
+### Added
+- **Modal Penjualan Pulsa, Paket Data & Token Listrik (`src/components/DigitalProductModal.vue`, `src/db/index.js` schema `v7`):**
+  - Menambahkan tabel IndexedDB **`digitalProducts`** (`++id, digitalNumber, createdAt, category, paymentMethod, customerId, shiftId, updatedAt, deleted`) dengan migrasi otomatis `v1 -> v7`.
+  - Mendukung kategori **Pulsa**, **Paket Data**, **Token PLN**, & **Lainnya / PPOB**, pilihan operator cepat (`Telkomsel`, `Indosat`, `XL`, `Axis`, `Tri`, `Smartfren`, `by.U`, `PLN`), preset nominal yang otomatis **mengingat harga modal agen & harga jual** (`kasiry_digital_presets_v1` di `localStorage`), input **No. HP / ID PLN** serta **Nomor Token Stroom (20 Digit) / SN** (bisa diisi langsung maupun diedit ulang di tab Riwayat), plus rollback piutang atomik saat hapus 2-tap.
+  - Mendukung pembayaran pembeli **Tunai** (masuk Laci), **QRIS** (masuk Non-Tunai), dan **Utang / Bon** (masuk Buku Utang pelanggan & blokir akun `"Umum"`), sedangkan harga modal dicatat dengan `costSource: 'SALDO_AGEN'` tanpa memotong fisik Laci Tunai.
+- **Cetak Nota & Kirim WhatsApp Token PLN (`thermalPrinter.js`, `ReceiptModal.vue`):**
+  - Menampilkan **No. Tujuan / ID PLN** dan kotak sorotan **Token / SN** pada preview struk, printer ESC/POS (`58mm`/`80mm`), cetak `iframe` browser, dan pesan WhatsApp (auto-isi nomor WA pembeli bila nomor HP valid).
+- **Excel 9-Sheet, Laporan, Shift & Cloud Sync (`dailyStats.js`, `excelExport.js`, `useGoogleSync.js`):**
+  - Rekap omzet & laba Pulsa/Token ke `computeDailyStats`, `ShiftModal.vue`, `DailyReportModal.vue`, teks WA, Google Sheets (`appendDigitalProductToSheet`), Google Drive LWW merge, JSON Backup/Arsip, dan sheet ke-9 **`Pulsa & Token Listrik`** di Excel.
+
+### Changed
+- **Reorganisasi Navigasi TopBar & Mobile Drawer (`src/components/TopBar.vue`):**
+  - Desktop/Tablet TopBar kini jauh lebih ringkas dan siap menampung modul berikutnya: **`Stok & Data ▾`** (`Kelola Barang`, `Kulakan Stok`, `Data Pelanggan`) | **`Layanan ▾`** (`Pulsa & Token PLN`, `Tarik Tunai & Transfer`, `Kas Keluar`) | **`Buku Utang`** | **`Laporan`** | **`⚙️`**.
+  - Mobile Drawer ditata menjadi 4 kelompok 1-tap rapi: **Layanan Konter & Kas**, **Keuangan & Laporan**, **Stok & Pelanggan**, dan **Sistem**.
+
+---
+
 ## [2.16.0] - 2026-11-27 (Backlog Fase 2 #1: Fitur Tarik Tunai & Transfer / Top-Up)
 
 ### Added

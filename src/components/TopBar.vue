@@ -12,7 +12,9 @@ import {
   Users,
   Wallet,
   Clock,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Smartphone,
+  Zap
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -40,6 +42,10 @@ const props = defineProps({
     type: Number,
     default: 0
   },
+  todayDigitalCount: {
+    type: Number,
+    default: 0
+  },
   isGoogleConnected: {
     type: Boolean,
     default: false
@@ -63,6 +69,7 @@ const emit = defineEmits([
   'openDailyReport',
   'openExpense',
   'openCashService',
+  'openDigitalProduct',
   'openRestock',
   'openShift',
   'openSettings',
@@ -75,13 +82,16 @@ const emit = defineEmits([
 
 const isDrawerOpen = ref(false)
 const isDataMenuOpen = ref(false)
+const isServiceMenuOpen = ref(false)
 const dataMenuRef = ref(null)
+const serviceMenuRef = ref(null)
 
 const openDrawer = () => {
   if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
     document.activeElement.blur()
   }
   isDataMenuOpen.value = false
+  isServiceMenuOpen.value = false
   isDrawerOpen.value = true
   emit('drawerOpened')
 }
@@ -143,23 +153,33 @@ const shiftChipInfo = computed(() => {
 const triggerAction = (actionEvent) => {
   isDrawerOpen.value = false
   isDataMenuOpen.value = false
+  isServiceMenuOpen.value = false
   emit(actionEvent)
 }
 
 const toggleDataMenu = () => {
+  isServiceMenuOpen.value = false
   isDataMenuOpen.value = !isDataMenuOpen.value
 }
 
+const toggleServiceMenu = () => {
+  isDataMenuOpen.value = false
+  isServiceMenuOpen.value = !isServiceMenuOpen.value
+}
+
 const handleDocumentClick = (e) => {
-  if (!isDataMenuOpen.value) return
-  if (dataMenuRef.value && !dataMenuRef.value.contains(e.target)) {
+  if (isDataMenuOpen.value && dataMenuRef.value && !dataMenuRef.value.contains(e.target)) {
     isDataMenuOpen.value = false
+  }
+  if (isServiceMenuOpen.value && serviceMenuRef.value && !serviceMenuRef.value.contains(e.target)) {
+    isServiceMenuOpen.value = false
   }
 }
 
 const handleDocumentKeydown = (e) => {
-  if (e.key === 'Escape' && isDataMenuOpen.value) {
+  if (e.key === 'Escape') {
     isDataMenuOpen.value = false
+    isServiceMenuOpen.value = false
   }
 }
 
@@ -202,7 +222,42 @@ const dataMenuItems = [
   }
 ]
 
-// Tombol operasional harian 1-klik di TopBar Desktop/Tablet
+// Dropdown Layanan Konter & Kas (Desktop/Tablet agar TopBar tetap lega)
+const serviceMenuItems = computed(() => [
+  {
+    event: 'openDigitalProduct',
+    label: 'Pulsa & Token PLN',
+    description: 'Pulsa, paket data & token listrik',
+    icon: Zap,
+    iconBg: 'bg-sky-50 text-[#0284c7] border-sky-100',
+    badge: props.todayDigitalCount,
+    badgeClass: 'bg-sky-100 text-sky-700'
+  },
+  {
+    event: 'openCashService',
+    label: 'Tarik Tunai & Transfer',
+    description: 'Tarik tunai laci & transfer/top-up',
+    icon: ArrowLeftRight,
+    iconBg: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    badge: props.todayCashServiceCount,
+    badgeClass: 'bg-emerald-100 text-emerald-700'
+  },
+  {
+    event: 'openExpense',
+    label: 'Kas Keluar',
+    description: 'Biaya operasional, makan & prive',
+    icon: Wallet,
+    iconBg: 'bg-amber-50 text-amber-700 border-amber-100',
+    badge: props.todayExpenseCount,
+    badgeClass: 'bg-amber-100 text-amber-800'
+  }
+])
+
+const totalServiceBadgeCount = computed(
+  () => Number(props.todayDigitalCount || 0) + Number(props.todayCashServiceCount || 0) + Number(props.todayExpenseCount || 0)
+)
+
+// Tombol inti kasir 1-klik di TopBar Desktop/Tablet
 const quickNavItems = computed(() => [
   {
     event: 'openDebtBook',
@@ -212,24 +267,6 @@ const quickNavItems = computed(() => [
     iconColor: 'text-rose-600 group-hover:text-rose-300',
     badge: props.totalDebtCount,
     badgeClass: 'bg-red-100 text-red-700'
-  },
-  {
-    event: 'openExpense',
-    label: 'Kas Keluar',
-    shortLabel: 'Keluar',
-    icon: Wallet,
-    iconColor: 'text-amber-600 group-hover:text-amber-300',
-    badge: props.todayExpenseCount,
-    badgeClass: 'bg-amber-100 text-amber-800'
-  },
-  {
-    event: 'openCashService',
-    label: 'Tarik & Tf',
-    shortLabel: 'Tarik',
-    icon: ArrowLeftRight,
-    iconColor: 'text-sky-600 group-hover:text-sky-300',
-    badge: props.todayCashServiceCount,
-    badgeClass: 'bg-sky-100 text-sky-700'
   },
   {
     event: 'openDailyReport',
@@ -245,7 +282,7 @@ const quickNavItems = computed(() => [
 // Drawer HP: tetap 1-tap per item tanpa dropdown, terkelompok berdasarkan domain operasional
 const drawerGroups = computed(() => [
   {
-    title: 'Keuangan & Kasir',
+    title: 'Layanan Konter & Kas',
     items: [
       {
         event: 'openShift',
@@ -258,21 +295,34 @@ const drawerGroups = computed(() => [
         badgeClass: shiftChipInfo.value.badgeClass
       },
       {
+        event: 'openDigitalProduct',
+        label: 'Pulsa & Token PLN',
+        icon: Smartphone,
+        iconBg: 'bg-sky-50 text-[#0284c7] border-sky-100',
+        badge: props.todayDigitalCount,
+        badgeClass: 'bg-sky-100 text-sky-700'
+      },
+      {
+        event: 'openCashService',
+        label: 'Tarik Tunai & Transfer',
+        icon: ArrowLeftRight,
+        iconBg: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+        badge: props.todayCashServiceCount,
+        badgeClass: 'bg-emerald-100 text-emerald-700'
+      },
+      {
         event: 'openExpense',
         label: 'Kas Keluar',
         icon: Wallet,
         iconBg: 'bg-amber-50 text-amber-700 border-amber-100',
         badge: props.todayExpenseCount,
         badgeClass: 'bg-amber-100 text-amber-800'
-      },
-      {
-        event: 'openCashService',
-        label: 'Tarik Tunai & Transfer',
-        icon: ArrowLeftRight,
-        iconBg: 'bg-sky-50 text-[#0284c7] border-sky-100',
-        badge: props.todayCashServiceCount,
-        badgeClass: 'bg-sky-100 text-sky-700'
-      },
+      }
+    ]
+  },
+  {
+    title: 'Keuangan & Laporan',
+    items: [
       {
         event: 'openDebtBook',
         label: 'Buku Utang',
@@ -468,6 +518,74 @@ const drawerGroups = computed(() => [
                 <p class="text-xs font-bold text-[#0a193d] leading-tight">{{ sub.label }}</p>
                 <p class="text-[11px] text-slate-500 leading-tight mt-0.5">{{ sub.description }}</p>
               </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Dropdown Layanan Konter & Kas -->
+        <div ref="serviceMenuRef" class="relative">
+          <button
+            type="button"
+            @click="toggleServiceMenu"
+            :aria-expanded="isServiceMenuOpen"
+            aria-haspopup="menu"
+            :class="[
+              'h-9 px-2.5 lg:px-3 rounded-xl border shadow-2xs flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-all group',
+              isServiceMenuOpen
+                ? 'bg-[#0a193d] text-white border-[#0a193d]'
+                : 'bg-white/85 hover:bg-[#0a193d] text-[#0a193d] hover:text-white border-slate-200/70 hover:border-[#0a193d]'
+            ]"
+            title="Layanan Konter, Tarik Tunai & Kas Keluar"
+          >
+            <Zap
+              aria-hidden="true"
+              :class="[
+                'size-3.5 shrink-0 transition-colors',
+                isServiceMenuOpen ? 'text-sky-300' : 'text-[#0284c7] group-hover:text-sky-300'
+              ]"
+            />
+            <span class="whitespace-nowrap">Layanan</span>
+            <span
+              v-if="totalServiceBadgeCount > 0"
+              class="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none tabular-nums bg-sky-100 text-sky-700"
+            >
+              {{ totalServiceBadgeCount }}
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              :class="['size-3.5 transition-transform duration-150', isServiceMenuOpen ? 'rotate-180 text-sky-300' : 'text-slate-400 group-hover:text-sky-300']"
+            />
+          </button>
+
+          <div
+            v-if="isServiceMenuOpen"
+            role="menu"
+            class="absolute right-0 mt-2 w-68 bg-white rounded-2xl shadow-xl border border-slate-200/90 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+          >
+            <button
+              v-for="sub in serviceMenuItems"
+              :key="sub.event"
+              type="button"
+              role="menuitem"
+              @click="triggerAction(sub.event)"
+              class="w-full p-2.5 rounded-xl hover:bg-slate-50 flex items-center justify-between gap-2.5 text-left transition-colors cursor-pointer group"
+            >
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border" :class="sub.iconBg">
+                  <component :is="sub.icon" aria-hidden="true" class="w-4 h-4" />
+                </div>
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-[#0a193d] leading-tight">{{ sub.label }}</p>
+                  <p class="text-[11px] text-slate-500 leading-tight mt-0.5">{{ sub.description }}</p>
+                </div>
+              </div>
+              <span
+                v-if="sub.badge > 0"
+                class="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none tabular-nums shrink-0"
+                :class="sub.badgeClass"
+              >
+                {{ sub.badge }}
+              </span>
             </button>
           </div>
         </div>

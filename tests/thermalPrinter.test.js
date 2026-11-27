@@ -460,4 +460,33 @@ describe('useThermalPrinter Composable (Bluetooth, WebUSB, Web Serial & Fallback
     expect(tfHtml).toContain('SELESAI (TRANSFER)')
     expect(tfHtml).not.toContain('DICATAT DI BUKU UTANG')
   })
+
+  it('prints PLN Token SN and target customer number clearly in ESC/POS and HTML digital receipts', () => {
+    const plnReceipt = {
+      invoiceNumber: 'PLN-7701',
+      time: '19:15',
+      paymentMethod: 'TUNAI',
+      totalAmount: 52500,
+      cashGiven: 60000,
+      changeAmount: 7500,
+      customer: { name: 'Bu Sari' },
+      digitalMeta: {
+        category: 'TOKEN_LISTRIK',
+        provider: 'PLN',
+        targetNumber: '541200889911',
+        tokenCode: '1234 5678 9012 3456 7890',
+        nominal: 50000
+      },
+      items: [{ id: 1, name: 'Token PLN 50.000', qty: 1, sellPrice: 52500 }]
+    }
+
+    const esc = decodeAscii(buildReceiptEscPosBytes(plnReceipt, { name: 'Warung Kasiry', phone: '' }))
+    expect(esc).toContain('541200889911')
+    expect(esc).toContain('TOKEN / SN:')
+    expect(esc).toContain('1234 5678 9012 3456 7890')
+
+    const html = buildReceiptPrintHtml(plnReceipt, { name: 'Warung Kasiry', phone: '' })
+    expect(html).toContain('541200889911')
+    expect(html).toContain('1234 5678 9012 3456 7890')
+  })
 })
