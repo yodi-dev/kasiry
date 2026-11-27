@@ -6,6 +6,24 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.12.0] - 2026-11-27 (Roadmap #5: Fitur Kulakan / Belanja Stok & Manajemen Stok Lunak)
+
+### Added
+- **Modal Kulakan & Riwayat Nota (`src/components/RestockModal.vue`):**
+  - Mencatat nota belanja stok multi-item (`supplierName` opsional, `note` opsional) melalui 3 sumber dana: **Tunai Laci**, **Non-Tunai (QRIS / Rek)**, dan **Dana Luar (Pribadi Owner)**.
+  - Pencarian barang cepat (memprioritaskan barang berstok tipis/habis), pengeditan kuantitas & harga beli baru, peringatan otomatis bila harga modal naik (+ opsi inline update harga jual langsung), serta centang per item **"Update Stok"** (default aktif).
+  - Tab **Riwayat Kulakan** lengkap dengan hapus 2-tap untuk membatalkan nota beserta *rollback* aman stok, harga beli/jual, dan catatan kas keluar terkait.
+- **Manajemen Stok Lunak & Non-Blocking (`src/composables/useKasiryDB.js`, `src/db/index.js`):**
+  - Migrasi skema Dexie `v5` dengan tabel baru `restocks` (`++id, restockNumber, createdAt, source, supplierName, updatedAt, deleted`).
+  - Kolom opsional `stock` (`null` = tidak dilacak; angka = dilacak lunak): berkurang otomatis secara atomik saat checkout (`recordTransaction`, dihentikan minimal `0`) dan bertambah saat kulakan (`recordRestock`), **namun barang berstok `0` tetap bebas dibeli di kasa**.
+  - Saat kulakan dibayar dari **Tunai Laci** atau **QRIS / Rek**, sistem atomik membuat catatan kas keluar berkategori `'kulakan'` (`affectsProfit: false`) sehingga saldo laci/rekening Shift & Harian ikut terpotong tanpa membuat laba jualan terpotong ganda.
+- **Navigasi, Lencana Stok, Excel 7-Sheet & Google Sync (`TopBar.vue`, `ProductManagementModal.vue`, `FrequentProductsSection.vue`, `excelExport.js`, `useGoogleSync.js`, `SettingsModal.vue`):**
+  - Menambahkan pintasan **`Kulakan Stok`** di dropdown desktop **`Stok & Data ▾`** maupun Drawer mobile **Stok & Pelanggan**.
+  - Input opsional **Stok Saat Ini** & lencana stok di `ProductManagementModal.vue`, serta lencana non-blokir `Habis` / `Sisa N` di kartu cepat `FrequentProductsSection.vue`.
+  - Penambahan sheet ke-7 **`Riwayat Kulakan`** di `exportKasiryExcel`, `appendRestockToSheet` & two-way LWW merge `restocks` di `useGoogleSync.js`, serta pratinjau jumlah nota kulakan di `SettingsModal.vue`.
+
+---
+
 ## [2.11.0] - 2026-11-27 (Roadmap #4: Multi Harga Ecer / Grosir / Agen & Edit Harga Manual)
 
 ### Added

@@ -409,4 +409,115 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(kasiry.transactions.value[0].items[0].priceTier).toBe('agen')
     expect(kasiry.transactions.value[0].items[0].priceLabel).toBe('Agen')
   })
+
+  it('handles soft non-blocking stock, restocks across funding sources, linked expenses, and safe rollback delete', async () => {
+    // 1. Produk dengan stok lunak awal = 2 dan produk kedua tanpa pelacakan stok (null)
+    const trackedProd = await kasiry.saveProduct({
+      name: 'Minyak Goreng 1L',
+      sellPrice: 18000,
+      buyPrice: 15000,
+      stock: 2,
+      category: 'Sembako'
+    })
+    const untrackedProd = await kasiry.saveProduct({
+      name: 'Es Batu',
+      sellPrice: 2000,
+      buyPrice: 1000,
+      stock: '',
+      category: 'Minuman'
+    })
+    expect(trackedProd.stock).toBe(2)
+    expect(untrackedProd.stock).toBeNull()
+
+    // 2. Beli melebihi sisa stok (qty 5 > stock 2) -> TIDAK BOLEH memblokir checkout, stok berhenti di 0
+    await kasiry.recordTransaction({
+      invoiceNumber: 'KSR-OVER-1',
+      totalAmount: 94000,
+      paymentMethod: 'TUNAI',
+      cashGiven: 100000,
+      changeAmount: 6000,
+      customer: { id: 1, name: 'Umum' },
+      items: [
+        { ...trackedProd, qty: 5 },
+        { ...untrackedProd, qty: 2 }
+      ]
+    })
+    const afterSaleTracked = kasiry.products.value.find(p => p.id === trackedProd.id)
+    const afterSaleUntracked = kasiry.products.value.find(p => p.id === untrackedProd.id)
+    expect(afterSaleTracked.stock).toBe(0)
+    expect(afterSaleUntracked.stock).toBeNull()
+
+    // Transaksi saat stok sudah 0 juga tetap berjalan mulus (soft/non-blocking)
+    await expect(kasiry.recordTransaction({
+      invoiceNumber: 'KSR-ZERO-2',
+      totalAmount: 18000,
+      paymentMethod: 'TUNAI',
+      cashGiven: 20000,
+      changeAmount: 2000,
+      customer: { id: 1, name: 'Umum' },
+      items: [{ ...afterSaleTracked, qty: 1 }]
+    })).resolves.toBeTruthy()
+
+    // 3. Kulakan Tunai dari Laci: tambah stok + update modal/jual + buat kas keluar kategori 'kulakan'
+    const res1 = await kasiry.recordRestock({
+      supplierName: 'Agen Sumber Rezeki',
+      source: 'TUNAI_LACI',
+      note: 'Nota kulakan #1',
+      items: [
+        {
+          productId: trackedProd.id,
+          productName: trackedProd.name,
+          qty: 12,
+          unitBuyPrice: 16000,
+          newSellPrice: 19000,
+          trackStock: true
+        }
+      ]
+    })
+    expect(res1.restock.restockNumber).toMatch(/^KLK-/)
+    expect(res1.restock.totalCost).toBe(192000)
+    expect(res1.expense).toBeTruthy()
+    expect(res1.expense.category).toBe('kulakan')
+    expect(res1.expense.amount).toBe(192000)
+    expect(kasiry.expenses.value.some(e => e.id === res1.expense.id)).toBe(true)
+
+    const updatedTracked = kasiry.products.value.find(p => p.id === trackedProd.id)
+    expect(updatedTracked.stock).toBe(12)
+    expect(updatedTracked.buyPrice).toBe(16000)
+    expect(updatedTracked.sellPrice).toBe(19000)
+
+    // 4. Kulakan dari Dana Luar / Pribadi Owner: TIDAK membuat catatan kas keluar di laci
+    const prevExpCount = kasiry.expenses.value.length
+    const resDanaLuar = await kasiry.recordRestock({
+      supplierName: 'Owner',
+      source: 'DANA_LUAR',
+      items: [
+        {
+          productId: untrackedProd.id,
+          productName: untrackedProd.name,
+          qty: 10,
+          unitBuyPrice: 1000,
+          trackStock: true
+        }
+      ]
+    })
+    expect(resDanaLuar.expense).toBeNull()
+    expect(kasiry.expenses.value).toHaveLength(prevExpCount)
+    expect(kasiry.products.value.find(p => p.id === untrackedProd.id).stock).toBe(10)
+
+    // 5. Inspect backup menyertakan restockCount
+    const payload = await kasiry.getFullDatabasePayload()
+    expect(payload.data.restocks).toHaveLength(2)
+    expect(kasiry.inspectBackupJSON(payload).restockCount).toBe(2)
+
+    // 6. Hapus nota kulakan pertama -> soft delete nota + linked expense + rollback stok & harga modal/jual
+    const deletedOk = await kasiry.deleteRestock(res1.restock.id)
+    expect(deletedOk).toBe(true)
+    expect(kasiry.restocks.value).toHaveLength(1)
+    expect(kasiry.expenses.value.some(e => e.id === res1.expense.id)).toBe(false)
+    const rolledBack = kasiry.products.value.find(p => p.id === trackedProd.id)
+    expect(rolledBack.stock).toBe(0)
+    expect(rolledBack.buyPrice).toBe(15000)
+    expect(rolledBack.sellPrice).toBe(18000)
+  })
 })

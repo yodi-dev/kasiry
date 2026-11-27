@@ -108,6 +108,23 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(shiftBody.values[0][2]).toBe('TUTUP SHIFT')
     expect(shiftBody.values[0][4]).toBe(248000)
     expect(shiftBody.values[0][6]).toBe(-2000)
+
+    // 6. Nota Kulakan tercatat ke Google Sheets
+    await sync.appendRestockToSheet({
+      restockNumber: 'KLK-777',
+      createdAt: 1700009500000,
+      supplierName: 'Agen Sembako Jaya',
+      source: 'TUNAI_LACI',
+      totalCost: 140000,
+      items: [{ productName: 'Gula 1kg', qty: 10, unitBuyPrice: 14000 }],
+      note: 'Kulakan rutin'
+    }, 'Habiba Store')
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+    const restockBody = JSON.parse(fetchMock.mock.calls[4][1].body)
+    expect(restockBody.values[0][1]).toBe('KLK-777')
+    expect(restockBody.values[0][2]).toBe('KULAKAN (TUNAI)')
+    expect(restockBody.values[0][4]).toBe(-140000)
+    expect(restockBody.values[0][7]).toContain('Gula 1kg x10')
   })
 
   it('batches Drive snapshots to 3 minutes / 10 transactions once txCount >= 200', async () => {
@@ -175,6 +192,10 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
           { id: 70, expenseNumber: 'KLR-OLD', createdAt: 1500000, amount: 5000, updatedAt: 1500000 },
           { id: 71, expenseNumber: 'KLR-DEL', createdAt: 2600000, amount: 10000, deleted: true, updatedAt: 9000 }
         ],
+        restocks: [
+          { id: 88, restockNumber: 'KLK-OLD', createdAt: 1500000, totalCost: 20000, updatedAt: 1500000 },
+          { id: 89, restockNumber: 'KLK-SYNC', createdAt: 2650000, totalCost: 85000, supplierName: 'Agen Baru', updatedAt: 9500 }
+        ],
         shifts: [
           { id: 80, shiftCode: 'SHF-OLD-CLOSED', status: 'CLOSED', openedAt: 1500000, updatedAt: 1500000 },
           { id: 81, shiftCode: 'SHF-SYNC', status: 'CLOSED', openedAt: 2500000, actualCash: 300000, updatedAt: 9000 }
@@ -214,6 +235,9 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
         expenses: [
           { id: 71, expenseNumber: 'KLR-DEL', createdAt: 2600000, amount: 10000, deleted: false, updatedAt: 5000 }
         ],
+        restocks: [
+          { id: 89, restockNumber: 'KLK-SYNC', createdAt: 2650000, totalCost: 80000, supplierName: 'Agen Lama', updatedAt: 4000 }
+        ],
         shifts: [
           { id: 81, shiftCode: 'SHF-SYNC', status: 'OPEN', openedAt: 2500000, updatedAt: 5000 }
         ],
@@ -236,13 +260,16 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     // Tidak menduplikasi "Umum"
     expect(appliedPayload.data.customers).toHaveLength(1)
     expect(appliedPayload.data.customers[0].id).toBe(1)
-    // Transaksi, cicilan, & pengeluaran terarsip (< cutoffAt) tersaring keluar; soft-delete LWW menang
+    // Transaksi, cicilan, kulakan, & pengeluaran terarsip (< cutoffAt) tersaring keluar; soft-delete LWW menang
     expect(appliedPayload.data.transactions.map(t => t.invoiceNumber)).toEqual(['NEW-LOCAL', 'NEW-REMOTE'])
     expect(appliedPayload.data.debtPayments).toHaveLength(1)
     expect(appliedPayload.data.debtPayments[0].amount).toBe(8000)
     expect(appliedPayload.data.expenses).toHaveLength(1)
     expect(appliedPayload.data.expenses[0].expenseNumber).toBe('KLR-DEL')
     expect(appliedPayload.data.expenses[0].deleted).toBe(true)
+    expect(appliedPayload.data.restocks).toHaveLength(1)
+    expect(appliedPayload.data.restocks[0].restockNumber).toBe('KLK-SYNC')
+    expect(appliedPayload.data.restocks[0].supplierName).toBe('Agen Baru')
     expect(appliedPayload.data.shifts).toHaveLength(1)
     expect(appliedPayload.data.shifts[0].shiftCode).toBe('SHF-SYNC')
     expect(appliedPayload.data.shifts[0].status).toBe('CLOSED')

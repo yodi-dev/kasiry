@@ -12,6 +12,7 @@ import { getExpenseCategoryMeta, getExpenseSourceMeta } from './expenseConstants
  * @param {Array} options.customers Daftar pelanggan buku utang
  * @param {Array} options.debtPayments Riwayat pelunasan utang
  * @param {Array} options.expenses Riwayat kas keluar / pengeluaran
+ * @param {Array} options.restocks Riwayat kulakan / belanja stok
  * @param {Array} options.shifts Riwayat buka & tutup shift
  */
 export async function exportKasiryExcel({
@@ -21,6 +22,7 @@ export async function exportKasiryExcel({
   customers = [],
   debtPayments = [],
   expenses = [],
+  restocks = [],
   shifts = []
 }) {
   const XLSX = await import('xlsx')
@@ -342,6 +344,59 @@ export async function exportKasiryExcel({
     { wch: 30 }
   ]
   XLSX.utils.book_append_sheet(wb, wsShift, 'Riwayat Shift')
+
+  // ==========================================
+  // SHEET 7: RIWAYAT KULAKAN / BELANJA STOK
+  // ==========================================
+  const restockHeader = [
+    'No',
+    'No. Nota',
+    'Tanggal & Jam',
+    'Supplier / Agen',
+    'Sumber Dana',
+    'Kode Shift',
+    'Total Modal (Rp)',
+    'Total Qty',
+    'Rincian Barang',
+    'Catatan'
+  ]
+  const activeRestocks = (restocks || []).filter(r => r && !r.deleted)
+  const restockRows = activeRestocks.map((r, idx) => {
+    const srcLabel = r.source === 'NON_TUNAI'
+      ? 'QRIS / Rek'
+      : r.source === 'DANA_LUAR'
+        ? 'Dana Luar'
+        : 'Tunai Laci'
+    const itemsDetail = Array.isArray(r.items)
+      ? r.items.map(it => `${it.productName || 'Barang'} x${it.qty || 0} (@Rp ${Number(it.unitBuyPrice || 0).toLocaleString('id-ID')})`).join('; ')
+      : '-'
+    return [
+      idx + 1,
+      r.restockNumber || `#${r.id || ''}`,
+      formatShiftDate(r.createdAt),
+      r.supplierName || 'Kulakan Mandiri',
+      srcLabel,
+      r.shiftCode || '-',
+      Number(r.totalCost || 0),
+      Number(r.totalItems || 0),
+      itemsDetail,
+      r.note || '-'
+    ]
+  })
+  const wsRestock = XLSX.utils.aoa_to_sheet([restockHeader, ...restockRows])
+  wsRestock['!cols'] = [
+    { wch: 6 },
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 22 },
+    { wch: 15 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 10 },
+    { wch: 44 },
+    { wch: 28 }
+  ]
+  XLSX.utils.book_append_sheet(wb, wsRestock, 'Riwayat Kulakan')
 
   // Eksekusi download file .xlsx
   const fileDate = new Date().toISOString().slice(0, 10)

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronDown,
   Package,
+  PackagePlus,
   Users,
   Wallet,
   Clock
@@ -56,6 +57,7 @@ const emit = defineEmits([
   'openDebtBook',
   'openDailyReport',
   'openExpense',
+  'openRestock',
   'openShift',
   'openSettings',
   'openCamera',
@@ -169,7 +171,7 @@ onUnmounted(() => {
   }
 })
 
-// Dropdown Stok & Data (Desktop/Tablet) — siap menampung fitur Kulakan Stok di tahap berikutnya
+// Dropdown Stok & Data (Desktop/Tablet)
 const dataMenuItems = [
   {
     event: 'openProductManage',
@@ -177,6 +179,13 @@ const dataMenuItems = [
     description: 'Katalog, harga & kategori',
     icon: Package,
     iconBg: 'bg-sky-50 text-sky-700 border-sky-100'
+  },
+  {
+    event: 'openRestock',
+    label: 'Kulakan Stok',
+    description: 'Belanja barang, modal & stok',
+    icon: PackagePlus,
+    iconBg: 'bg-emerald-50 text-emerald-700 border-emerald-100'
   },
   {
     event: 'openCustomerManage',
@@ -267,6 +276,14 @@ const drawerGroups = computed(() => [
         label: 'Kelola Barang',
         icon: Package,
         iconBg: 'bg-sky-50 text-sky-700 border-sky-100',
+        badge: 0,
+        badgeClass: ''
+      },
+      {
+        event: 'openRestock',
+        label: 'Kulakan Stok',
+        icon: PackagePlus,
+        iconBg: 'bg-emerald-50 text-emerald-700 border-emerald-100',
         badge: 0,
         badgeClass: ''
       },

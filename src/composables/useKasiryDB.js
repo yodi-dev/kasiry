@@ -21,6 +21,14 @@ const generateUniqueId = () => {
   return lastGeneratedId
 }
 
+const normalizeStock = (val) => {
+  if (val === null || val === undefined) return null
+  if (typeof val === 'string' && val.trim() === '') return null
+  const num = Math.round(Number(val))
+  if (!Number.isFinite(num)) return null
+  return Math.max(0, num)
+}
+
 // Shared Reactive State (shallowRef untuk daftar besar agar bebas beban deep Proxy Vue)
 const isDbReady = ref(false)
 const products = shallowRef([])
@@ -28,11 +36,13 @@ const customers = ref([])
 const transactions = shallowRef([])
 const debtPayments = shallowRef([])
 const expenses = shallowRef([])
+const restocks = shallowRef([])
 const shifts = shallowRef([])
 const lastOpeningCash = ref(0)
 const totalTransactionCount = ref(0)
 const totalDebtPaymentCount = ref(0)
 const totalExpenseCount = ref(0)
+const totalRestockCount = ref(0)
 const totalShiftCount = ref(0)
 const archiveCutoffAt = ref(0)
 const olderTransactionCount = computed(() =>
@@ -139,15 +149,17 @@ export function useKasiryDB() {
 
   const refreshRecentTransactions = async () => {
     const windowCutoff = Date.now() - ACTIVE_HISTORY_DAYS * MS_PER_DAY
-    const [recentTx, recentPays, recentExpenses, recentShifts, openShifts, txCount, payCount, expCount, shiftCount] = await Promise.all([
+    const [recentTx, recentPays, recentExpenses, recentRestocks, recentShifts, openShifts, txCount, payCount, expCount, restockCount, shiftCount] = await Promise.all([
       db.transactions.where('createdAt').aboveOrEqual(windowCutoff).reverse().toArray(),
       db.debtPayments.where('paymentDate').aboveOrEqual(windowCutoff).reverse().toArray(),
       db.expenses.where('createdAt').aboveOrEqual(windowCutoff).reverse().filter(e => !e.deleted).toArray(),
+      db.restocks.where('createdAt').aboveOrEqual(windowCutoff).reverse().filter(r => !r.deleted).toArray(),
       db.shifts.where('openedAt').aboveOrEqual(windowCutoff).reverse().filter(s => !s.deleted).toArray(),
       db.shifts.where('status').equals('OPEN').filter(s => !s.deleted).toArray(),
       db.transactions.count(),
       db.debtPayments.count(),
       db.expenses.filter(e => !e.deleted).count(),
+      db.restocks.filter(r => !r.deleted).count(),
       db.shifts.filter(s => !s.deleted).count()
     ])
 
@@ -159,10 +171,12 @@ export function useKasiryDB() {
     transactions.value = recentTx
     debtPayments.value = recentPays
     expenses.value = recentExpenses
+    restocks.value = recentRestocks
     shifts.value = Array.from(shiftMap.values()).sort((a, b) => (b.openedAt || 0) - (a.openedAt || 0))
     totalTransactionCount.value = txCount
     totalDebtPaymentCount.value = payCount
     totalExpenseCount.value = expCount
+    totalRestockCount.value = restockCount
     totalShiftCount.value = shiftCount
   }
 
@@ -210,7 +224,7 @@ export function useKasiryDB() {
     return products.value.slice(0, 8)
   })
 
-  // CRUD Produk (mendukung harga ecer + opsional multi harga grosir/agen)
+  // CRUD Produk (mendukung harga ecer + opsional multi harga grosir/agen + stok lunak opsional)
   const saveProduct = async (productData) => {
     const now = Date.now()
     const payload = toPlain({
@@ -220,6 +234,7 @@ export function useKasiryDB() {
       wholesalePrice: sanitizeOptionalPrice(productData.wholesalePrice),
       wholesaleMinQty: sanitizeMinQty(productData.wholesaleMinQty),
       agentPrice: sanitizeOptionalPrice(productData.agentPrice),
+      stock: normalizeStock(productData.stock),
       updatedAt: now,
       deleted: false
     })
@@ -396,6 +411,242 @@ export function useKasiryDB() {
     return true
   }
 
+  // Pencatatan Kulakan / Belanja Stok Barang (update harga beli, stok lunak opsional, & kas keluar otomatis bila dari laci/rekening)
+  const recordRestock = async ({
+    supplierName = '',
+    source = 'TUNAI_LACI',
+    note = '',
+    items = [],
+    createdAt
+  } = {}) => {
+    if (!Array.isArray(items) || items.length === 0) return null
+
+    const now = Date.now()
+    const timestamp = Number.isFinite(Number(createdAt)) ? Number(createdAt) : now
+    const cleanSource = ['TUNAI_LACI', 'NON_TUNAI', 'DANA_LUAR'].includes(source) ? source : 'TUNAI_LACI'
+    const cleanSupplier = typeof supplierName === 'string' ? supplierName.trim() : ''
+    const cleanNote = typeof note === 'string' ? note.trim() : ''
+
+    const normalizedItems = items
+      .map(raw => {
+        const qty = Math.round(Number(raw?.qty || 0))
+        const unitBuyPrice = Math.max(0, Math.round(Number(raw?.unitBuyPrice ?? raw?.buyPrice ?? 0)))
+        const hasNewSell = raw?.newSellPrice !== null && raw?.newSellPrice !== undefined && raw?.newSellPrice !== '' && Number.isFinite(Number(raw.newSellPrice))
+        const newSellPrice = hasNewSell ? Math.max(0, Math.round(Number(raw.newSellPrice))) : null
+        return {
+          productId: raw?.productId ?? null,
+          productName: typeof raw?.productName === 'string' ? raw.productName.trim() : (raw?.name || 'Barang'),
+          qty,
+          unitBuyPrice,
+          subtotal: qty * unitBuyPrice,
+          trackStock: raw?.trackStock !== false,
+          newSellPrice,
+          prevBuyPrice: null,
+          prevSellPrice: null,
+          prevStock: null,
+          nextStock: null
+        }
+      })
+      .filter(it => it.qty > 0)
+
+    if (normalizedItems.length === 0) return null
+
+    const totalCost = normalizedItems.reduce((sum, it) => sum + it.subtotal, 0)
+    const id = generateUniqueId()
+    const restockNumber = `KLK-${String(id).slice(-7)}`
+    const currentShift = activeShift.value
+
+    let expenseRecord = null
+    let mutatedProds = []
+    let restockRecord = null
+
+    await db.transaction('rw', [db.restocks, db.products, db.expenses], async () => {
+      const targetIds = Array.from(new Set(normalizedItems.map(i => i.productId).filter(pid => pid !== null && pid !== undefined && pid !== '')))
+      const fetchedProds = targetIds.length > 0 ? await db.products.bulkGet(targetIds) : []
+      const prodMap = new Map()
+      for (const p of fetchedProds) {
+        if (p && !p.deleted) {
+          prodMap.set(p.id, toPlain(p))
+        }
+      }
+
+      const dirtyProdIds = new Set()
+      for (const item of normalizedItems) {
+        if (item.productId === null || item.productId === undefined) continue
+        const prod = prodMap.get(item.productId)
+        if (!prod) continue
+
+        item.productName = prod.name || item.productName
+        item.prevBuyPrice = Math.max(0, Number(prod.buyPrice || 0))
+        item.prevSellPrice = Math.max(0, Number(prod.sellPrice || 0))
+        item.prevStock = (prod.stock !== null && prod.stock !== undefined && Number.isFinite(Number(prod.stock)))
+          ? Math.max(0, Math.round(Number(prod.stock)))
+          : null
+
+        prod.buyPrice = item.unitBuyPrice
+        if (item.newSellPrice !== null && item.newSellPrice !== undefined) {
+          prod.sellPrice = item.newSellPrice
+        }
+        if (item.trackStock) {
+          const baseStock = (prod.stock !== null && prod.stock !== undefined && Number.isFinite(Number(prod.stock)))
+            ? Math.max(0, Math.round(Number(prod.stock)))
+            : 0
+          prod.stock = baseStock + item.qty
+        }
+        item.nextStock = prod.stock !== null && prod.stock !== undefined ? prod.stock : null
+        prod.updatedAt = now
+        dirtyProdIds.add(prod.id)
+      }
+
+      mutatedProds = Array.from(dirtyProdIds).map(pid => toPlain(prodMap.get(pid)))
+      if (mutatedProds.length > 0) {
+        await db.products.bulkPut(mutatedProds)
+      }
+
+      if ((cleanSource === 'TUNAI_LACI' || cleanSource === 'NON_TUNAI') && totalCost > 0) {
+        const expId = generateUniqueId()
+        const previewNames = normalizedItems.slice(0, 2).map(it => `${it.productName} x${it.qty}`).join(', ')
+        const extraSuffix = normalizedItems.length > 2 ? ` +${normalizedItems.length - 2} item` : ''
+        const supplierTag = cleanSupplier ? `Kulakan (${cleanSupplier})` : 'Kulakan'
+        const detailTag = cleanNote ? ` — ${cleanNote}` : ''
+        expenseRecord = toPlain({
+          id: expId,
+          expenseNumber: `KLR-${String(expId).slice(-7)}`,
+          createdAt: timestamp,
+          amount: totalCost,
+          category: 'kulakan',
+          source: cleanSource,
+          note: `${supplierTag}: ${previewNames}${extraSuffix}${detailTag}`,
+          shiftId: currentShift?.id || null,
+          shiftCode: currentShift?.shiftCode || null,
+          updatedAt: now,
+          deleted: false
+        })
+        await db.expenses.add(expenseRecord)
+      }
+
+      restockRecord = toPlain({
+        id,
+        restockNumber,
+        createdAt: timestamp,
+        supplierName: cleanSupplier,
+        source: cleanSource,
+        note: cleanNote,
+        totalCost,
+        totalItems: normalizedItems.reduce((sum, it) => sum + it.qty, 0),
+        items: normalizedItems,
+        expenseId: expenseRecord ? expenseRecord.id : null,
+        shiftId: currentShift?.id || null,
+        shiftCode: currentShift?.shiftCode || null,
+        updatedAt: now,
+        deleted: false
+      })
+      await db.restocks.add(restockRecord)
+    })
+
+    restocks.value = [restockRecord, ...restocks.value].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    totalRestockCount.value += 1
+    if (expenseRecord) {
+      expenses.value = [expenseRecord, ...expenses.value].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      totalExpenseCount.value += 1
+    }
+    if (mutatedProds.length > 0) {
+      await refreshProducts()
+    }
+
+    return {
+      restock: restockRecord,
+      expense: expenseRecord,
+      updatedProducts: mutatedProds
+    }
+  }
+
+  const deleteRestock = async (restockId) => {
+    const rec = await db.restocks.get(restockId)
+    if (!rec || rec.deleted) return false
+
+    const now = Date.now()
+    let expDeleted = false
+    let productMutated = false
+
+    await db.transaction('rw', [db.restocks, db.products, db.expenses], async () => {
+      const cleanRec = toPlain({ ...rec, deleted: true, updatedAt: now })
+      await db.restocks.put(cleanRec)
+
+      if (rec.expenseId) {
+        const exp = await db.expenses.get(rec.expenseId)
+        if (exp && !exp.deleted) {
+          exp.deleted = true
+          exp.updatedAt = now
+          await db.expenses.put(toPlain(exp))
+          expDeleted = true
+        }
+      }
+
+      const items = Array.isArray(rec.items) ? rec.items : []
+      const targetIds = Array.from(new Set(items.map(i => i.productId).filter(pid => pid !== null && pid !== undefined && pid !== '')))
+      if (targetIds.length > 0) {
+        const fetchedProds = await db.products.bulkGet(targetIds)
+        const prodMap = new Map()
+        for (const p of fetchedProds) {
+          if (p && !p.deleted) prodMap.set(p.id, toPlain(p))
+        }
+        const dirtyIds = new Set()
+
+        for (const item of items) {
+          const prod = prodMap.get(item.productId)
+          if (!prod) continue
+
+          if (item.trackStock && prod.stock !== null && prod.stock !== undefined && Number.isFinite(Number(prod.stock))) {
+            const currentStock = Math.max(0, Math.round(Number(prod.stock)))
+            const addedQty = Math.max(0, Math.round(Number(item.qty || 0)))
+            if (item.prevStock === null && currentStock === addedQty) {
+              prod.stock = null
+            } else {
+              prod.stock = Math.max(0, currentStock - addedQty)
+            }
+            prod.updatedAt = now
+            dirtyIds.add(prod.id)
+          }
+
+          if (item.prevBuyPrice !== null && item.prevBuyPrice !== undefined && Number(prod.buyPrice) === Number(item.unitBuyPrice)) {
+            prod.buyPrice = item.prevBuyPrice
+            prod.updatedAt = now
+            dirtyIds.add(prod.id)
+          }
+          if (
+            item.newSellPrice !== null &&
+            item.newSellPrice !== undefined &&
+            item.prevSellPrice !== null &&
+            item.prevSellPrice !== undefined &&
+            Number(prod.sellPrice) === Number(item.newSellPrice)
+          ) {
+            prod.sellPrice = item.prevSellPrice
+            prod.updatedAt = now
+            dirtyIds.add(prod.id)
+          }
+        }
+
+        if (dirtyIds.size > 0) {
+          const toPut = Array.from(dirtyIds).map(pid => toPlain(prodMap.get(pid)))
+          await db.products.bulkPut(toPut)
+          productMutated = true
+        }
+      }
+    })
+
+    restocks.value = restocks.value.filter(r => r.id !== restockId)
+    totalRestockCount.value = Math.max(0, totalRestockCount.value - 1)
+    if (expDeleted) {
+      expenses.value = expenses.value.filter(e => e.id !== rec.expenseId)
+      totalExpenseCount.value = Math.max(0, totalExpenseCount.value - 1)
+    }
+    if (productMutated) {
+      await refreshProducts()
+    }
+    return true
+  }
+
   // Buka & Tutup Shift (1 shift = 1 hari operasional toko dengan modal awal & tutup buku laci)
   const openShift = async ({
     cashierName,
@@ -438,7 +689,7 @@ export function useKasiryDB() {
     startOfToday.setHours(0, 0, 0, 0)
     const todayTs = startOfToday.getTime()
 
-    await db.transaction('rw', [db.shifts, db.transactions, db.debtPayments, db.expenses, db.settings], async () => {
+    await db.transaction('rw', [db.shifts, db.transactions, db.debtPayments, db.expenses, db.restocks, db.settings], async () => {
       await db.shifts.add(shiftRecord)
       await db.settings.put({
         key: 'lastOpeningCash',
@@ -447,10 +698,11 @@ export function useKasiryDB() {
       })
 
       if (adoptUnassignedToday) {
-        const [unassignedTx, unassignedPays, unassignedExps] = await Promise.all([
+        const [unassignedTx, unassignedPays, unassignedExps, unassignedRestocks] = await Promise.all([
           db.transactions.where('createdAt').aboveOrEqual(todayTs).filter(t => !t.shiftId && !t.shiftCode).toArray(),
           db.debtPayments.where('paymentDate').aboveOrEqual(todayTs).filter(p => !p.shiftId && !p.shiftCode).toArray(),
-          db.expenses.where('createdAt').aboveOrEqual(todayTs).filter(e => !e.deleted && !e.shiftId && !e.shiftCode).toArray()
+          db.expenses.where('createdAt').aboveOrEqual(todayTs).filter(e => !e.deleted && !e.shiftId && !e.shiftCode).toArray(),
+          db.restocks.where('createdAt').aboveOrEqual(todayTs).filter(r => !r.deleted && !r.shiftId && !r.shiftCode).toArray()
         ])
 
         if (unassignedTx.length > 0) {
@@ -461,6 +713,9 @@ export function useKasiryDB() {
         }
         if (unassignedExps.length > 0) {
           await db.expenses.bulkPut(toPlain(unassignedExps.map(e => ({ ...e, shiftId: id, shiftCode, updatedAt: now }))))
+        }
+        if (unassignedRestocks.length > 0) {
+          await db.restocks.bulkPut(toPlain(unassignedRestocks.map(r => ({ ...r, shiftId: id, shiftCode, updatedAt: now }))))
         }
       }
     })
@@ -552,42 +807,82 @@ export function useKasiryDB() {
       updatedAt: now
     })
 
-    // 1. Simpan Transaksi Induk ke IndexedDB
-    const txId = await db.transactions.add(txRecord)
-
-    // 2. Jika Metode Utang, akumulasikan saldo utang pelanggan (kecuali akun sistem "Umum")
+    // 1. Simpan transaksi, akumulasi utang pelanggan (bila Bon), & kurangi stok lunak (bila dilacak) secara atomik
+    let txId = null
     let customerMutated = false
-    if (paymentMethod === 'UTANG / BON' && customer && customer.name?.trim().toLowerCase() !== 'umum') {
-      let cust = customer.id ? await db.customers.get(customer.id) : null
-      if (!cust && customer.name) {
-        const cleanName = customer.name.trim().toLowerCase()
-        cust = await db.customers.filter(c => !c.deleted && c.name?.toLowerCase() === cleanName).first()
-      }
-      if (cust) {
-        cust.totalDebt = (cust.totalDebt || 0) + totalAmount
-        cust.lastDate = 'Hari ini'
-        cust.updatedAt = now
-        await db.customers.put(toPlain(cust))
-      } else {
-        cust = toPlain({
-          id: customer.id || generateUniqueId(),
-          name: customer.name,
-          phone: customer.phone || '',
-          totalDebt: totalAmount,
-          lastDate: 'Hari ini',
-          updatedAt: now,
-          deleted: false
-        })
-        await db.customers.add(cust)
-      }
-      customerMutated = true
-    }
+    let productMutated = false
 
-    // 3. Perbarui shallowRef & counter lokal langsung tanpa full reload 5 tabel
+    await db.transaction('rw', [db.transactions, db.customers, db.products], async () => {
+      txId = await db.transactions.add(txRecord)
+
+      // 2. Jika Metode Utang, akumulasikan saldo utang pelanggan (kecuali akun sistem "Umum")
+      if (paymentMethod === 'UTANG / BON' && customer && customer.name?.trim().toLowerCase() !== 'umum') {
+        let cust = customer.id ? await db.customers.get(customer.id) : null
+        if (!cust && customer.name) {
+          const cleanName = customer.name.trim().toLowerCase()
+          cust = await db.customers.filter(c => !c.deleted && c.name?.toLowerCase() === cleanName).first()
+        }
+        if (cust) {
+          cust.totalDebt = (cust.totalDebt || 0) + totalAmount
+          cust.lastDate = 'Hari ini'
+          cust.updatedAt = now
+          await db.customers.put(toPlain(cust))
+        } else {
+          cust = toPlain({
+            id: customer.id || generateUniqueId(),
+            name: customer.name,
+            phone: customer.phone || '',
+            totalDebt: totalAmount,
+            lastDate: 'Hari ini',
+            updatedAt: now,
+            deleted: false
+          })
+          await db.customers.add(cust)
+        }
+        customerMutated = true
+      }
+
+      // 3. Kurangi stok secara lunak hanya untuk barang yang melacak stok (stock != null; 0 tetap boleh dibeli)
+      const qtyByProductId = new Map()
+      for (const item of items) {
+        if (item && item.id !== null && item.id !== undefined && item.id !== '') {
+          const q = Number(item.qty || 0)
+          if (Number.isFinite(q) && q > 0) {
+            qtyByProductId.set(item.id, (qtyByProductId.get(item.id) || 0) + q)
+          }
+        }
+      }
+
+      if (qtyByProductId.size > 0) {
+        const prodDocs = await db.products.bulkGet(Array.from(qtyByProductId.keys()))
+        const toUpdateProds = []
+        for (const prod of prodDocs) {
+          if (!prod || prod.deleted) continue
+          if (prod.stock !== null && prod.stock !== undefined && Number.isFinite(Number(prod.stock))) {
+            const currentStock = Math.max(0, Math.round(Number(prod.stock)))
+            const soldQty = Math.round(qtyByProductId.get(prod.id) || 0)
+            toUpdateProds.push(toPlain({
+              ...prod,
+              stock: Math.max(0, currentStock - soldQty),
+              updatedAt: now
+            }))
+          }
+        }
+        if (toUpdateProds.length > 0) {
+          await db.products.bulkPut(toUpdateProds)
+          productMutated = true
+        }
+      }
+    })
+
+    // 4. Perbarui shallowRef & counter lokal langsung tanpa full reload 5 tabel
     transactions.value = [txRecord, ...transactions.value]
     totalTransactionCount.value += 1
     if (customerMutated) {
       await refreshCustomers()
+    }
+    if (productMutated) {
+      await refreshProducts()
     }
     return txId
   }
@@ -605,12 +900,13 @@ export function useKasiryDB() {
 
   // Dapatkan seluruh data database untuk sinkronisasi cloud
   const getFullDatabasePayload = async () => {
-    const [allProducts, allCustomers, allTransactions, allDebtPayments, allExpenses, allShifts, allSettings] = await Promise.all([
+    const [allProducts, allCustomers, allTransactions, allDebtPayments, allExpenses, allRestocks, allShifts, allSettings] = await Promise.all([
       db.products.toArray(),
       db.customers.toArray(),
       db.transactions.toArray(),
       db.debtPayments.toArray(),
       db.expenses.toArray(),
+      db.restocks.toArray(),
       db.shifts.toArray(),
       db.settings.toArray()
     ])
@@ -626,6 +922,7 @@ export function useKasiryDB() {
         transactions: allTransactions,
         debtPayments: allDebtPayments,
         expenses: allExpenses,
+        restocks: allRestocks,
         shifts: allShifts,
         settings: allSettings
       }
@@ -657,18 +954,20 @@ export function useKasiryDB() {
     return true
   }
 
-  // Ambil seluruh transaksi, pelunasan, pengeluaran, & shift dari IndexedDB on-demand (khusus ekspor Excel lengkap)
+  // Ambil seluruh transaksi, pelunasan, pengeluaran, kulakan, & shift dari IndexedDB on-demand (khusus ekspor Excel lengkap)
   const getAllTransactionsForExport = async () => {
-    const [allTransactions, allDebtPayments, allExpenses, allShifts] = await Promise.all([
+    const [allTransactions, allDebtPayments, allExpenses, allRestocks, allShifts] = await Promise.all([
       db.transactions.orderBy('createdAt').reverse().toArray(),
       db.debtPayments.orderBy('paymentDate').reverse().toArray(),
       db.expenses.orderBy('createdAt').reverse().filter(e => !e.deleted).toArray(),
+      db.restocks.orderBy('createdAt').reverse().filter(r => !r.deleted).toArray(),
       db.shifts.orderBy('openedAt').reverse().filter(s => !s.deleted).toArray()
     ])
     return {
       transactions: allTransactions,
       debtPayments: allDebtPayments,
       expenses: allExpenses,
+      restocks: allRestocks,
       shifts: allShifts
     }
   }
@@ -702,10 +1001,11 @@ export function useKasiryDB() {
   // Hitung jumlah riwayat yang memenuhi syarat arsip (lebih tua dari retentionDays) tanpa memuat payload penuh
   const getArchivableSummary = async (retentionDays = 180) => {
     const cutoffTimestamp = Date.now() - retentionDays * MS_PER_DAY
-    const [txCount, payCount, expenseCount, shiftCount] = await Promise.all([
+    const [txCount, payCount, expenseCount, restockCount, shiftCount] = await Promise.all([
       db.transactions.where('createdAt').below(cutoffTimestamp).count(),
       db.debtPayments.where('paymentDate').below(cutoffTimestamp).count(),
       db.expenses.where('createdAt').below(cutoffTimestamp).count(),
+      db.restocks.where('createdAt').below(cutoffTimestamp).count(),
       db.shifts.where('openedAt').below(cutoffTimestamp).filter(s => s.status !== 'OPEN').count()
     ])
     return {
@@ -714,6 +1014,7 @@ export function useKasiryDB() {
       txCount,
       payCount,
       expenseCount,
+      restockCount,
       shiftCount
     }
   }
@@ -721,18 +1022,20 @@ export function useKasiryDB() {
   // Arsipkan & pangkas transaksi lama ke file JSON (+ siapkan payload untuk arsip Drive) tanpa menyentuh utang/barang/pelanggan
   const archiveOldTransactions = async (retentionDays = 180) => {
     const cutoffTimestamp = Date.now() - retentionDays * MS_PER_DAY
-    const [oldTx, oldPays, oldExpenses, oldShifts] = await Promise.all([
+    const [oldTx, oldPays, oldExpenses, oldRestocks, oldShifts] = await Promise.all([
       db.transactions.where('createdAt').below(cutoffTimestamp).toArray(),
       db.debtPayments.where('paymentDate').below(cutoffTimestamp).toArray(),
       db.expenses.where('createdAt').below(cutoffTimestamp).toArray(),
+      db.restocks.where('createdAt').below(cutoffTimestamp).toArray(),
       db.shifts.where('openedAt').below(cutoffTimestamp).filter(s => s.status !== 'OPEN').toArray()
     ])
 
-    if (oldTx.length === 0 && oldPays.length === 0 && oldExpenses.length === 0 && oldShifts.length === 0) {
+    if (oldTx.length === 0 && oldPays.length === 0 && oldExpenses.length === 0 && oldRestocks.length === 0 && oldShifts.length === 0) {
       return {
         archivedTxCount: 0,
         archivedPayCount: 0,
         archivedExpenseCount: 0,
+        archivedRestockCount: 0,
         archivedShiftCount: 0,
         cutoffTimestamp,
         archiveFilename: null,
@@ -754,6 +1057,7 @@ export function useKasiryDB() {
         transactions: oldTx,
         debtPayments: oldPays,
         expenses: oldExpenses,
+        restocks: oldRestocks,
         shifts: oldShifts
       }
     })
@@ -771,10 +1075,11 @@ export function useKasiryDB() {
     URL.revokeObjectURL(url)
 
     const nextCutoff = Math.max(archiveCutoffAt.value || 0, cutoffTimestamp)
-    await db.transaction('rw', [db.transactions, db.debtPayments, db.expenses, db.shifts, db.settings], async () => {
+    await db.transaction('rw', [db.transactions, db.debtPayments, db.expenses, db.restocks, db.shifts, db.settings], async () => {
       await db.transactions.where('createdAt').below(cutoffTimestamp).delete()
       await db.debtPayments.where('paymentDate').below(cutoffTimestamp).delete()
       await db.expenses.where('createdAt').below(cutoffTimestamp).delete()
+      await db.restocks.where('createdAt').below(cutoffTimestamp).delete()
       if (oldShifts.length > 0) {
         await db.shifts.bulkDelete(oldShifts.map(s => s.id))
       }
@@ -792,6 +1097,7 @@ export function useKasiryDB() {
       archivedTxCount: oldTx.length,
       archivedPayCount: oldPays.length,
       archivedExpenseCount: oldExpenses.length,
+      archivedRestockCount: oldRestocks.length,
       archivedShiftCount: oldShifts.length,
       cutoffTimestamp,
       archiveFilename,
@@ -815,6 +1121,7 @@ export function useKasiryDB() {
     const txList = Array.isArray(d.transactions) ? d.transactions : []
     const payList = Array.isArray(d.debtPayments) ? d.debtPayments : []
     const activeExpenses = Array.isArray(d.expenses) ? d.expenses.filter(e => !e.deleted) : []
+    const activeRestocks = Array.isArray(d.restocks) ? d.restocks.filter(r => !r.deleted) : []
     const activeShifts = Array.isArray(d.shifts) ? d.shifts.filter(s => !s.deleted) : []
 
     return {
@@ -826,6 +1133,7 @@ export function useKasiryDB() {
       transactionCount: txList.length,
       debtPaymentCount: payList.length,
       expenseCount: activeExpenses.length,
+      restockCount: activeRestocks.length,
       shiftCount: activeShifts.length,
       payload
     }
@@ -849,17 +1157,19 @@ export function useKasiryDB() {
         transactions: inTransactions = [],
         debtPayments: inDebtPayments = [],
         expenses: inExpenses = [],
+        restocks: inRestocks = [],
         shifts: inShifts = [],
         settings: inSettings = []
       } = payload.data
 
-      await db.transaction('rw', [db.products, db.customers, db.transactions, db.debtPayments, db.expenses, db.shifts, db.settings], async () => {
+      await db.transaction('rw', [db.products, db.customers, db.transactions, db.debtPayments, db.expenses, db.restocks, db.shifts, db.settings], async () => {
         if (mode === 'replace') {
           await db.products.clear()
           await db.customers.clear()
           await db.transactions.clear()
           await db.debtPayments.clear()
           await db.expenses.clear()
+          await db.restocks.clear()
           await db.shifts.clear()
           await db.settings.clear()
 
@@ -877,6 +1187,9 @@ export function useKasiryDB() {
           }
           if (Array.isArray(inExpenses) && inExpenses.length > 0) {
             await db.expenses.bulkPut(toPlain(inExpenses))
+          }
+          if (Array.isArray(inRestocks) && inRestocks.length > 0) {
+            await db.restocks.bulkPut(toPlain(inRestocks))
           }
           if (Array.isArray(inShifts) && inShifts.length > 0) {
             await db.shifts.bulkPut(toPlain(inShifts))
@@ -992,6 +1305,30 @@ export function useKasiryDB() {
           if (toPutExps.length > 0) await db.expenses.bulkPut(toPutExps)
         }
 
+        if (Array.isArray(inRestocks) && inRestocks.length > 0) {
+          const existingRestocks = await db.restocks.toArray()
+          const restockById = new Map(existingRestocks.map(r => [r.id, r]))
+          const restockByNo = new Map(existingRestocks.filter(r => r.restockNumber).map(r => [r.restockNumber, r]))
+          const usedRestockIds = new Set(existingRestocks.map(r => r.id))
+          const toPutRestocks = []
+
+          for (const rr of inRestocks) {
+            if (effectiveCutoff > 0 && (rr.createdAt || 0) < effectiveCutoff) continue
+            const localMatch = (rr.restockNumber && restockByNo.get(rr.restockNumber)) || restockById.get(rr.id)
+            if (!localMatch) {
+              const cleanRestock = toPlain(rr)
+              if (!cleanRestock.id || usedRestockIds.has(cleanRestock.id)) {
+                cleanRestock.id = generateUniqueId()
+              }
+              usedRestockIds.add(cleanRestock.id)
+              toPutRestocks.push(cleanRestock)
+            } else if ((rr.updatedAt || 0) >= (localMatch.updatedAt || 0)) {
+              toPutRestocks.push(toPlain({ ...rr, id: localMatch.id }))
+            }
+          }
+          if (toPutRestocks.length > 0) await db.restocks.bulkPut(toPutRestocks)
+        }
+
         if (Array.isArray(inShifts) && inShifts.length > 0) {
           const existingShifts = await db.shifts.toArray()
           const shiftById = new Map(existingShifts.map(s => [s.id, s]))
@@ -1039,6 +1376,7 @@ export function useKasiryDB() {
         transactionCount: inTransactions?.length || 0,
         customerCount: inCustomers?.length || 0,
         expenseCount: inExpenses?.length || 0,
+        restockCount: inRestocks?.length || 0,
         shiftCount: inShifts?.length || 0
       }
     } catch (err) {
@@ -1085,6 +1423,7 @@ export function useKasiryDB() {
     transactions,
     debtPayments,
     expenses,
+    restocks,
     shifts,
     activeShift,
     isActiveShiftStale,
@@ -1093,6 +1432,7 @@ export function useKasiryDB() {
     totalTransactionCount,
     totalDebtPaymentCount,
     totalExpenseCount,
+    totalRestockCount,
     totalShiftCount,
     olderTransactionCount,
     archiveCutoffAt,
@@ -1111,6 +1451,8 @@ export function useKasiryDB() {
     recordDebtPayment,
     recordExpense,
     deleteExpense,
+    recordRestock,
+    deleteRestock,
     openShift,
     closeShift,
     recordTransaction,

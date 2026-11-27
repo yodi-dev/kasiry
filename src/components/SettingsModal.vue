@@ -287,6 +287,7 @@ const onFileSelected = (event) => {
       const activeCusts = Array.isArray(d.customers) ? d.customers.filter(c => !c.deleted) : []
       const txList = Array.isArray(d.transactions) ? d.transactions : []
       const activeExpenses = Array.isArray(d.expenses) ? d.expenses.filter(e => !e.deleted) : []
+      const activeRestocks = Array.isArray(d.restocks) ? d.restocks.filter(r => !r.deleted) : []
       const activeShifts = Array.isArray(d.shifts) ? d.shifts.filter(s => !s.deleted) : []
 
       pendingImportPreview.value = {
@@ -305,6 +306,7 @@ const onFileSelected = (event) => {
         customerCount: activeCusts.length,
         transactionCount: txList.length,
         expenseCount: activeExpenses.length,
+        restockCount: activeRestocks.length,
         shiftCount: activeShifts.length,
         content
       }
@@ -749,7 +751,7 @@ const cancelImport = () => {
                 <div class="flex justify-between">
                   <span class="text-slate-500">Isi Data:</span>
                   <span class="font-bold text-[#0284c7]">
-                    {{ pendingImportPreview.productCount }} barang • {{ pendingImportPreview.customerCount }} pelanggan • {{ pendingImportPreview.transactionCount }} struk<template v-if="pendingImportPreview.expenseCount > 0"> • {{ pendingImportPreview.expenseCount }} kas keluar</template><template v-if="pendingImportPreview.shiftCount > 0"> • {{ pendingImportPreview.shiftCount }} shift</template>
+                    {{ pendingImportPreview.productCount }} barang • {{ pendingImportPreview.customerCount }} pelanggan • {{ pendingImportPreview.transactionCount }} struk<template v-if="pendingImportPreview.expenseCount > 0"> • {{ pendingImportPreview.expenseCount }} kas keluar</template><template v-if="pendingImportPreview.restockCount > 0"> • {{ pendingImportPreview.restockCount }} kulakan</template><template v-if="pendingImportPreview.shiftCount > 0"> • {{ pendingImportPreview.shiftCount }} shift</template>
                   </span>
                 </div>
               </div>

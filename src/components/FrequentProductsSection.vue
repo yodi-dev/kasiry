@@ -157,15 +157,27 @@ const displayedProducts = computed(() => {
           </span>
 
           <div class="min-w-0" :class="cartQtyMap[item.id] > 0 ? 'pr-8' : 'pr-1'">
-            <div v-if="item.category || item.wholesalePrice > 0 || item.agentPrice > 0" class="hidden md:flex items-center gap-1 mb-0.5">
-              <span v-if="item.category" class="text-[10px] font-semibold text-slate-400 truncate">
+            <div
+              v-if="item.category || item.wholesalePrice > 0 || item.agentPrice > 0 || (item.stock !== null && item.stock !== undefined && Number(item.stock) <= 5)"
+              class="flex items-center gap-1 mb-0.5 flex-wrap"
+            >
+              <span v-if="item.category" class="hidden md:inline text-[10px] font-semibold text-slate-400 truncate">
                 {{ item.category }}
               </span>
               <span
                 v-if="item.wholesalePrice > 0 || item.agentPrice > 0"
-                class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-800 border border-amber-200/70 shrink-0"
+                class="hidden md:inline-block text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-800 border border-amber-200/70 shrink-0"
               >
                 {{ item.agentPrice > 0 && !(item.wholesalePrice > 0) ? 'Agen' : 'Grosir' }}
+              </span>
+              <span
+                v-if="item.stock !== null && item.stock !== undefined && Number(item.stock) <= 5"
+                class="text-[9px] font-bold px-1.5 py-0.2 rounded-full border shrink-0"
+                :class="Number(item.stock) === 0
+                  ? 'bg-rose-50 text-rose-700 border-rose-200/80'
+                  : 'bg-amber-50 text-amber-800 border-amber-200/80'"
+              >
+                {{ Number(item.stock) === 0 ? 'Habis' : `Sisa ${item.stock}` }}
               </span>
             </div>
             <p class="font-semibold text-[#0a193d] text-xs sm:text-[13px] leading-snug line-clamp-2 group-hover:text-sky-800 transition-colors">

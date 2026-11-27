@@ -537,6 +537,30 @@ export function useGoogleSync() {
     }, storeName)
   }
 
+  // Catat Nota Kulakan / Belanja Stok ke Google Sheets melalui pipeline antrean yang sama
+  const appendRestockToSheet = async ({ restockNumber, createdAt = Date.now(), supplierName = '', source = 'TUNAI_LACI', totalCost = 0, items = [], note = '' } = {}, storeName = 'Toko') => {
+    const sourceLabel = source === 'NON_TUNAI'
+      ? 'KULAKAN (NON-TUNAI)'
+      : source === 'DANA_LUAR'
+        ? 'KULAKAN (DANA LUAR)'
+        : 'KULAKAN (TUNAI)'
+    const itemsSummary = Array.isArray(items) && items.length > 0
+      ? items.map(it => `${it.productName || 'Barang'} x${it.qty || 0} (@Rp ${Number(it.unitBuyPrice || 0).toLocaleString('id-ID')})`).join(', ')
+      : 'Kulakan stok'
+    const fullText = note ? `${itemsSummary} • ${note}` : itemsSummary
+
+    return appendTransactionToSheet({
+      invoiceNumber: restockNumber || `KLK-${String(createdAt).slice(-6)}`,
+      createdAt,
+      paymentMethod: sourceLabel,
+      customerName: supplierName || 'Supplier / Kulakan',
+      totalAmount: -Math.abs(Number(totalCost || 0)),
+      cashGiven: 0,
+      changeAmount: 0,
+      itemsText: fullText
+    }, storeName)
+  }
+
   // Catat Aktivitas Buka / Tutup Shift ke Google Sheets melalui pipeline antrean yang sama
   const appendShiftEventToSheet = async ({ action = 'BUKA SHIFT', shift = {} } = {}, storeName = 'Toko') => {
     const isClosing = action === 'TUTUP SHIFT'
@@ -714,6 +738,24 @@ export function useGoogleSync() {
       const mergedShifts = Array.from(shiftMap.values())
         .sort((a, b) => (b.openedAt || 0) - (a.openedAt || 0))
 
+      // 8. Merge Nota Kulakan (berdasarkan restockNumber atau id, LWW per updatedAt & hormati cutoff arsip)
+      const restockMap = new Map()
+      ;(lData.restocks || []).forEach(rec => {
+        if (archiveCutoff > 0 && toTimestamp(rec.createdAt) < archiveCutoff) return
+        const key = rec.restockNumber || rec.id
+        restockMap.set(key, rec)
+      })
+      ;(rData.restocks || []).forEach(rr => {
+        if (archiveCutoff > 0 && toTimestamp(rr.createdAt) < archiveCutoff) return
+        const key = rr.restockNumber || rr.id
+        const lr = restockMap.get(key)
+        if (!lr || (rr.updatedAt || 0) > (lr.updatedAt || 0)) {
+          restockMap.set(key, rr)
+        }
+      })
+      const mergedRestocks = Array.from(restockMap.values())
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+
       const mergedPayload = {
         app: 'Kasiry POS',
         version: '2.4',
@@ -725,6 +767,7 @@ export function useGoogleSync() {
           transactions: mergedTransactions,
           debtPayments: mergedDebtPayments,
           expenses: mergedExpenses,
+          restocks: mergedRestocks,
           shifts: mergedShifts,
           settings: mergedSettings
         }
@@ -836,6 +879,7 @@ export function useGoogleSync() {
     appendTransactionToSheet,
     appendDebtPaymentToSheet,
     appendExpenseToSheet,
+    appendRestockToSheet,
     appendShiftEventToSheet,
     ensureSpreadsheet
   }

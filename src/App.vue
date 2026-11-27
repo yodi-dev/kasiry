@@ -82,6 +82,7 @@ const ReceiptModal = lazyModal(loadReceiptModal)
 const DebtBookModal = lazyModal(() => import('./components/DebtBookModal.vue'))
 const DailyReportModal = lazyModal(() => import('./components/DailyReportModal.vue'))
 const ExpenseModal = lazyModal(() => import('./components/ExpenseModal.vue'))
+const RestockModal = lazyModal(() => import('./components/RestockModal.vue'))
 const ShiftModal = lazyModal(() => import('./components/ShiftModal.vue'))
 const SettingsModal = lazyModal(() => import('./components/SettingsModal.vue'))
 const CameraScannerModal = lazyModal(() => import('./components/CameraScannerModal.vue'))
@@ -105,6 +106,7 @@ const {
   transactions,
   debtPayments,
   expenses,
+  restocks,
   shifts,
   activeShift,
   isActiveShiftStale,
@@ -125,6 +127,8 @@ const {
   recordDebtPayment,
   recordExpense,
   deleteExpense,
+  recordRestock,
+  deleteRestock,
   openShift,
   closeShift,
   recordTransaction,
@@ -161,6 +165,7 @@ const {
   appendTransactionToSheet,
   appendDebtPaymentToSheet,
   appendExpenseToSheet,
+  appendRestockToSheet,
   appendShiftEventToSheet,
   ensureSpreadsheet
 } = useGoogleSync()
@@ -206,6 +211,7 @@ const isLazyInventoryOpen = ref(false)
 const isDebtBookOpen = ref(false)
 const isDailyReportOpen = ref(false)
 const isExpenseOpen = ref(false)
+const isRestockOpen = ref(false)
 const isShiftOpen = ref(false)
 const isShiftAutoPrompt = ref(false)
 const completedShiftSummary = ref(null)
@@ -225,6 +231,7 @@ const isAnyModalOpen = computed(() => {
     isDebtBookOpen.value ||
     isDailyReportOpen.value ||
     isExpenseOpen.value ||
+    isRestockOpen.value ||
     isShiftOpen.value ||
     isSettingsOpen.value ||
     isCameraOpen.value ||
@@ -592,6 +599,43 @@ const handleDeleteExpense = async (expenseId) => {
   }
 }
 
+// Record & Hapus Nota Kulakan / Belanja Stok (update stok lunak, modal, kas keluar & sync Sheets/Drive)
+const handleRecordRestock = async (payload) => {
+  const res = await recordRestock(payload)
+  if (!res?.restock) return
+  playBeepSound('success')
+
+  if (Array.isArray(res.updatedProducts) && res.updatedProducts.length > 0 && cart.value.length > 0) {
+    const updatedMap = new Map(res.updatedProducts.map(p => [p.id, p]))
+    cart.value = cart.value.map(item => {
+      const updated = updatedMap.get(item.id)
+      if (!updated) return item
+      return buildPricedCartItem(
+        {
+          ...item,
+          buyPrice: updated.buyPrice,
+          baseSellPrice: updated.sellPrice,
+          stock: updated.stock
+        },
+        cartPriceTier.value
+      )
+    })
+  }
+
+  if (res.expense) {
+    appendExpenseToSheet(res.expense, storeProfile.value?.name)
+  }
+  appendRestockToSheet(res.restock, storeProfile.value?.name)
+  triggerCloudAutoBackup(true)
+}
+
+const handleDeleteRestock = async (restockId) => {
+  const ok = await deleteRestock(restockId)
+  if (ok) {
+    triggerCloudAutoBackup(true)
+  }
+}
+
 // Buka & Tutup Shift Kasir
 const openShiftModalManual = () => {
   completedShiftSummary.value = null
@@ -761,6 +805,7 @@ const handleDownloadExcel = async () => {
       transactions: allTransactions,
       debtPayments: allDebtPayments,
       expenses: allExpenses,
+      restocks: allRestocks,
       shifts: allShifts
     } = await getAllTransactionsForExport()
     await exportKasiryExcel({
@@ -770,6 +815,7 @@ const handleDownloadExcel = async () => {
       customers: customers.value,
       debtPayments: allDebtPayments,
       expenses: allExpenses,
+      restocks: allRestocks,
       shifts: allShifts
     })
     playBeepSound('success')
@@ -869,6 +915,7 @@ const modalFlagKeys = [
   'debtBook',
   'dailyReport',
   'expense',
+  'restock',
   'shift',
   'settings',
   'camera',
@@ -882,6 +929,7 @@ const activatedModals = reactive({
   debtBook: false,
   dailyReport: false,
   expense: false,
+  restock: false,
   shift: false,
   settings: false,
   camera: false,
@@ -897,6 +945,7 @@ watch(
     isDebtBookOpen,
     isDailyReportOpen,
     isExpenseOpen,
+    isRestockOpen,
     isShiftOpen,
     isSettingsOpen,
     isCameraOpen,
@@ -1004,6 +1053,7 @@ onUnmounted(() => {
       @openDebtBook="isDebtBookOpen = true"
       @openDailyReport="isDailyReportOpen = true"
       @openExpense="isExpenseOpen = true"
+      @openRestock="isRestockOpen = true"
       @openShift="openShiftModalManual"
       @openSettings="isSettingsOpen = true"
       @openCamera="isCameraOpen = true"
@@ -1193,6 +1243,19 @@ onUnmounted(() => {
       @close="isExpenseOpen = false"
       @recordExpense="handleRecordExpense"
       @deleteExpense="handleDeleteExpense"
+    />
+
+    <!-- Modal Kulakan / Belanja Stok & Manajemen Stok Lunak -->
+    <RestockModal
+      v-if="activatedModals.restock || isRestockOpen"
+      :isOpen="isRestockOpen"
+      :products="products"
+      :restocks="restocks"
+      :activeShift="activeShift"
+      :stats="stats"
+      @close="isRestockOpen = false"
+      @recordRestock="handleRecordRestock"
+      @deleteRestock="handleDeleteRestock"
     />
 
     <!-- Modal Buka & Tutup Shift (Tutup Buku Harian) -->

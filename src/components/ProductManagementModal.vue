@@ -72,6 +72,7 @@ const currentProduct = ref({
   wholesalePrice: '',
   wholesaleMinQty: '',
   agentPrice: '',
+  stock: '',
   barcode: '',
   category: 'Sembako',
   isMacro: false
@@ -124,6 +125,7 @@ const openAddForm = () => {
     wholesalePrice: '',
     wholesaleMinQty: '',
     agentPrice: '',
+    stock: '',
     barcode: '',
     category: selectedCategory.value !== 'Semua' ? selectedCategory.value : (availableCategories.value[0] || 'Sembako'),
     isMacro: false
@@ -141,6 +143,7 @@ const openEditForm = (p) => {
     wholesalePrice: p.wholesalePrice > 0 ? String(p.wholesalePrice) : '',
     wholesaleMinQty: p.wholesaleMinQty >= 2 ? String(p.wholesaleMinQty) : '',
     agentPrice: p.agentPrice > 0 ? String(p.agentPrice) : '',
+    stock: (p.stock !== null && p.stock !== undefined && Number.isFinite(Number(p.stock))) ? String(p.stock) : '',
     barcode: p.barcode || '',
     category: p.category || (availableCategories.value[0] || 'Sembako'),
     isMacro: !!p.isMacro
@@ -154,6 +157,9 @@ const handleSave = () => {
   const buy = parseInt(String(currentProduct.value.buyPrice).replace(/\D/g, '') || '0', 10)
   if (!currentProduct.value.name.trim() || sell <= 0) return
 
+  const rawStock = String(currentProduct.value.stock ?? '').trim()
+  const parsedStock = rawStock === '' ? null : Math.max(0, Math.round(Number(rawStock)))
+
   emit('saveProduct', {
     id: currentProduct.value.id || Date.now(),
     name: currentProduct.value.name.trim(),
@@ -162,6 +168,7 @@ const handleSave = () => {
     wholesalePrice: sanitizeOptionalPrice(currentProduct.value.wholesalePrice),
     wholesaleMinQty: sanitizeMinQty(currentProduct.value.wholesaleMinQty),
     agentPrice: sanitizeOptionalPrice(currentProduct.value.agentPrice),
+    stock: parsedStock !== null && Number.isFinite(parsedStock) ? parsedStock : null,
     barcode: currentProduct.value.barcode.trim(),
     category: currentProduct.value.category,
     isMacro: currentProduct.value.isMacro || false
@@ -366,6 +373,20 @@ const handleDeleteCategory = (cat) => {
                     Agen: Rp {{ p.agentPrice.toLocaleString('id-ID') }}
                   </span>
 
+                  <span
+                    v-if="p.stock !== null && p.stock !== undefined"
+                    :class="[
+                      'text-[10px] font-bold px-2 py-0.5 rounded-full border font-mono',
+                      Number(p.stock) === 0
+                        ? 'bg-rose-50 text-rose-700 border-rose-200/80'
+                        : Number(p.stock) <= 5
+                          ? 'bg-amber-50 text-amber-800 border-amber-200/80'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                    ]"
+                  >
+                    {{ Number(p.stock) === 0 ? 'Habis (0)' : `Stok: ${p.stock}` }}
+                  </span>
+
                   <span v-if="p.category" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
                     {{ p.category }}
                   </span>
@@ -543,6 +564,31 @@ const handleDeleteCategory = (cat) => {
                   class="w-full h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-sm font-bold text-[#0284c7] text-right font-mono outline-hidden transition-all"
                 />
               </div>
+            </div>
+          </div>
+
+          <!-- Stok Produk (Opsional & Non-Blocking) -->
+          <div class="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200/70 space-y-1.5">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Stok Saat Ini (Opsional)
+              </label>
+              <span class="text-[11px] text-slate-500 font-medium">
+                Kosongkan jika tidak perlu melacak stok
+              </span>
+            </div>
+            <div class="flex items-center gap-3">
+              <input
+                type="number"
+                min="0"
+                inputmode="numeric"
+                v-model="currentProduct.stock"
+                placeholder="Kosong = tidak dilacak (bebas jual)"
+                class="w-44 h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-sm font-bold text-[#0a193d] text-right font-mono outline-hidden transition-all"
+              />
+              <span class="text-[11px] text-slate-600 leading-snug">
+                Berkurang otomatis saat laku &amp; bertambah saat kulakan. Barang stok 0 tetap bisa dibeli di kasa.
+              </span>
             </div>
           </div>
 

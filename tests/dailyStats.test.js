@@ -199,4 +199,27 @@ describe('computeDailyStats (Separation of Cash Drawer, QRIS Non-Cash, and Bon)'
     expect(waText).toContain('SHF-77')
     expect(waText).toContain('Kurang -Rp 5.000')
   })
+
+  it('deducts kulakan expenses from drawer/non-cash balance without double-cutting operating profit', () => {
+    const now = Date.now()
+    const transactions = [
+      {
+        invoiceNumber: 'KSR-10',
+        createdAt: now,
+        paymentMethod: 'TUNAI',
+        totalAmount: 200000,
+        items: [{ name: 'Beras', sellPrice: 200000, buyPrice: 170000, qty: 1 }] // laba kotor 30.000
+      }
+    ]
+    const expenses = [
+      { id: 1, expenseNumber: 'KLR-KUL1', createdAt: now, amount: 120000, category: 'kulakan', source: 'TUNAI_LACI', deleted: false },
+      { id: 2, expenseNumber: 'KLR-OPS1', createdAt: now, amount: 5000, category: 'operasional', source: 'TUNAI_LACI', deleted: false }
+    ]
+
+    const stats = computeDailyStats(transactions, [], expenses, now)
+    expect(stats.todayExpensesCash).toBe(125000)
+    expect(stats.todayNetCashDrawer).toBe(75000) // 200.000 - 120.000 kulakan - 5.000 ops
+    expect(stats.todayOperationalExpenses).toBe(5000) // hanya biaya ops; kulakan non-biaya
+    expect(stats.todayProfit).toBe(25000) // 30.000 laba kotor - 5.000 ops
+  })
 })

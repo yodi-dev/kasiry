@@ -32,12 +32,18 @@ export class KasiryDatabase extends Dexie {
       shifts: '++id, shiftCode, status, openedAt, closedAt, updatedAt, deleted'
     })
 
+    // Schema Version 5: Tabel restocks untuk pencatatan kulakan / belanja stok barang
+    this.version(5).stores({
+      restocks: '++id, restockNumber, createdAt, source, supplierName, updatedAt, deleted'
+    })
+
     this.products = this.table('products')
     this.transactions = this.table('transactions')
     this.customers = this.table('customers')
     this.debtPayments = this.table('debtPayments')
     this.expenses = this.table('expenses')
     this.shifts = this.table('shifts')
+    this.restocks = this.table('restocks')
     this.settings = this.table('settings')
   }
 }

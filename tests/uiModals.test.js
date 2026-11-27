@@ -7,6 +7,7 @@ import DebtBookModal from '../src/components/DebtBookModal.vue'
 import ReceiptModal from '../src/components/ReceiptModal.vue'
 import DailyReportModal from '../src/components/DailyReportModal.vue'
 import ExpenseModal from '../src/components/ExpenseModal.vue'
+import RestockModal from '../src/components/RestockModal.vue'
 import ShiftModal from '../src/components/ShiftModal.vue'
 import CartSection from '../src/components/CartSection.vue'
 import FrequentProductsSection from '../src/components/FrequentProductsSection.vue'
@@ -575,5 +576,121 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
       }
     })
     expect(receiptGrosir.text()).toContain('Grosir (Auto)')
+  })
+
+  it('handles TopBar Kulakan Stok action, soft stock badges without blocking clicks, and RestockModal workflows', async () => {
+    // 1. TopBar dropdown Stok & Data memuat opsi Kulakan Stok dan emit openRestock
+    const topBar = mount(TopBar, {
+      props: {
+        storeName: 'Habiba Store',
+        totalDebtCount: 0,
+        todayTxCount: 0,
+        todayExpenseCount: 0
+      }
+    })
+    await topBar.find('button[title="Kelola Barang & Data Pelanggan"]').trigger('click')
+    await nextTick()
+    expect(topBar.text()).toContain('Kulakan Stok')
+    const kulakanBtn = topBar.findAll('button').find(b => b.text().includes('Kulakan Stok'))
+    await kulakanBtn.trigger('click')
+    expect(topBar.emitted('openRestock')).toBeTruthy()
+
+    // 2. FrequentProductsSection menampilkan lencana stok lunak (Habis / Sisa N) tanpa memblokir klik
+    const freq = mount(FrequentProductsSection, {
+      props: {
+        frequentProducts: [
+          { id: 1, name: 'Gas LPG 3 Kg', sellPrice: 22000, category: 'Sembako', stock: 0 },
+          { id: 2, name: 'Gula 1kg', sellPrice: 17500, category: 'Sembako', stock: 4 }
+        ],
+        allProducts: [
+          { id: 1, name: 'Gas LPG 3 Kg', sellPrice: 22000, category: 'Sembako', stock: 0 },
+          { id: 2, name: 'Gula 1kg', sellPrice: 17500, category: 'Sembako', stock: 4 }
+        ],
+        categories: ['Sembako'],
+        cartItems: []
+      }
+    })
+    expect(freq.text()).toContain('Habis')
+    expect(freq.text()).toContain('Sisa 4')
+    const gasBtn = freq.findAll('button').find(b => b.text().includes('Gas LPG 3 Kg'))
+    await gasBtn.trigger('click')
+    expect(freq.emitted('selectProduct')?.[0]?.[0]?.id).toBe(1)
+
+    // 3. ProductManagementModal menampilkan badge Stok pada daftar produk
+    const prodModal = mount(ProductManagementModal, {
+      props: {
+        isOpen: true,
+        products: [{ id: 2, name: 'Gula 1kg', sellPrice: 17500, buyPrice: 15000, stock: 4, category: 'Sembako' }],
+        categories: ['Sembako']
+      }
+    })
+    expect(prodModal.text()).toContain('Stok: 4')
+
+    // 4. RestockModal: pilih produk, deteksi kenaikan modal, simpan nota kulakan, & hapus di riwayat
+    const restock = mount(RestockModal, {
+      props: {
+        isOpen: true,
+        products: [{ id: 10, name: 'Minyak Goreng 1L', sellPrice: 18000, buyPrice: 14500, stock: 2, category: 'Sembako' }],
+        restocks: [
+          {
+            id: 501,
+            restockNumber: 'KLK-501',
+            createdAt: Date.now(),
+            supplierName: 'Agen Maju',
+            source: 'TUNAI_LACI',
+            totalCost: 72500,
+            totalItems: 5,
+            items: [{ productId: 10, productName: 'Minyak Goreng 1L', qty: 5, unitBuyPrice: 14500 }],
+            deleted: false
+          }
+        ],
+        stats: { todayCashDrawer: 150000, todayNetCashDrawer: 150000, todayExpensesCash: 0 }
+      }
+    })
+
+    const pickProdBtn = restock.findAll('button').find(b => b.text().includes('Minyak Goreng 1L'))
+    expect(pickProdBtn).toBeTruthy()
+    await pickProdBtn.trigger('click')
+    await nextTick()
+    expect(restock.text()).toContain('Daftar Belanja Nota (1 Item)')
+
+    const supplierInput = restock.find('input[placeholder="Misal: Agen Sembako Jaya"]')
+    await supplierInput.setValue('Agen Sumber Rezeki')
+
+    const numInputs = restock.findAll('input[type="number"]')
+    await numInputs[0].setValue('6')
+    await numInputs[1].setValue('15500')
+    await nextTick()
+    expect(restock.text()).toContain('Modal naik')
+    expect(restock.text()).toContain('Ubah Jual:')
+
+    const submitBtn = restock.findAll('button').find(b => b.text().includes('Simpan Nota Kulakan'))
+    await submitBtn.trigger('click')
+    expect(restock.emitted('recordRestock')?.[0]?.[0]).toEqual({
+      supplierName: 'Agen Sumber Rezeki',
+      source: 'TUNAI_LACI',
+      note: '',
+      items: [
+        {
+          productId: 10,
+          productName: 'Minyak Goreng 1L',
+          qty: 6,
+          unitBuyPrice: 15500,
+          trackStock: true,
+          newSellPrice: null
+        }
+      ]
+    })
+
+    const historyTab = restock.findAll('button').find(b => b.text().includes('Riwayat Kulakan'))
+    await historyTab.trigger('click')
+    await nextTick()
+    expect(restock.text()).toContain('Agen Maju')
+    const trashBtn = restock.find('button[title="Batalkan / Hapus Nota Kulakan"]')
+    await trashBtn.trigger('click')
+    await nextTick()
+    const confirmDelBtn = restock.findAll('button').find(b => b.text().trim() === 'Hapus')
+    await confirmDelBtn.trigger('click')
+    expect(restock.emitted('deleteRestock')?.[0]?.[0]).toBe(501)
   })
 })

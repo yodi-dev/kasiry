@@ -110,6 +110,21 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
           },
           deleted: false
         }
+      ],
+      restocks: [
+        {
+          id: 21,
+          restockNumber: 'KLK-201',
+          createdAt: Date.now(),
+          supplierName: 'Agen Sembako Jaya',
+          source: 'TUNAI_LACI',
+          shiftCode: 'SHF-901',
+          totalCost: 130000,
+          totalItems: 10,
+          items: [{ productId: 2, productName: 'Minyakita 1L', qty: 10, unitBuyPrice: 13000 }],
+          note: 'Nota pagi',
+          deleted: false
+        }
       ]
     })
 
@@ -124,7 +139,8 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
       'Barang Terjual',
       'Buku Utang Pelanggan',
       'Pengeluaran Kas',
-      'Riwayat Shift'
+      'Riwayat Shift',
+      'Riwayat Kulakan'
     ])
 
     const summaryRows = XLSX.utils.sheet_to_json(workbook.Sheets['Ringkasan Kas'], { header: 1 })
@@ -160,5 +176,12 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(shiftRows[0]['Modal Awal (Rp)']).toBe(100000)
     expect(shiftRows[0]['Uang Fisik (Rp)']).toBe(125000)
     expect(shiftRows[0]['Selisih (Rp)']).toBe(0)
+
+    const restockRows = XLSX.utils.sheet_to_json(workbook.Sheets['Riwayat Kulakan'])
+    expect(restockRows).toHaveLength(1)
+    expect(restockRows[0]['No. Nota']).toBe('KLK-201')
+    expect(restockRows[0]['Supplier / Agen']).toBe('Agen Sembako Jaya')
+    expect(restockRows[0]['Total Modal (Rp)']).toBe(130000)
+    expect(restockRows[0]['Rincian Barang']).toContain('Minyakita 1L x10')
   })
 })
