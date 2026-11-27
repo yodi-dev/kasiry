@@ -40,6 +40,7 @@ const expenses = shallowRef([])
 const restocks = shallowRef([])
 const cashServices = shallowRef([])
 const digitalProducts = shallowRef([])
+const fundMovements = shallowRef([])
 const shifts = shallowRef([])
 const lastOpeningCash = ref(0)
 const totalTransactionCount = ref(0)
@@ -48,6 +49,7 @@ const totalExpenseCount = ref(0)
 const totalRestockCount = ref(0)
 const totalCashServiceCount = ref(0)
 const totalDigitalProductCount = ref(0)
+const totalFundMovementCount = ref(0)
 const totalShiftCount = ref(0)
 const archiveCutoffAt = ref(0)
 const olderTransactionCount = computed(() =>
@@ -85,7 +87,10 @@ const unassignedTodayCount = computed(() => {
   const unassignedDigitals = digitalProducts.value.filter(
     d => !d?.deleted && (d?.createdAt || 0) >= todayTs && !d.shiftId && !d.shiftCode
   ).length
-  return unassignedTx + unassignedPays + unassignedExps + unassignedServices + unassignedDigitals
+  const unassignedFundMovements = fundMovements.value.filter(
+    m => !m?.deleted && (m?.createdAt || 0) >= todayTs && !m.shiftId && !m.shiftCode
+  ).length
+  return unassignedTx + unassignedPays + unassignedExps + unassignedServices + unassignedDigitals + unassignedFundMovements
 })
 const lastLocalBackupTime = ref(
   typeof localStorage !== 'undefined' ? localStorage.getItem('kasiry_last_local_backup') || null : null
@@ -170,13 +175,14 @@ export function useKasiryDB() {
 
   const refreshRecentTransactions = async () => {
     const windowCutoff = Date.now() - ACTIVE_HISTORY_DAYS * MS_PER_DAY
-    const [recentTx, recentPays, recentExpenses, recentRestocks, recentCashServices, recentDigitalProducts, recentShifts, openShifts, txCount, payCount, expCount, restockCount, cashServiceCount, digitalCount, shiftCount] = await Promise.all([
+    const [recentTx, recentPays, recentExpenses, recentRestocks, recentCashServices, recentDigitalProducts, recentFundMovements, recentShifts, openShifts, txCount, payCount, expCount, restockCount, cashServiceCount, digitalCount, fundMovementCount, shiftCount] = await Promise.all([
       db.transactions.where('createdAt').aboveOrEqual(windowCutoff).reverse().toArray(),
       db.debtPayments.where('paymentDate').aboveOrEqual(windowCutoff).reverse().toArray(),
       db.expenses.where('createdAt').aboveOrEqual(windowCutoff).reverse().filter(e => !e.deleted).toArray(),
       db.restocks.where('createdAt').aboveOrEqual(windowCutoff).reverse().filter(r => !r.deleted).toArray(),
       db.cashServices.where('createdAt').aboveOrEqual(windowCutoff).reverse().filter(s => !s.deleted).toArray(),
       db.digitalProducts.where('createdAt').aboveOrEqual(windowCutoff).reverse().filter(d => !d.deleted).toArray(),
+      db.fundMovements.where('createdAt').aboveOrEqual(windowCutoff).reverse().filter(m => !m.deleted).toArray(),
       db.shifts.where('openedAt').aboveOrEqual(windowCutoff).reverse().filter(s => !s.deleted).toArray(),
       db.shifts.where('status').equals('OPEN').filter(s => !s.deleted).toArray(),
       db.transactions.count(),
@@ -185,6 +191,7 @@ export function useKasiryDB() {
       db.restocks.filter(r => !r.deleted).count(),
       db.cashServices.filter(s => !s.deleted).count(),
       db.digitalProducts.filter(d => !d.deleted).count(),
+      db.fundMovements.filter(m => !m.deleted).count(),
       db.shifts.filter(s => !s.deleted).count()
     ])
 
@@ -199,6 +206,7 @@ export function useKasiryDB() {
     restocks.value = recentRestocks
     cashServices.value = recentCashServices
     digitalProducts.value = recentDigitalProducts
+    fundMovements.value = recentFundMovements
     shifts.value = Array.from(shiftMap.values()).sort((a, b) => (b.openedAt || 0) - (a.openedAt || 0))
     totalTransactionCount.value = txCount
     totalDebtPaymentCount.value = payCount
@@ -206,6 +214,7 @@ export function useKasiryDB() {
     totalRestockCount.value = restockCount
     totalCashServiceCount.value = cashServiceCount
     totalDigitalProductCount.value = digitalCount
+    totalFundMovementCount.value = fundMovementCount
     totalShiftCount.value = shiftCount
   }
 
@@ -498,13 +507,14 @@ export function useKasiryDB() {
 
     const rawAdmin = Math.round(Number(adminFee || 0))
     const cleanAdminFee = Number.isFinite(rawAdmin) && rawAdmin > 0 ? rawAdmin : 0
-    const cleanSource = cashSource === 'LACI' ? 'LACI' : 'LACI'
+    const cleanSource = cashSource === 'KAS' ? 'KAS' : 'LACI'
 
     if (cleanType === 'TARIK_TUNAI' && availableDrawerCash !== undefined && availableDrawerCash !== null) {
       const cleanAvailable = Math.round(Number(availableDrawerCash || 0))
       if (cleanAvailable <= 0 || numericAmount > cleanAvailable) {
+        const sourceName = cleanSource === 'KAS' ? 'Uang Kas Toko' : 'laci kasir'
         throw new Error(
-          `Uang tunai di laci tidak mencukupi (tersedia Rp ${Math.max(0, cleanAvailable).toLocaleString('id-ID')}).`
+          `Uang tunai di ${sourceName} tidak mencukupi (tersedia Rp ${Math.max(0, cleanAvailable).toLocaleString('id-ID')}).`
         )
       }
     }
@@ -552,6 +562,94 @@ export function useKasiryDB() {
     await db.cashServices.put(toPlain(svc))
     cashServices.value = cashServices.value.filter(s => s.id !== serviceId)
     totalCashServiceCount.value = Math.max(0, totalCashServiceCount.value - 1)
+    return true
+  }
+
+  // Pencatatan Mutasi Dana & Tabungan Toko (Laci Kasir <-> Uang Kas <-> Rekening/QRIS <-> Tabungan <-> Dana Luar)
+  const ALLOWED_FUND_TYPES = new Set(['TAMBAH_TABUNGAN', 'MUTASI', 'SETOR_MODAL', 'TARIK_DANA'])
+  const ALLOWED_FUND_ACCOUNTS = new Set(['LACI', 'KAS', 'REKENING', 'TABUNGAN', 'LUAR'])
+
+  const recordFundMovement = async ({
+    type = 'MUTASI',
+    fromAccount = 'LACI',
+    toAccount = 'KAS',
+    amount,
+    availableSourceBalance,
+    note = '',
+    createdAt,
+    movementNumber
+  } = {}) => {
+    const cleanType = ALLOWED_FUND_TYPES.has(type) ? type : 'MUTASI'
+    const cleanFrom = ALLOWED_FUND_ACCOUNTS.has(fromAccount) ? fromAccount : 'LACI'
+    const cleanTo = ALLOWED_FUND_ACCOUNTS.has(toAccount) ? toAccount : 'KAS'
+
+    if (cleanFrom === cleanTo) {
+      throw new Error('Kantong asal dan tujuan tidak boleh sama.')
+    }
+
+    const numericAmount = Math.round(Number(amount))
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      throw new Error('Nominal mutasi dana harus lebih dari Rp 0.')
+    }
+
+    if (
+      cleanFrom !== 'LUAR' &&
+      availableSourceBalance !== undefined &&
+      availableSourceBalance !== null
+    ) {
+      const cleanAvailable = Math.round(Number(availableSourceBalance || 0))
+      if (cleanAvailable <= 0 || numericAmount > cleanAvailable) {
+        const sourceLabelMap = {
+          LACI: 'Uang Laci Kasir',
+          KAS: 'Uang Kas Toko',
+          REKENING: 'Rekening & QRIS',
+          TABUNGAN: 'Tabungan Toko'
+        }
+        throw new Error(
+          `Saldo ${sourceLabelMap[cleanFrom] || cleanFrom} tidak mencukupi (tersedia Rp ${Math.max(0, cleanAvailable).toLocaleString('id-ID')}).`
+        )
+      }
+    }
+
+    const now = Date.now()
+    const timestamp = Number.isFinite(Number(createdAt)) ? Number(createdAt) : now
+    const id = generateUniqueId()
+    const prefix = cleanType === 'TAMBAH_TABUNGAN' || cleanTo === 'TABUNGAN' ? 'TBG' : 'KEU'
+    const cleanMovementNo = (typeof movementNumber === 'string' && movementNumber.trim())
+      ? movementNumber.trim()
+      : `${prefix}-${String(id).slice(-7)}`
+    const cleanNote = typeof note === 'string' ? note.trim() : ''
+    const currentShift = activeShift.value
+
+    const movementRecord = toPlain({
+      id,
+      movementNumber: cleanMovementNo,
+      createdAt: timestamp,
+      type: cleanType,
+      fromAccount: cleanFrom,
+      toAccount: cleanTo,
+      amount: numericAmount,
+      note: cleanNote,
+      shiftId: currentShift?.id || null,
+      shiftCode: currentShift?.shiftCode || null,
+      updatedAt: now,
+      deleted: false
+    })
+
+    await db.fundMovements.add(movementRecord)
+    fundMovements.value = [movementRecord, ...fundMovements.value].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    totalFundMovementCount.value += 1
+    return movementRecord
+  }
+
+  const deleteFundMovement = async (movementId) => {
+    const rec = await db.fundMovements.get(movementId)
+    if (!rec || rec.deleted) return false
+    rec.deleted = true
+    rec.updatedAt = Date.now()
+    await db.fundMovements.put(toPlain(rec))
+    fundMovements.value = fundMovements.value.filter(m => m.id !== movementId)
+    totalFundMovementCount.value = Math.max(0, totalFundMovementCount.value - 1)
     return true
   }
 
@@ -1004,7 +1102,7 @@ export function useKasiryDB() {
     startOfToday.setHours(0, 0, 0, 0)
     const todayTs = startOfToday.getTime()
 
-    await db.transaction('rw', [db.shifts, db.transactions, db.debtPayments, db.expenses, db.restocks, db.cashServices, db.digitalProducts, db.settings], async () => {
+    await db.transaction('rw', [db.shifts, db.transactions, db.debtPayments, db.expenses, db.restocks, db.cashServices, db.digitalProducts, db.fundMovements, db.settings], async () => {
       await db.shifts.add(shiftRecord)
       await db.settings.put({
         key: 'lastOpeningCash',
@@ -1013,13 +1111,14 @@ export function useKasiryDB() {
       })
 
       if (adoptUnassignedToday) {
-        const [unassignedTx, unassignedPays, unassignedExps, unassignedRestocks, unassignedCashServices, unassignedDigitals] = await Promise.all([
+        const [unassignedTx, unassignedPays, unassignedExps, unassignedRestocks, unassignedCashServices, unassignedDigitals, unassignedFundMovements] = await Promise.all([
           db.transactions.where('createdAt').aboveOrEqual(todayTs).filter(t => !t.shiftId && !t.shiftCode).toArray(),
           db.debtPayments.where('paymentDate').aboveOrEqual(todayTs).filter(p => !p.shiftId && !p.shiftCode).toArray(),
           db.expenses.where('createdAt').aboveOrEqual(todayTs).filter(e => !e.deleted && !e.shiftId && !e.shiftCode).toArray(),
           db.restocks.where('createdAt').aboveOrEqual(todayTs).filter(r => !r.deleted && !r.shiftId && !r.shiftCode).toArray(),
           db.cashServices.where('createdAt').aboveOrEqual(todayTs).filter(s => !s.deleted && !s.shiftId && !s.shiftCode).toArray(),
-          db.digitalProducts.where('createdAt').aboveOrEqual(todayTs).filter(d => !d.deleted && !d.shiftId && !d.shiftCode).toArray()
+          db.digitalProducts.where('createdAt').aboveOrEqual(todayTs).filter(d => !d.deleted && !d.shiftId && !d.shiftCode).toArray(),
+          db.fundMovements.where('createdAt').aboveOrEqual(todayTs).filter(m => !m.deleted && !m.shiftId && !m.shiftCode).toArray()
         ])
 
         if (unassignedTx.length > 0) {
@@ -1039,6 +1138,9 @@ export function useKasiryDB() {
         }
         if (unassignedDigitals.length > 0) {
           await db.digitalProducts.bulkPut(toPlain(unassignedDigitals.map(d => ({ ...d, shiftId: id, shiftCode, updatedAt: now }))))
+        }
+        if (unassignedFundMovements.length > 0) {
+          await db.fundMovements.bulkPut(toPlain(unassignedFundMovements.map(m => ({ ...m, shiftId: id, shiftCode, updatedAt: now }))))
         }
       }
     })
@@ -1066,12 +1168,13 @@ export function useKasiryDB() {
     startOfOpenedDay.setHours(0, 0, 0, 0)
     const queryStart = Math.min(Number(shift.openedAt || now), startOfOpenedDay.getTime())
 
-    const [periodTx, periodPays, periodExps, periodCashServices, periodDigitalProducts] = await Promise.all([
+    const [periodTx, periodPays, periodExps, periodCashServices, periodDigitalProducts, periodFundMovements] = await Promise.all([
       db.transactions.where('createdAt').aboveOrEqual(queryStart).toArray(),
       db.debtPayments.where('paymentDate').aboveOrEqual(queryStart).toArray(),
       db.expenses.where('createdAt').aboveOrEqual(queryStart).filter(e => !e.deleted).toArray(),
       db.cashServices.where('createdAt').aboveOrEqual(queryStart).filter(s => !s.deleted).toArray(),
-      db.digitalProducts.where('createdAt').aboveOrEqual(queryStart).filter(d => !d.deleted).toArray()
+      db.digitalProducts.where('createdAt').aboveOrEqual(queryStart).filter(d => !d.deleted).toArray(),
+      db.fundMovements.where('createdAt').aboveOrEqual(queryStart).filter(m => !m.deleted).toArray()
     ])
 
     const numericActual = Math.round(Number(actualCash))
@@ -1084,6 +1187,7 @@ export function useKasiryDB() {
       expenses: periodExps,
       cashServices: periodCashServices,
       digitalProducts: periodDigitalProducts,
+      fundMovements: periodFundMovements,
       actualCash: numericActual
     })
 
@@ -1269,7 +1373,7 @@ export function useKasiryDB() {
 
   // Dapatkan seluruh data database untuk sinkronisasi cloud
   const getFullDatabasePayload = async () => {
-    const [allProducts, allCustomers, allTransactions, allDebtPayments, allExpenses, allRestocks, allCashServices, allDigitalProducts, allShifts, allSettings] = await Promise.all([
+    const [allProducts, allCustomers, allTransactions, allDebtPayments, allExpenses, allRestocks, allCashServices, allDigitalProducts, allFundMovements, allShifts, allSettings] = await Promise.all([
       db.products.toArray(),
       db.customers.toArray(),
       db.transactions.toArray(),
@@ -1278,6 +1382,7 @@ export function useKasiryDB() {
       db.restocks.toArray(),
       db.cashServices.toArray(),
       db.digitalProducts.toArray(),
+      db.fundMovements.toArray(),
       db.shifts.toArray(),
       db.settings.toArray()
     ])
@@ -1296,6 +1401,7 @@ export function useKasiryDB() {
         restocks: allRestocks,
         cashServices: allCashServices,
         digitalProducts: allDigitalProducts,
+        fundMovements: allFundMovements,
         shifts: allShifts,
         settings: allSettings
       }
@@ -1327,15 +1433,16 @@ export function useKasiryDB() {
     return true
   }
 
-  // Ambil seluruh transaksi, pelunasan, pengeluaran, kulakan, layanan tunai/tf, pulsa/PLN, & shift dari IndexedDB on-demand (khusus ekspor Excel lengkap)
+  // Ambil seluruh transaksi, pelunasan, pengeluaran, kulakan, layanan tunai/tf, pulsa/PLN, mutasi dana, & shift dari IndexedDB on-demand (khusus ekspor Excel lengkap)
   const getAllTransactionsForExport = async () => {
-    const [allTransactions, allDebtPayments, allExpenses, allRestocks, allCashServices, allDigitalProducts, allShifts] = await Promise.all([
+    const [allTransactions, allDebtPayments, allExpenses, allRestocks, allCashServices, allDigitalProducts, allFundMovements, allShifts] = await Promise.all([
       db.transactions.orderBy('createdAt').reverse().toArray(),
       db.debtPayments.orderBy('paymentDate').reverse().toArray(),
       db.expenses.orderBy('createdAt').reverse().filter(e => !e.deleted).toArray(),
       db.restocks.orderBy('createdAt').reverse().filter(r => !r.deleted).toArray(),
       db.cashServices.orderBy('createdAt').reverse().filter(s => !s.deleted).toArray(),
       db.digitalProducts.orderBy('createdAt').reverse().filter(d => !d.deleted).toArray(),
+      db.fundMovements.orderBy('createdAt').reverse().filter(m => !m.deleted).toArray(),
       db.shifts.orderBy('openedAt').reverse().filter(s => !s.deleted).toArray()
     ])
     return {
@@ -1345,6 +1452,7 @@ export function useKasiryDB() {
       restocks: allRestocks,
       cashServices: allCashServices,
       digitalProducts: allDigitalProducts,
+      fundMovements: allFundMovements,
       shifts: allShifts
     }
   }
@@ -1378,13 +1486,14 @@ export function useKasiryDB() {
   // Hitung jumlah riwayat yang memenuhi syarat arsip (lebih tua dari retentionDays) tanpa memuat payload penuh
   const getArchivableSummary = async (retentionDays = 180) => {
     const cutoffTimestamp = Date.now() - retentionDays * MS_PER_DAY
-    const [txCount, payCount, expenseCount, restockCount, cashServiceCount, digitalCount, shiftCount] = await Promise.all([
+    const [txCount, payCount, expenseCount, restockCount, cashServiceCount, digitalCount, fundMovementCount, shiftCount] = await Promise.all([
       db.transactions.where('createdAt').below(cutoffTimestamp).count(),
       db.debtPayments.where('paymentDate').below(cutoffTimestamp).count(),
       db.expenses.where('createdAt').below(cutoffTimestamp).count(),
       db.restocks.where('createdAt').below(cutoffTimestamp).count(),
       db.cashServices.where('createdAt').below(cutoffTimestamp).count(),
       db.digitalProducts.where('createdAt').below(cutoffTimestamp).count(),
+      db.fundMovements.where('createdAt').below(cutoffTimestamp).count(),
       db.shifts.where('openedAt').below(cutoffTimestamp).filter(s => s.status !== 'OPEN').count()
     ])
     return {
@@ -1396,6 +1505,7 @@ export function useKasiryDB() {
       restockCount,
       cashServiceCount,
       digitalCount,
+      fundMovementCount,
       shiftCount
     }
   }
@@ -1403,17 +1513,18 @@ export function useKasiryDB() {
   // Arsipkan & pangkas transaksi lama ke file JSON (+ siapkan payload untuk arsip Drive) tanpa menyentuh utang/barang/pelanggan
   const archiveOldTransactions = async (retentionDays = 180) => {
     const cutoffTimestamp = Date.now() - retentionDays * MS_PER_DAY
-    const [oldTx, oldPays, oldExpenses, oldRestocks, oldCashServices, oldDigitalProducts, oldShifts] = await Promise.all([
+    const [oldTx, oldPays, oldExpenses, oldRestocks, oldCashServices, oldDigitalProducts, oldFundMovements, oldShifts] = await Promise.all([
       db.transactions.where('createdAt').below(cutoffTimestamp).toArray(),
       db.debtPayments.where('paymentDate').below(cutoffTimestamp).toArray(),
       db.expenses.where('createdAt').below(cutoffTimestamp).toArray(),
       db.restocks.where('createdAt').below(cutoffTimestamp).toArray(),
       db.cashServices.where('createdAt').below(cutoffTimestamp).toArray(),
       db.digitalProducts.where('createdAt').below(cutoffTimestamp).toArray(),
+      db.fundMovements.where('createdAt').below(cutoffTimestamp).toArray(),
       db.shifts.where('openedAt').below(cutoffTimestamp).filter(s => s.status !== 'OPEN').toArray()
     ])
 
-    if (oldTx.length === 0 && oldPays.length === 0 && oldExpenses.length === 0 && oldRestocks.length === 0 && oldCashServices.length === 0 && oldDigitalProducts.length === 0 && oldShifts.length === 0) {
+    if (oldTx.length === 0 && oldPays.length === 0 && oldExpenses.length === 0 && oldRestocks.length === 0 && oldCashServices.length === 0 && oldDigitalProducts.length === 0 && oldFundMovements.length === 0 && oldShifts.length === 0) {
       return {
         archivedTxCount: 0,
         archivedPayCount: 0,
@@ -1421,6 +1532,7 @@ export function useKasiryDB() {
         archivedRestockCount: 0,
         archivedCashServiceCount: 0,
         archivedDigitalCount: 0,
+        archivedFundMovementCount: 0,
         archivedShiftCount: 0,
         cutoffTimestamp,
         archiveFilename: null,
@@ -1445,6 +1557,7 @@ export function useKasiryDB() {
         restocks: oldRestocks,
         cashServices: oldCashServices,
         digitalProducts: oldDigitalProducts,
+        fundMovements: oldFundMovements,
         shifts: oldShifts
       }
     })
@@ -1462,13 +1575,14 @@ export function useKasiryDB() {
     URL.revokeObjectURL(url)
 
     const nextCutoff = Math.max(archiveCutoffAt.value || 0, cutoffTimestamp)
-    await db.transaction('rw', [db.transactions, db.debtPayments, db.expenses, db.restocks, db.cashServices, db.digitalProducts, db.shifts, db.settings], async () => {
+    await db.transaction('rw', [db.transactions, db.debtPayments, db.expenses, db.restocks, db.cashServices, db.digitalProducts, db.fundMovements, db.shifts, db.settings], async () => {
       await db.transactions.where('createdAt').below(cutoffTimestamp).delete()
       await db.debtPayments.where('paymentDate').below(cutoffTimestamp).delete()
       await db.expenses.where('createdAt').below(cutoffTimestamp).delete()
       await db.restocks.where('createdAt').below(cutoffTimestamp).delete()
       await db.cashServices.where('createdAt').below(cutoffTimestamp).delete()
       await db.digitalProducts.where('createdAt').below(cutoffTimestamp).delete()
+      await db.fundMovements.where('createdAt').below(cutoffTimestamp).delete()
       if (oldShifts.length > 0) {
         await db.shifts.bulkDelete(oldShifts.map(s => s.id))
       }
@@ -1489,6 +1603,7 @@ export function useKasiryDB() {
       archivedRestockCount: oldRestocks.length,
       archivedCashServiceCount: oldCashServices.length,
       archivedDigitalCount: oldDigitalProducts.length,
+      archivedFundMovementCount: oldFundMovements.length,
       archivedShiftCount: oldShifts.length,
       cutoffTimestamp,
       archiveFilename,
@@ -1515,6 +1630,7 @@ export function useKasiryDB() {
     const activeRestocks = Array.isArray(d.restocks) ? d.restocks.filter(r => !r.deleted) : []
     const activeCashServices = Array.isArray(d.cashServices) ? d.cashServices.filter(s => !s.deleted) : []
     const activeDigitalProducts = Array.isArray(d.digitalProducts) ? d.digitalProducts.filter(dig => !dig.deleted) : []
+    const activeFundMovements = Array.isArray(d.fundMovements) ? d.fundMovements.filter(m => !m.deleted) : []
     const activeShifts = Array.isArray(d.shifts) ? d.shifts.filter(s => !s.deleted) : []
 
     return {
@@ -1529,6 +1645,7 @@ export function useKasiryDB() {
       restockCount: activeRestocks.length,
       cashServiceCount: activeCashServices.length,
       digitalProductCount: activeDigitalProducts.length,
+      fundMovementCount: activeFundMovements.length,
       shiftCount: activeShifts.length,
       payload
     }
@@ -1555,11 +1672,12 @@ export function useKasiryDB() {
         restocks: inRestocks = [],
         cashServices: inCashServices = [],
         digitalProducts: inDigitalProducts = [],
+        fundMovements: inFundMovements = [],
         shifts: inShifts = [],
         settings: inSettings = []
       } = payload.data
 
-      await db.transaction('rw', [db.products, db.customers, db.transactions, db.debtPayments, db.expenses, db.restocks, db.cashServices, db.digitalProducts, db.shifts, db.settings], async () => {
+      await db.transaction('rw', [db.products, db.customers, db.transactions, db.debtPayments, db.expenses, db.restocks, db.cashServices, db.digitalProducts, db.fundMovements, db.shifts, db.settings], async () => {
         if (mode === 'replace') {
           await db.products.clear()
           await db.customers.clear()
@@ -1569,6 +1687,7 @@ export function useKasiryDB() {
           await db.restocks.clear()
           await db.cashServices.clear()
           await db.digitalProducts.clear()
+          await db.fundMovements.clear()
           await db.shifts.clear()
           await db.settings.clear()
 
@@ -1595,6 +1714,9 @@ export function useKasiryDB() {
           }
           if (Array.isArray(inDigitalProducts) && inDigitalProducts.length > 0) {
             await db.digitalProducts.bulkPut(toPlain(inDigitalProducts))
+          }
+          if (Array.isArray(inFundMovements) && inFundMovements.length > 0) {
+            await db.fundMovements.bulkPut(toPlain(inFundMovements))
           }
           if (Array.isArray(inShifts) && inShifts.length > 0) {
             await db.shifts.bulkPut(toPlain(inShifts))
@@ -1806,6 +1928,30 @@ export function useKasiryDB() {
           if (toPutShifts.length > 0) await db.shifts.bulkPut(toPutShifts)
         }
 
+        if (Array.isArray(inFundMovements) && inFundMovements.length > 0) {
+          const existingMovements = await db.fundMovements.toArray()
+          const fmById = new Map(existingMovements.map(m => [m.id, m]))
+          const fmByNo = new Map(existingMovements.filter(m => m.movementNumber).map(m => [m.movementNumber, m]))
+          const usedFmIds = new Set(existingMovements.map(m => m.id))
+          const toPutMovements = []
+
+          for (const rm of inFundMovements) {
+            if (effectiveCutoff > 0 && (rm.createdAt || 0) < effectiveCutoff) continue
+            const localMatch = (rm.movementNumber && fmByNo.get(rm.movementNumber)) || fmById.get(rm.id)
+            if (!localMatch) {
+              const cleanFm = toPlain(rm)
+              if (!cleanFm.id || usedFmIds.has(cleanFm.id)) {
+                cleanFm.id = generateUniqueId()
+              }
+              usedFmIds.add(cleanFm.id)
+              toPutMovements.push(cleanFm)
+            } else if ((rm.updatedAt || 0) >= (localMatch.updatedAt || 0)) {
+              toPutMovements.push(toPlain({ ...rm, id: localMatch.id }))
+            }
+          }
+          if (toPutMovements.length > 0) await db.fundMovements.bulkPut(toPutMovements)
+        }
+
         if (Array.isArray(inSettings) && inSettings.length > 0) {
           const existingSettings = await db.settings.toArray()
           const setMap = new Map(existingSettings.map(s => [s.key, s]))
@@ -1832,6 +1978,7 @@ export function useKasiryDB() {
         restockCount: inRestocks?.length || 0,
         cashServiceCount: inCashServices?.length || 0,
         digitalProductCount: inDigitalProducts?.length || 0,
+        fundMovementCount: inFundMovements?.length || 0,
         shiftCount: inShifts?.length || 0
       }
     } catch (err) {
@@ -1902,7 +2049,7 @@ export function useKasiryDB() {
 
     await db.transaction(
       'rw',
-      [db.products, db.customers, db.transactions, db.debtPayments, db.expenses, db.restocks, db.cashServices, db.digitalProducts, db.shifts, db.settings],
+      [db.products, db.customers, db.transactions, db.debtPayments, db.expenses, db.restocks, db.cashServices, db.digitalProducts, db.fundMovements, db.shifts, db.settings],
       async () => {
         await Promise.all([
           db.products.clear(),
@@ -1913,6 +2060,7 @@ export function useKasiryDB() {
           db.restocks.clear(),
           db.cashServices.clear(),
           db.digitalProducts.clear(),
+          db.fundMovements.clear(),
           db.shifts.clear()
         ])
 
@@ -1951,6 +2099,7 @@ export function useKasiryDB() {
     restocks,
     cashServices,
     digitalProducts,
+    fundMovements,
     shifts,
     activeShift,
     isActiveShiftStale,
@@ -1962,6 +2111,7 @@ export function useKasiryDB() {
     totalRestockCount,
     totalCashServiceCount,
     totalDigitalProductCount,
+    totalFundMovementCount,
     totalShiftCount,
     olderTransactionCount,
     archiveCutoffAt,
@@ -1987,6 +2137,8 @@ export function useKasiryDB() {
     deleteRestock,
     recordCashService,
     deleteCashService,
+    recordFundMovement,
+    deleteFundMovement,
     recordDigitalProduct,
     updateDigitalTokenCode,
     deleteDigitalProduct,

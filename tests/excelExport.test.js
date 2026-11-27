@@ -173,7 +173,29 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
           shiftCode: 'SHF-901',
           deleted: false
         }
-      ]
+      ],
+      fundMovements: [
+        {
+          id: 51,
+          movementNumber: 'TBG-501',
+          createdAt: Date.now(),
+          type: 'TAMBAH_TABUNGAN',
+          fromAccount: 'LACI',
+          toAccount: 'TABUNGAN',
+          amount: 50000,
+          shiftCode: 'SHF-901',
+          note: 'Nabung harian',
+          deleted: false
+        }
+      ],
+      financeBalances: {
+        laciBalance: 125000,
+        kasBalance: 250000,
+        rekeningBalance: 85000,
+        tabunganBalance: 50000,
+        totalReceivables: 15000,
+        totalNetWealth: 525000
+      }
     })
 
     expect(fileName).toMatch(/^Laporan_Habiba_Store_\d{4}-\d{2}-\d{2}\.xlsx$/)
@@ -190,7 +212,8 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
       'Riwayat Shift',
       'Riwayat Kulakan',
       'Tarik Tunai & Transfer',
-      'Pulsa & Token Listrik'
+      'Pulsa & Token Listrik',
+      'Mutasi Kas & Tabungan'
     ])
 
     const summaryRows = XLSX.utils.sheet_to_json(workbook.Sheets['Ringkasan Kas'], { header: 1 })
@@ -250,5 +273,11 @@ describe('exportKasiryExcel (Dynamic SheetJS Multi-Sheet Export)', () => {
     expect(digitalRows[0]['No. HP / ID PLN']).toBe('541200889911')
     expect(digitalRows[0]['No. Token / SN']).toBe('1234 5678 9012 3456 7890')
     expect(digitalRows[0]['Laba (Rp)']).toBe(2000)
+
+    const fundRows = XLSX.utils.sheet_to_json(workbook.Sheets['Mutasi Kas & Tabungan'])
+    expect(fundRows).toHaveLength(1)
+    expect(fundRows[0]['No. Mutasi']).toBe('TBG-501')
+    expect(fundRows[0]['Nominal (Rp)']).toBe(50000)
+    expect(fundRows[0]['Keterangan']).toBe('Nabung harian')
   })
 })

@@ -6,6 +6,22 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.19.0] - 2026-11-27 (Backlog Fase 2 #4: Modul Manajemen Keuangan, 4 Kantong Dana & Tabungan)
+
+### Added
+- **Modul Manajemen Keuangan & Tabungan Terpadu (`src/components/FinanceModal.vue`, `src/utils/financeEngine.js`, `src/db/index.js` schema `v8`):**
+  - Menambahkan tabel IndexedDB **`fundMovements`** (`++id, movementNumber, createdAt, type, fromAccount, toAccount, shiftId, updatedAt, deleted`) dengan migrasi otomatis `v1 -> v8` tanpa menghapus data lama.
+  - Mesin perhitungan 4 kantong keuangan (`computeFinanceBalances` & `computePeriodFinanceSummary`): **Uang Laci Kasir (`LACI`)**, **Uang Kas Toko (`KAS`)**, **Rekening & QRIS (`REKENING`)**, dan **Tabungan Toko (`TABUNGAN`)**, beserta **Total Kas Likuid**, **Total Piutang Pelanggan**, dan **Total Kekayaan Bersih**.
+  - Modal 3 tab terpisah (**`Ringkasan Saldo`**, **`Tabungan & Mutasi`**, **`Riwayat`**) dengan pemilih rentang waktu **`Shift Ini / Hari Ini`**, **`7 Hari`**, & **`30 Hari`**, form **`+ Tambah Tabungan`**, **Pindah Kantong**, **Setor Modal**, & **Ambil Dana**, penjagaan anti-minus saldo sumber (kecuali sumber `LUAR`), serta hapus aman 2-tap.
+  - **Pemisahan Laporan Harian vs Manajemen Keuangan:** Ringkasan keuangan & kekayaan berada terpisah pada tombol **`Keuangan`** di `TopBar.vue` (serta `Manajemen Keuangan & Tabungan` di Mobile Drawer) tanpa mencemari UI `DailyReportModal.vue` & `ShiftModal.vue` — sembari tetap merekonsiliasi perpindahan fisik uang masuk/keluar `LACI` (`todayFundToLaci`, `todayFundFromLaci`) ke hitung laci shift di `dailyStats.js`.
+- **Pilihan Sumber Tunai `Laci Kasir` vs `Uang Kas` di Tarik Tunai & Transfer (`CashServiceModal.vue`, `useKasiryDB.js`, `App.vue`):**
+  - Kasir kini dapat memilih apakah uang fisik Tarik Tunai/Transfer diambil atau disimpan ke **`Laci Kasir`** atau **`Uang Kas Toko`** lengkap dengan guard saldo masing-masing kantong.
+- **Excel 10-Sheet & Google Cloud Sync (`excelExport.js`, `useGoogleSync.js`, `useKasiryDB.js`):**
+  - Menambahkan ringkasan posisi saldo 4 kantong di Sheet 1 (`Ringkasan Kas`) serta Sheet ke-10 **`Mutasi Kas & Tabungan`**.
+  - Menambahkan `appendFundMovementToSheet`, two-way LWW merge #11 (`fundMovements`) di `syncWithCloud`, JSON Backup/Restore (`merge` & `replace`), Arsip Tahunan, & Reset Toko.
+
+---
+
 ## [2.18.0] - 2026-11-27 (Backlog Fase 2 #3: Pembayaran Kurang / Sebagian Otomatis Masuk Buku Utang)
 
 ### Added

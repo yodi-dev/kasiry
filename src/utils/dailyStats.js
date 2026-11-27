@@ -24,7 +24,8 @@ function aggregateRecords(
   periodExpenses = [],
   openingCash = 0,
   periodCashServices = [],
-  periodDigitalProducts = []
+  periodDigitalProducts = [],
+  periodFundMovements = []
 ) {
   let cashSales = 0
   let qrisSales = 0
@@ -173,6 +174,16 @@ function aggregateRecords(
     }
   })
 
+  let todayFundToLaci = 0
+  let todayFundFromLaci = 0
+  ;(periodFundMovements || []).forEach(mv => {
+    if (!mv || mv.deleted) return
+    const amt = Math.round(Number(mv.amount || 0))
+    if (!Number.isFinite(amt) || amt <= 0) return
+    if (mv.toAccount === 'LACI') todayFundToLaci += amt
+    if (mv.fromAccount === 'LACI') todayFundFromLaci += amt
+  })
+
   const topProducts = Object.values(productCountMap)
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 5)
@@ -183,7 +194,12 @@ function aggregateRecords(
   const cleanOpening = Math.max(0, Number(openingCash || 0))
   const todayNonCashServiceNet = todayNonCashServiceIn - todayNonCashServiceOut
   const todayNetCashDrawer =
-    todayCashDrawer - todayExpensesCash + todayCashServiceIn - todayCashServiceOut
+    todayCashDrawer -
+    todayExpensesCash +
+    todayCashServiceIn -
+    todayCashServiceOut +
+    todayFundToLaci -
+    todayFundFromLaci
 
   return {
     openingCash: cleanOpening,
@@ -219,6 +235,8 @@ function aggregateRecords(
     todayDigitalCost,
     todayDigitalProfit,
     todayDigitalCount,
+    todayFundToLaci,
+    todayFundFromLaci,
     todayNetCashDrawer,
     expectedCashDrawer: cleanOpening + todayNetCashDrawer,
     todayNetQris: todayQrisTotal - todayExpensesNonCash + todayNonCashServiceNet,
@@ -254,6 +272,7 @@ export function computeDailyStats(
   let activeShift = null
   let cashServices = []
   let digitalProducts = []
+  let fundMovements = []
 
   if (typeof expensesOrNow === 'number') {
     nowTs = expensesOrNow
@@ -264,6 +283,7 @@ export function computeDailyStats(
     activeShift = maybeNowOrOptions.activeShift || null
     cashServices = Array.isArray(maybeNowOrOptions.cashServices) ? maybeNowOrOptions.cashServices : []
     digitalProducts = Array.isArray(maybeNowOrOptions.digitalProducts) ? maybeNowOrOptions.digitalProducts : []
+    fundMovements = Array.isArray(maybeNowOrOptions.fundMovements) ? maybeNowOrOptions.fundMovements : []
   }
 
   let periodTx
@@ -271,6 +291,7 @@ export function computeDailyStats(
   let periodExpenses
   let periodCashServices
   let periodDigitalProducts
+  let periodFundMovements
 
   if (activeShift && activeShift.status === 'OPEN') {
     periodTx = (transactions || []).filter(t => recordBelongsToShift(t, activeShift, 'createdAt'))
@@ -278,6 +299,7 @@ export function computeDailyStats(
     periodExpenses = (expenses || []).filter(e => !e?.deleted && recordBelongsToShift(e, activeShift, 'createdAt'))
     periodCashServices = cashServices.filter(s => !s?.deleted && recordBelongsToShift(s, activeShift, 'createdAt'))
     periodDigitalProducts = digitalProducts.filter(d => !d?.deleted && recordBelongsToShift(d, activeShift, 'createdAt'))
+    periodFundMovements = fundMovements.filter(m => !m?.deleted && recordBelongsToShift(m, activeShift, 'createdAt'))
   } else {
     const startOfDay = new Date(nowTs)
     startOfDay.setHours(0, 0, 0, 0)
@@ -288,6 +310,7 @@ export function computeDailyStats(
     periodExpenses = (expenses || []).filter(e => !e?.deleted && (e?.createdAt || 0) >= todayTimestamp)
     periodCashServices = cashServices.filter(s => !s?.deleted && (s?.createdAt || 0) >= todayTimestamp)
     periodDigitalProducts = digitalProducts.filter(d => !d?.deleted && (d?.createdAt || 0) >= todayTimestamp)
+    periodFundMovements = fundMovements.filter(m => !m?.deleted && (m?.createdAt || 0) >= todayTimestamp)
   }
 
   const agg = aggregateRecords(
@@ -296,7 +319,8 @@ export function computeDailyStats(
     periodExpenses,
     activeShift?.openingCash || 0,
     periodCashServices,
-    periodDigitalProducts
+    periodDigitalProducts,
+    periodFundMovements
   )
 
   return {
@@ -319,6 +343,7 @@ export function computeShiftClosingPreview({
   expenses = [],
   cashServices = [],
   digitalProducts = [],
+  fundMovements = [],
   actualCash = 0
 } = {}) {
   if (!shift) return null
@@ -327,6 +352,7 @@ export function computeShiftClosingPreview({
   const periodExpenses = (expenses || []).filter(e => !e?.deleted && recordBelongsToShift(e, shift, 'createdAt'))
   const periodCashServices = (cashServices || []).filter(s => !s?.deleted && recordBelongsToShift(s, shift, 'createdAt'))
   const periodDigitalProducts = (digitalProducts || []).filter(d => !d?.deleted && recordBelongsToShift(d, shift, 'createdAt'))
+  const periodFundMovements = (fundMovements || []).filter(m => !m?.deleted && recordBelongsToShift(m, shift, 'createdAt'))
 
   const stats = aggregateRecords(
     periodTx,
@@ -334,7 +360,8 @@ export function computeShiftClosingPreview({
     periodExpenses,
     shift.openingCash || 0,
     periodCashServices,
-    periodDigitalProducts
+    periodDigitalProducts,
+    periodFundMovements
   )
   const cleanActualCash = Math.round(Number(actualCash || 0))
   const expectedCash = stats.expectedCashDrawer
@@ -380,6 +407,8 @@ export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
   const cashServiceIn = Number(s.todayCashServiceIn || 0)
   const cashServiceOut = Number(s.todayCashServiceOut || 0)
   const cashServiceAdminProfit = Number(s.todayCashServiceAdminProfit || 0)
+  const fundToLaci = Number(s.todayFundToLaci || 0)
+  const fundFromLaci = Number(s.todayFundFromLaci || 0)
   const expensesCash = Number(s.todayExpensesCash || 0)
   const qrisTotal = Number(s.todayQrisTotal || 0)
   const newDebt = Number(s.todayNewDebt || 0)
@@ -412,6 +441,12 @@ export function formatShiftWhatsAppText(shift, storeName = 'Warung Kasiry') {
   }
   if (cashServiceOut > 0) {
     text += `🏧 Tarik Tunai Dari Laci: -Rp ${cashServiceOut.toLocaleString('id-ID')}\n`
+  }
+  if (fundToLaci > 0) {
+    text += `📥 Dana Masuk ke Laci: +Rp ${fundToLaci.toLocaleString('id-ID')}\n`
+  }
+  if (fundFromLaci > 0) {
+    text += `📤 Setor/Mutasi Dari Laci: -Rp ${fundFromLaci.toLocaleString('id-ID')}\n`
   }
   if (expensesCash > 0) {
     text += `💸 Kas Keluar Dari Laci: -Rp ${expensesCash.toLocaleString('id-ID')}\n`

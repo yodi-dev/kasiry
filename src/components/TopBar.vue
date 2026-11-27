@@ -14,7 +14,8 @@ import {
   Clock,
   ArrowLeftRight,
   Smartphone,
-  Zap
+  Zap,
+  Landmark
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -67,6 +68,7 @@ const props = defineProps({
 const emit = defineEmits([
   'openDebtBook',
   'openDailyReport',
+  'openFinance',
   'openExpense',
   'openCashService',
   'openDigitalProduct',
@@ -269,6 +271,15 @@ const quickNavItems = computed(() => [
     badgeClass: 'bg-red-100 text-red-700'
   },
   {
+    event: 'openFinance',
+    label: 'Keuangan',
+    shortLabel: 'Kas',
+    icon: Landmark,
+    iconColor: 'text-sky-600 group-hover:text-sky-300',
+    badge: 0,
+    badgeClass: ''
+  },
+  {
     event: 'openDailyReport',
     label: 'Laporan',
     shortLabel: 'Laporan',
@@ -323,6 +334,14 @@ const drawerGroups = computed(() => [
   {
     title: 'Keuangan & Laporan',
     items: [
+      {
+        event: 'openFinance',
+        label: 'Manajemen Keuangan & Tabungan',
+        icon: Landmark,
+        iconBg: 'bg-sky-50 text-[#0284c7] border-sky-100',
+        badge: 0,
+        badgeClass: ''
+      },
       {
         event: 'openDebtBook',
         label: 'Buku Utang',

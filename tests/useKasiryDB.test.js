@@ -730,4 +730,62 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(kasiry.transactions.value[0].paidAmount).toBe(30000)
     expect(kasiry.transactions.value[0].debtAmount).toBe(20000)
   })
+
+  it('records fund movements (Tambah Tabungan, Mutasi, overdraft guard, soft-delete) and Tarik Tunai from KAS', async () => {
+    // 1. Tolak Mutasi jika saldo sumber tidak mencukupi (kecuali dari LUAR)
+    await expect(
+      kasiry.recordFundMovement({
+        type: 'TAMBAH_TABUNGAN',
+        fromAccount: 'LACI',
+        toAccount: 'TABUNGAN',
+        amount: 250000,
+        availableSourceBalance: 100000
+      })
+    ).rejects.toThrow(/tidak mencukupi/)
+
+    // 2. Setor Modal Awal ke Uang Kas dari LUAR (diizinkan walau tanpa cek saldo LUAR)
+    const modalKas = await kasiry.recordFundMovement({
+      type: 'SETOR_MODAL',
+      fromAccount: 'LUAR',
+      toAccount: 'KAS',
+      amount: 400000,
+      note: 'Modal awal brankas toko'
+    })
+    expect(modalKas.movementNumber).toMatch(/^KEU-/)
+    expect(modalKas.toAccount).toBe('KAS')
+
+    // 3. Tambah Tabungan dari KAS 100.000 -> prefix TBG-
+    const tabungan = await kasiry.recordFundMovement({
+      type: 'TAMBAH_TABUNGAN',
+      fromAccount: 'KAS',
+      toAccount: 'TABUNGAN',
+      amount: 100000,
+      availableSourceBalance: 400000,
+      note: 'Sisihkan laba harian'
+    })
+    expect(tabungan.movementNumber).toMatch(/^TBG-/)
+    expect(tabungan.toAccount).toBe('TABUNGAN')
+    expect(kasiry.fundMovements.value).toHaveLength(2)
+
+    // 4. Tarik Tunai memakai sumber Uang Kas (KAS)
+    const ttKas = await kasiry.recordCashService({
+      type: 'TARIK_TUNAI',
+      cashSource: 'KAS',
+      amount: 150000,
+      adminFee: 5000,
+      channel: 'QRIS',
+      availableDrawerCash: 300000
+    })
+    expect(ttKas.cashSource).toBe('KAS')
+
+    // Backup & inspect menyertakan fundMovements
+    const payload = await kasiry.getFullDatabasePayload()
+    expect(payload.data.fundMovements).toHaveLength(2)
+    expect(kasiry.inspectBackupJSON(payload).fundMovementCount).toBe(2)
+
+    // Soft-delete mutasi dana
+    const deleted = await kasiry.deleteFundMovement(tabungan.id)
+    expect(deleted).toBe(true)
+    expect(kasiry.fundMovements.value).toHaveLength(1)
+  })
 })

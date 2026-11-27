@@ -46,6 +46,11 @@ export class KasiryDatabase extends Dexie {
       digitalProducts: '++id, digitalNumber, createdAt, category, paymentMethod, customerId, shiftId, updatedAt, deleted'
     })
 
+    // Schema Version 8: Tabel fundMovements untuk Manajemen Keuangan (Uang Kas, Rekening, Tabungan & Mutasi)
+    this.version(8).stores({
+      fundMovements: '++id, movementNumber, createdAt, type, fromAccount, toAccount, shiftId, updatedAt, deleted'
+    })
+
     this.products = this.table('products')
     this.transactions = this.table('transactions')
     this.customers = this.table('customers')
@@ -55,6 +60,7 @@ export class KasiryDatabase extends Dexie {
     this.restocks = this.table('restocks')
     this.cashServices = this.table('cashServices')
     this.digitalProducts = this.table('digitalProducts')
+    this.fundMovements = this.table('fundMovements')
     this.settings = this.table('settings')
   }
 }

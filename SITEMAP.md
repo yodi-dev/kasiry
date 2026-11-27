@@ -88,7 +88,7 @@ stateDiagram-v2
 
 ```text
 App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud Sync)
-├── TopBar.vue (Desktop: Chip Shift + `Stok & Data ▾`, `Layanan ▾`, `Buku Utang`, `Laporan`, `⚙️`; HP: Chip Shift + Drawer 4 seksi)
+├── TopBar.vue (Desktop: Chip Shift + `Stok & Data ▾`, `Layanan ▾`, `Buku Utang`, `Keuangan`, `Laporan`, `⚙️`; HP: Chip Shift + Drawer 4 seksi)
 │
 ├── Workspace Kasa Utama (Eager Load — Tampil Instan di Frame Pertama):
 │   ├── CartSection.vue (Struk belanjaan, saklar Ecer/Grosir/Agen, inline editor harga manual, stepper qty, bayar)
@@ -96,7 +96,7 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
 │   ├── BarcodeInputBar.vue (Floating di mobile dengan touch keyboard lock; Inline autofocus di desktop)
 │   └── StickyBottomBar.vue (Bar total & tombol Pembayaran khusus mobile saat cart > 0)
 │
-└── 14 Modal Dialog (Lazy Loaded via defineAsyncComponent + watcher { immediate: true }):
+└── 15 Modal Dialog (Lazy Loaded via defineAsyncComponent + watcher { immediate: true }):
     ├── PaymentModal.vue (Prewarmed: Tunai, QRIS uang pas/sebagian, & Utang/Bon + guard Umum saat kurang bayar + dropdown loyalitas O(N))
     ├── LazyInventoryModal.vue (Prewarmed: Input kilat barcode baru + tambah kategori inline)
     ├── ReceiptModal.vue (Prewarmed: Pratinjau struk thermal 58mm/80mm, Cetak Bluetooth/USB/Serial ESC/POS + Iframe Browser, Token PLN/SN & Kirim WA)
@@ -106,10 +106,11 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
     ├── CustomerManagementModal.vue (Daftar Pelanggan loyalitas O(N), Profil & Riwayat penuh per ID via Dexie)
     ├── DebtBookModal.vue (Buku Utang Digital, Pelunasan Tunai/QRIS presisi kembalian, Pengingat WA, Riwayat Bon)
     ├── ExpenseModal.vue (Catatan Kas Keluar: Kategori cepat, Dari Laci vs Non-Tunai, KPI sisa laci & hapus 2-tap)
-    ├── CashServiceModal.vue (Layanan Tarik Tunai & Transfer/Top-Up Cara A, Guard Saldo Laci, Cetak Struk, & Riwayat 2-tap)
+    ├── CashServiceModal.vue (Layanan Tarik Tunai & Transfer/Top-Up Cara A, Pilih Laci vs Uang Kas, Cetak Struk, & Riwayat 2-tap)
     ├── DigitalProductModal.vue (Penjualan Pulsa, Paket Data & Token Listrik PLN dg Remembered Preset Harga, Input Token SN, Tunai/QRIS/Utang, & Struk)
+    ├── FinanceModal.vue (Manajemen Keuangan & Tabungan Terpadu: 4 Kantong Laci/Kas/Rekening/Tabungan, Shift Ini/7 Hari/30 Hari, Tambah Tabungan & Mutasi)
     ├── ShiftModal.vue (Buka Shift dg auto-modal awal & adopsi catatan hari ini, Tutup Buku + hitung selisih laci, Share WA)
-    ├── DailyReportModal.vue (Ringkasan Shift Aktif/Harian, Kas Keluar, Tarik/Tf, Pulsa/PLN, Riwayat Transaksi, Riwayat Shift, WA & Excel 9-sheet via vendor-xlsx)
+    ├── DailyReportModal.vue (Ringkasan Shift Aktif/Harian, Kas Keluar, Tarik/Tf, Pulsa/PLN, Riwayat Transaksi, Riwayat Shift, WA & Excel 10-sheet via vendor-xlsx)
     └── SettingsModal.vue (Profil Toko + Versi App, Tab Printer ESC/POS Bluetooth/USB-OTG/Serial 58mm/80mm & Auto-Print, Google Drive/Sheets Sync, Backup JSON, Arsip Tahunan & Reset Toko)
 ```
 

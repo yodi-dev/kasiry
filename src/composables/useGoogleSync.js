@@ -665,6 +665,38 @@ export function useGoogleSync() {
     }, storeName)
   }
 
+  // Catat Mutasi Dana / Tambah Tabungan / Setor Modal Kas ke Google Sheets
+  const appendFundMovementToSheet = async ({
+    movementNumber,
+    createdAt = Date.now(),
+    type = 'MUTASI',
+    fromAccount = 'LACI',
+    toAccount = 'KAS',
+    amount = 0,
+    note = ''
+  } = {}, storeName = 'Toko') => {
+    const numericAmount = Math.round(Number(amount || 0))
+    const labelMap = {
+      TAMBAH_TABUNGAN: 'TAMBAH TABUNGAN',
+      SETOR_MODAL: 'SETOR MODAL KAS',
+      TARIK_DANA: 'TARIK DANA KEUANGAN',
+      MUTASI: 'MUTASI DANA'
+    }
+    const actionLabel = labelMap[type] || 'MUTASI DANA'
+    const text = `${fromAccount} -> ${toAccount}${note ? ` • ${note}` : ''}`
+
+    return appendTransactionToSheet({
+      invoiceNumber: movementNumber || `KEU-${String(createdAt).slice(-6)}`,
+      createdAt,
+      paymentMethod: actionLabel,
+      customerName: `${fromAccount} -> ${toAccount}`,
+      totalAmount: numericAmount,
+      cashGiven: numericAmount,
+      changeAmount: 0,
+      itemsText: text
+    }, storeName)
+  }
+
   // ==============================================================
   // ENGINE TWO-WAY SYNC MULTI-DEVICE (Berdasarkan Timestamp updatedAt)
   // ==============================================================
@@ -872,6 +904,24 @@ export function useGoogleSync() {
       const mergedDigitalProducts = Array.from(digitalMap.values())
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 
+      // 11. Merge Mutasi Dana, Uang Kas, & Tabungan (LWW per updatedAt & hormati cutoff arsip)
+      const movementMap = new Map()
+      ;(lData.fundMovements || []).forEach(mv => {
+        if (archiveCutoff > 0 && toTimestamp(mv.createdAt) < archiveCutoff) return
+        const key = mv.movementNumber || mv.id
+        movementMap.set(key, mv)
+      })
+      ;(rData.fundMovements || []).forEach(rm => {
+        if (archiveCutoff > 0 && toTimestamp(rm.createdAt) < archiveCutoff) return
+        const key = rm.movementNumber || rm.id
+        const lm = movementMap.get(key)
+        if (!lm || (rm.updatedAt || 0) > (lm.updatedAt || 0)) {
+          movementMap.set(key, rm)
+        }
+      })
+      const mergedFundMovements = Array.from(movementMap.values())
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+
       const mergedPayload = {
         app: 'Kasiry POS',
         version: '2.4',
@@ -886,6 +936,7 @@ export function useGoogleSync() {
           restocks: mergedRestocks,
           cashServices: mergedCashServices,
           digitalProducts: mergedDigitalProducts,
+          fundMovements: mergedFundMovements,
           shifts: mergedShifts,
           settings: mergedSettings
         }
@@ -1000,6 +1051,7 @@ export function useGoogleSync() {
     appendRestockToSheet,
     appendCashServiceToSheet,
     appendDigitalProductToSheet,
+    appendFundMovementToSheet,
     appendShiftEventToSheet,
     ensureSpreadsheet
   }

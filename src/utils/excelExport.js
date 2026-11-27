@@ -25,6 +25,8 @@ export async function exportKasiryExcel({
   restocks = [],
   cashServices = [],
   digitalProducts = [],
+  fundMovements = [],
+  financeBalances = null,
   shifts = []
 }) {
   const XLSX = await import('xlsx')
@@ -91,7 +93,17 @@ export async function exportKasiryExcel({
     ['Estimasi Untung Bersih', stats.todayProfit || 0],
     ['Bon / Utang Baru Tercatat', stats.todayNewDebt || 0],
     ['Total Transaksi / Struk', `${stats.transactionCount || 0} Kali`],
-    ['Total Piutang Belum Lunas (Semua Pelanggan)', customers.reduce((sum, c) => sum + (c.totalDebt || 0), 0)]
+    ['Total Piutang Belum Lunas (Semua Pelanggan)', customers.reduce((sum, c) => sum + (c.totalDebt || 0), 0)],
+    ...(financeBalances
+      ? [
+          [],
+          ['POSISI KEUANGAN KANTONG DANA', 'SALDO (Rp)'],
+          ['Uang Kas Toko (Cadangan / Brankas)', financeBalances.kasBalance || 0],
+          ['Saldo Rekening / QRIS (Kumulatif)', financeBalances.rekeningBalance || 0],
+          ['Saldo Tabungan Usaha', financeBalances.tabunganBalance || 0],
+          ['Total Kekayaan Likuid + Piutang', financeBalances.totalNetWealth || 0]
+        ]
+      : [])
   ]
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
   wsSummary['!cols'] = [{ wch: 38 }, { wch: 25 }]
@@ -529,6 +541,46 @@ export async function exportKasiryExcel({
     { wch: 24 }
   ]
   XLSX.utils.book_append_sheet(wb, wsDigital, 'Pulsa & Token Listrik')
+
+  // ==========================================
+  // SHEET 10: MUTASI KAS & TABUNGAN
+  // ==========================================
+  const movementHeader = [
+    'No',
+    'No. Mutasi',
+    'Tanggal & Jam',
+    'Jenis Aksi',
+    'Dari Kantong',
+    'Ke Kantong',
+    'Nominal (Rp)',
+    'Kode Shift',
+    'Keterangan'
+  ]
+  const activeMovements = (fundMovements || []).filter(m => m && !m.deleted)
+  const movementRows = activeMovements.map((m, idx) => [
+    idx + 1,
+    m.movementNumber || `#${m.id || ''}`,
+    formatShiftDate(m.createdAt),
+    m.type || 'MUTASI',
+    m.fromAccount || '-',
+    m.toAccount || '-',
+    Number(m.amount || 0),
+    m.shiftCode || '-',
+    m.note || '-'
+  ])
+  const wsMovements = XLSX.utils.aoa_to_sheet([movementHeader, ...movementRows])
+  wsMovements['!cols'] = [
+    { wch: 6 },
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 20 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 34 }
+  ]
+  XLSX.utils.book_append_sheet(wb, wsMovements, 'Mutasi Kas & Tabungan')
 
   // Eksekusi download file .xlsx
   const fileDate = new Date().toISOString().slice(0, 10)

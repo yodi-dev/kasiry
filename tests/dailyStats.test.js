@@ -417,4 +417,42 @@ describe('computeDailyStats (Separation of Cash Drawer, QRIS Non-Cash, and Bon)'
     expect(stats.todayNetCashDrawer).toBe(30000)
     expect(stats.todayGrossProfit).toBe(13000)
   })
+
+  it('adjusts live Laci drawer cash when fundMovements transfer cash between LACI, KAS, and TABUNGAN', () => {
+    const now = Date.now()
+    const shift = { id: 12, shiftCode: 'SHF-FM1', status: 'OPEN', openingCash: 100000, openedAt: now - 10000 }
+    const transactions = [
+      {
+        invoiceNumber: 'KSR-FM1',
+        createdAt: now,
+        shiftId: 12,
+        paymentMethod: 'TUNAI',
+        totalAmount: 150000,
+        items: [{ name: 'Beras', sellPrice: 150000, buyPrice: 120000, qty: 1 }]
+      }
+    ]
+    const cashServices = [
+      // Tarik Tunai dari UANG KAS tidak memotong Laci Kasir
+      { id: 1, createdAt: now, shiftId: 12, type: 'TARIK_TUNAI', cashSource: 'KAS', amount: 80000, adminFee: 5000, deleted: false }
+    ]
+    const fundMovements = [
+      { id: 1, createdAt: now, shiftId: 12, type: 'MUTASI', fromAccount: 'LACI', toAccount: 'KAS', amount: 50000, deleted: false },
+      { id: 2, createdAt: now, shiftId: 12, type: 'TAMBAH_TABUNGAN', fromAccount: 'LACI', toAccount: 'TABUNGAN', amount: 30000, deleted: false },
+      { id: 3, createdAt: now, shiftId: 12, type: 'SETOR_MODAL', fromAccount: 'KAS', toAccount: 'LACI', amount: 20000, deleted: false }
+    ]
+
+    const stats = computeDailyStats(transactions, [], [], {
+      activeShift: shift,
+      nowTs: now,
+      cashServices,
+      fundMovements
+    })
+
+    // Laci awal 100rb + Penjualan tunai 150rb + Masuk laci 20rb - Keluar laci (50rb+30rb) = 190rb
+    expect(stats.todayFundToLaci).toBe(20000)
+    expect(stats.todayFundFromLaci).toBe(80000)
+    expect(stats.todayCashServiceOut).toBe(0) // Tarik Tunai dari KAS tidak memotong laci
+    expect(stats.expectedCashDrawer).toBe(190000)
+    expect(stats.todayCashServiceAdminProfit).toBe(5000)
+  })
 })

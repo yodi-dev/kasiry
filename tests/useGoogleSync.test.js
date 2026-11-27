@@ -204,6 +204,10 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
           { id: 92, digitalNumber: 'PLS-OLD', createdAt: 1500000, sellPrice: 12000, updatedAt: 1500000 },
           { id: 93, digitalNumber: 'PLN-SYNC', createdAt: 2690000, category: 'TOKEN_LISTRIK', tokenCode: '1111 2222 3333 4444 5555', sellPrice: 52500, updatedAt: 9700 }
         ],
+        fundMovements: [
+          { id: 94, movementNumber: 'TBG-OLD', createdAt: 1500000, type: 'TAMBAH_TABUNGAN', fromAccount: 'LACI', toAccount: 'TABUNGAN', amount: 20000, updatedAt: 1500000 },
+          { id: 95, movementNumber: 'TBG-SYNC', createdAt: 2695000, type: 'TAMBAH_TABUNGAN', fromAccount: 'KAS', toAccount: 'TABUNGAN', amount: 100000, updatedAt: 9800 }
+        ],
         shifts: [
           { id: 80, shiftCode: 'SHF-OLD-CLOSED', status: 'CLOSED', openedAt: 1500000, updatedAt: 1500000 },
           { id: 81, shiftCode: 'SHF-SYNC', status: 'CLOSED', openedAt: 2500000, actualCash: 300000, updatedAt: 9000 }
@@ -252,6 +256,9 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
         digitalProducts: [
           { id: 93, digitalNumber: 'PLN-SYNC', createdAt: 2690000, category: 'TOKEN_LISTRIK', tokenCode: '', sellPrice: 52500, updatedAt: 4600 }
         ],
+        fundMovements: [
+          { id: 95, movementNumber: 'TBG-SYNC', createdAt: 2695000, type: 'TAMBAH_TABUNGAN', fromAccount: 'KAS', toAccount: 'TABUNGAN', amount: 50000, updatedAt: 4700 }
+        ],
         shifts: [
           { id: 81, shiftCode: 'SHF-SYNC', status: 'OPEN', openedAt: 2500000, updatedAt: 5000 }
         ],
@@ -290,6 +297,9 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(appliedPayload.data.digitalProducts).toHaveLength(1)
     expect(appliedPayload.data.digitalProducts[0].digitalNumber).toBe('PLN-SYNC')
     expect(appliedPayload.data.digitalProducts[0].tokenCode).toBe('1111 2222 3333 4444 5555')
+    expect(appliedPayload.data.fundMovements).toHaveLength(1)
+    expect(appliedPayload.data.fundMovements[0].movementNumber).toBe('TBG-SYNC')
+    expect(appliedPayload.data.fundMovements[0].amount).toBe(100000)
     expect(appliedPayload.data.shifts).toHaveLength(1)
     expect(appliedPayload.data.shifts[0].shiftCode).toBe('SHF-SYNC')
     expect(appliedPayload.data.shifts[0].status).toBe('CLOSED')

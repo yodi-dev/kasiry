@@ -84,6 +84,7 @@ const DailyReportModal = lazyModal(() => import('./components/DailyReportModal.v
 const ExpenseModal = lazyModal(() => import('./components/ExpenseModal.vue'))
 const CashServiceModal = lazyModal(() => import('./components/CashServiceModal.vue'))
 const DigitalProductModal = lazyModal(() => import('./components/DigitalProductModal.vue'))
+const FinanceModal = lazyModal(() => import('./components/FinanceModal.vue'))
 const RestockModal = lazyModal(() => import('./components/RestockModal.vue'))
 const ShiftModal = lazyModal(() => import('./components/ShiftModal.vue'))
 const SettingsModal = lazyModal(() => import('./components/SettingsModal.vue'))
@@ -96,6 +97,7 @@ import { useHardwareScanner } from './composables/useHardwareScanner'
 import { playBeepSound } from './utils/sound'
 import { exportKasiryExcel } from './utils/excelExport'
 import { computeDailyStats } from './utils/dailyStats'
+import { computeFinanceBalances } from './utils/financeEngine'
 import { buildPricedCartItem, normalizePriceTier, repriceCartItems } from './utils/pricing'
 import { useGoogleSync } from './composables/useGoogleSync'
 import { useThermalPrinter } from './composables/useThermalPrinter'
@@ -134,6 +136,7 @@ const {
   restocks,
   cashServices,
   digitalProducts,
+  fundMovements,
   shifts,
   activeShift,
   isActiveShiftStale,
@@ -161,6 +164,8 @@ const {
   deleteRestock,
   recordCashService,
   deleteCashService,
+  recordFundMovement,
+  deleteFundMovement,
   recordDigitalProduct,
   updateDigitalTokenCode,
   deleteDigitalProduct,
@@ -203,6 +208,7 @@ const {
   appendRestockToSheet,
   appendCashServiceToSheet,
   appendDigitalProductToSheet,
+  appendFundMovementToSheet,
   appendShiftEventToSheet,
   ensureSpreadsheet
 } = useGoogleSync()
@@ -250,6 +256,7 @@ const isDailyReportOpen = ref(false)
 const isExpenseOpen = ref(false)
 const isCashServiceOpen = ref(false)
 const isDigitalProductOpen = ref(false)
+const isFinanceOpen = ref(false)
 const isRestockOpen = ref(false)
 const isShiftOpen = ref(false)
 const isShiftAutoPrompt = ref(false)
@@ -272,6 +279,7 @@ const isAnyModalOpen = computed(() => {
     isExpenseOpen.value ||
     isCashServiceOpen.value ||
     isDigitalProductOpen.value ||
+    isFinanceOpen.value ||
     isRestockOpen.value ||
     isShiftOpen.value ||
     isSettingsOpen.value ||
@@ -293,7 +301,8 @@ const stats = computed(() =>
   computeDailyStats(transactions.value, debtPayments.value, expenses.value, {
     activeShift: activeShift.value,
     cashServices: cashServices.value,
-    digitalProducts: digitalProducts.value
+    digitalProducts: digitalProducts.value,
+    fundMovements: fundMovements.value
   })
 )
 
@@ -770,14 +779,26 @@ const buildCashServiceReceiptData = (svc) => {
 
 // Record & Hapus Layanan Tarik Tunai / Transfer (IndexedDB + Google Sheets + Struk Thermal & Auto-Backup)
 const handleRecordCashService = async (payload) => {
-  const availableDrawerCash = stats.value.isShiftScoped
+  const liveDrawerCash = stats.value.isShiftScoped
     ? Number(stats.value.expectedCashDrawer ?? 0)
     : Number(stats.value.todayNetCashDrawer ?? 0)
+  const availableSourceCash = payload?.cashSource === 'KAS'
+    ? computeFinanceBalances({
+        transactions: transactions.value,
+        debtPayments: debtPayments.value,
+        expenses: expenses.value,
+        cashServices: cashServices.value,
+        digitalProducts: digitalProducts.value,
+        fundMovements: fundMovements.value,
+        customers: customers.value,
+        liveDrawerBalance: liveDrawerCash
+      }).kasBalance
+    : liveDrawerCash
 
   try {
     const saved = await recordCashService({
       ...payload,
-      availableDrawerCash
+      availableDrawerCash: availableSourceCash
     })
     if (saved) {
       playBeepSound('success')
@@ -807,6 +828,28 @@ const handleOpenCashServiceReceipt = (svc) => {
   receiptData.value = buildCashServiceReceiptData(svc)
   isCashServiceOpen.value = false
   isReceiptOpen.value = true
+}
+
+// Record & Hapus Mutasi Dana / Tambah Tabungan (IndexedDB + Google Sheets & Auto-Backup)
+const handleRecordFundMovement = async (payload) => {
+  try {
+    const saved = await recordFundMovement(payload)
+    if (saved) {
+      playBeepSound('success')
+      appendFundMovementToSheet(saved, storeProfile.value?.name)
+      triggerCloudAutoBackup(true)
+    }
+  } catch (err) {
+    playBeepSound('warning')
+    alert(err.message)
+  }
+}
+
+const handleDeleteFundMovement = async (movementId) => {
+  const ok = await deleteFundMovement(movementId)
+  if (ok) {
+    triggerCloudAutoBackup(true)
+  }
 }
 
 const buildDigitalReceiptData = (rec) => {
@@ -1062,8 +1105,22 @@ const handleDownloadExcel = async () => {
       restocks: allRestocks,
       cashServices: allCashServices,
       digitalProducts: allDigitalProducts,
+      fundMovements: allFundMovements,
       shifts: allShifts
     } = await getAllTransactionsForExport()
+    const liveDrawerCash = stats.value.isShiftScoped
+      ? Number(stats.value.expectedCashDrawer ?? 0)
+      : Number(stats.value.todayNetCashDrawer ?? 0)
+    const financeBalances = computeFinanceBalances({
+      transactions: allTransactions,
+      debtPayments: allDebtPayments,
+      expenses: allExpenses,
+      cashServices: allCashServices,
+      digitalProducts: allDigitalProducts,
+      fundMovements: allFundMovements,
+      customers: customers.value,
+      liveDrawerBalance: liveDrawerCash
+    })
     await exportKasiryExcel({
       storeProfile: storeProfile.value,
       stats: stats.value,
@@ -1074,6 +1131,8 @@ const handleDownloadExcel = async () => {
       restocks: allRestocks,
       cashServices: allCashServices,
       digitalProducts: allDigitalProducts,
+      fundMovements: allFundMovements,
+      financeBalances,
       shifts: allShifts
     })
     playBeepSound('success')
@@ -1197,6 +1256,7 @@ const modalFlagKeys = [
   'expense',
   'cashService',
   'digitalProduct',
+  'finance',
   'restock',
   'shift',
   'settings',
@@ -1213,6 +1273,7 @@ const activatedModals = reactive({
   expense: false,
   cashService: false,
   digitalProduct: false,
+  finance: false,
   restock: false,
   shift: false,
   settings: false,
@@ -1231,6 +1292,7 @@ watch(
     isExpenseOpen,
     isCashServiceOpen,
     isDigitalProductOpen,
+    isFinanceOpen,
     isRestockOpen,
     isShiftOpen,
     isSettingsOpen,
@@ -1343,6 +1405,7 @@ onUnmounted(() => {
       :googleUser="googleUser"
       @openDebtBook="isDebtBookOpen = true"
       @openDailyReport="isDailyReportOpen = true"
+      @openFinance="isFinanceOpen = true"
       @openExpense="isExpenseOpen = true"
       @openCashService="isCashServiceOpen = true"
       @openDigitalProduct="isDigitalProductOpen = true"
@@ -1559,6 +1622,12 @@ onUnmounted(() => {
       v-if="activatedModals.cashService || isCashServiceOpen"
       :isOpen="isCashServiceOpen"
       :cashServices="cashServices"
+      :transactions="transactions"
+      :debtPayments="debtPayments"
+      :expenses="expenses"
+      :digitalProducts="digitalProducts"
+      :fundMovements="fundMovements"
+      :customers="customers"
       :activeShift="activeShift"
       :stats="stats"
       @close="isCashServiceOpen = false"
@@ -1580,6 +1649,24 @@ onUnmounted(() => {
       @updateTokenCode="handleUpdateDigitalTokenCode"
       @deleteDigitalProduct="handleDeleteDigitalProduct"
       @openReceipt="handleOpenDigitalReceipt"
+    />
+
+    <!-- Modal Manajemen Keuangan & Tabungan Terpadu -->
+    <FinanceModal
+      v-if="activatedModals.finance || isFinanceOpen"
+      :isOpen="isFinanceOpen"
+      :activeShift="activeShift"
+      :stats="stats"
+      :transactions="transactions"
+      :debtPayments="debtPayments"
+      :expenses="expenses"
+      :cashServices="cashServices"
+      :digitalProducts="digitalProducts"
+      :fundMovements="fundMovements"
+      :customers="customers"
+      @close="isFinanceOpen = false"
+      @recordFundMovement="handleRecordFundMovement"
+      @deleteFundMovement="handleDeleteFundMovement"
     />
 
     <!-- Modal Kulakan / Belanja Stok & Manajemen Stok Lunak -->
@@ -1610,6 +1697,7 @@ onUnmounted(() => {
       :expenses="expenses"
       :cashServices="cashServices"
       :digitalProducts="digitalProducts"
+      :fundMovements="fundMovements"
       :storeName="storeProfile.name"
       :isAutoPrompt="isShiftAutoPrompt"
       @close="isShiftOpen = false; completedShiftSummary = null"

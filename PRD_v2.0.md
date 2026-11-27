@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD) & Blueprint Arsitektur: Kasiry POS
 
-**Versi Dokumen:** 2.18 (QRIS, Bayar Sebagian Bon, Pengeluaran Harian, Shift, Multi Harga, Kulakan Stok Lunak, Layanan Tarik Tunai & Transfer, Pulsa & Token PLN, 300 Katalog Bersih & Printer Thermal)  
+**Versi Dokumen:** 2.19 (Manajemen Keuangan & Tabungan, Tarik Tunai Laci/Uang Kas, Pulsa & Token PLN, Bayar Sebagian Bon, QRIS, Shift, Multi Harga, Kulakan, 300 Katalog Bersih & Printer Thermal)  
 **Status:** Production-Ready & Terverifikasi Build/Unit-Integration Test  
 **Penulis:** Yodi & Antigravity (AI Assistant)  
 **Identitas Toko Bawaan:** Warung Kasiry (Generik siap pakai — profil disesuaikan pemilik warung di Pengaturan)  
@@ -16,6 +16,7 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
+| **v2.19.0** | 27 November 2026 | **Backlog Fase 2 #4 (Manajemen Keuangan & Tabungan Terpadu):** Modal `FinanceModal.vue` terpisah dari `DailyReportModal` & `ShiftModal`, engine `financeEngine.js` 4 kantong (`Laci Kasir`, `Uang Kas`, `Rekening & QRIS`, `Tabungan`), mutasi **`Tambah Tabungan` / `Pindah Kantong` / `Setor Modal` / `Ambil Dana`**, ringkasan `Shift Ini / 7 Hari / 30 Hari`, pemilihan sumber `Laci` vs `Uang Kas` di `CashServiceModal.vue`, skema Dexie `v8` `fundMovements`, Google Sync, & Excel 10 sheet (`Mutasi Kas & Tabungan`). |
 | **v2.18.0** | 27 November 2026 | **Backlog Fase 2 #3 (Bayar Kurang / Sebagian Otomatis Masuk Buku Utang):** Dukungan pembayaran kurang (`0 < bayar < total`) pada mode Tunai & QRIS di `PaymentModal.vue`, blokir akun `"Umum"` di UI & `recordTransaction()`, pencatatan `paidAmount` & `debtAmount` (`TUNAI/QRIS (SEBAGIAN BON)`), pemisahan laci/QRIS vs `todayNewDebt` di `dailyStats.js`, struk ESC/POS & WA, `DebtBookModal`, Excel, & Google Sheets. |
 | **v2.17.0** | 27 November 2026 | **Backlog Fase 2 #2 (Penjualan Pulsa, Paket Data, Token PLN & Reorganisasi TopBar):** Modal `DigitalProductModal.vue` (`Pulsa`, `Paket Data`, `Token PLN`, preset harga diingat via `localStorage`, input No. HP/ID PLN & Token SN 20 digit + edit ulang, bayar Tunai/QRIS/Utang dg rollback), skema Dexie `v7` `digitalProducts`, cetak nota & WA Token PLN, reorganisasi TopBar dropdown `Layanan ▾`, Google Sync, & Excel 9 sheet (`Pulsa & Token Listrik`). |
 | **v2.16.0** | 27 November 2026 | **Backlog Fase 2 #1 (Layanan Tarik Tunai & Transfer / Top-Up):** Modal `CashServiceModal.vue` (`Tarik Tunai` keluar laci vs `Transfer / Top-Up` masuk laci dg skema biaya admin Cara A + guard saldo laci ketat), skema Dexie `v6` `cashServices`, cetak struk `ReceiptModal.vue` & ESC/POS, tombol `Tarik & Tf` di `TopBar.vue`, rekonsiliasi Shift/Laporan/WA, Excel 8 sheet (`Tarik Tunai & Transfer`), JSON Backup/Arsip, & Google Sync. |
@@ -162,8 +163,13 @@ db.version(6).stores({
 db.version(7).stores({
   digitalProducts: '++id, digitalNumber, createdAt, category, paymentMethod, customerId, shiftId, updatedAt, deleted'
 })
+
+// Migrasi v8: manajemen keuangan, uang kas toko & tabungan
+db.version(8).stores({
+  fundMovements: '++id, movementNumber, createdAt, type, fromAccount, toAccount, shiftId, updatedAt, deleted'
+})
 ```
-*Catatan `settings` keys:* `storeProfile`, `categories`, `archiveState` (`{ cutoffAt }`), `lastOpeningCash`. Format backup JSON eksternal mempertahankan `version: '2.4'` (kompatibel lintas versi dengan node opsional `expenses`, `restocks`, `cashServices`, `digitalProducts`, & `shifts`).
+*Catatan `settings` keys:* `storeProfile`, `categories`, `archiveState` (`{ cutoffAt }`), `lastOpeningCash`. Format backup JSON eksternal mempertahankan `version: '2.4'` (kompatibel lintas versi dengan node opsional `expenses`, `restocks`, `cashServices`, `digitalProducts`, `fundMovements`, & `shifts`).
 
 ---
 

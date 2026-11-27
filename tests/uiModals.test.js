@@ -18,6 +18,7 @@ import ProductManagementModal from '../src/components/ProductManagementModal.vue
 import SettingsModal from '../src/components/SettingsModal.vue'
 import CashServiceModal from '../src/components/CashServiceModal.vue'
 import DigitalProductModal from '../src/components/DigitalProductModal.vue'
+import FinanceModal from '../src/components/FinanceModal.vue'
 
 const sampleCustomers = [
   { id: 1, name: 'Umum', phone: '', totalDebt: 0, updatedAt: 1000 },
@@ -912,7 +913,7 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     const preset200 = modal.findAll('button').find(b => b.text().trim() === '200rb')
     await preset200.trigger('click')
     await nextTick()
-    expect(modal.text()).toContain('Uang tunai di laci tidak cukup')
+    expect(modal.text()).toContain('Uang tunai di Laci Kasir tidak cukup')
     const saveTarikBtn = modal.findAll('button').find(b => b.text().includes('Simpan Tarik Tunai'))
     expect(saveTarikBtn.attributes('disabled')).toBeDefined()
 
@@ -1133,5 +1134,98 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     })
     expect(partReceipt.text()).toContain('MASUK BUKU UTANG')
     expect(partReceipt.text()).toContain('BAYAR SEBAGIAN (BON)')
+  })
+
+  it('opens FinanceModal from TopBar, renders 4 pockets + period selector, validates overdraft, and emits Tambah Tabungan & KAS CashService source', async () => {
+    // 1. TopBar memiliki tombol Keuangan (openFinance)
+    const topBar = mount(TopBar, {
+      props: { storeName: 'Warung Kasiry' }
+    })
+    const financeNav = topBar.find('button[title="Keuangan"]')
+    expect(financeNav.exists()).toBe(true)
+    await financeNav.trigger('click')
+    expect(topBar.emitted('openFinance')).toBeTruthy()
+
+    // 2. FinanceModal menampilkan 4 kantong saldo, periode, dan form Tambah Tabungan
+    const now = Date.now()
+    const financeModal = mount(FinanceModal, {
+      props: {
+        isOpen: true,
+        activeShift: { id: 1, shiftCode: 'SHF-KEU', openingCash: 100000, openedAt: now - 5000 },
+        stats: {
+          isShiftScoped: true,
+          openingCash: 100000,
+          todayNetCashDrawer: 50000,
+          expectedCashDrawer: 150000
+        },
+        transactions: [],
+        debtPayments: [],
+        expenses: [],
+        cashServices: [],
+        digitalProducts: [],
+        fundMovements: [
+          { id: 1, movementNumber: 'KEU-001', createdAt: now, type: 'SETOR_MODAL', fromAccount: 'LUAR', toAccount: 'KAS', amount: 300000, deleted: false }
+        ],
+        customers: sampleCustomers
+      }
+    })
+
+    expect(financeModal.text()).toContain('Rp 150.000') // LACI
+    expect(financeModal.text()).toContain('Rp 300.000') // KAS
+
+    // Pindah ke tab Tabungan & Mutasi
+    const mutasiTab = financeModal.findAll('button').find(b => b.text().includes('Tabungan & Mutasi'))
+    expect(mutasiTab).toBeTruthy()
+    await mutasiTab.trigger('click')
+    await nextTick()
+
+    // Isi nominal Tambah Tabungan 50rb dari LACI (150rb tersedia) -> submit emit TAMBAH_TABUNGAN
+    const amountInput = financeModal.find('input[inputmode="numeric"]')
+    await amountInput.setValue('50000')
+    await nextTick()
+    await financeModal.find('form').trigger('submit')
+    expect(financeModal.emitted('recordFundMovement')?.[0]?.[0]).toMatchObject({
+      type: 'TAMBAH_TABUNGAN',
+      toAccount: 'TABUNGAN',
+      amount: 50000
+    })
+
+    // 3. CashServiceModal memilih sumber Uang Kas ('KAS')
+    const cashModal = mount(CashServiceModal, {
+      props: {
+        isOpen: true,
+        cashServices: [],
+        transactions: [],
+        debtPayments: [],
+        expenses: [],
+        digitalProducts: [],
+        fundMovements: [
+          { id: 1, createdAt: now, type: 'SETOR_MODAL', fromAccount: 'LUAR', toAccount: 'KAS', amount: 300000, deleted: false }
+        ],
+        customers: sampleCustomers,
+        activeShift: { id: 1, shiftCode: 'SHF-KAS', openingCash: 50000 },
+        stats: {
+          isShiftScoped: true,
+          openingCash: 50000,
+          todayNetCashDrawer: 0,
+          expectedCashDrawer: 50000
+        }
+      }
+    })
+
+    const kasSourceBtn = cashModal.findAll('button').find(b => b.text().includes('Uang Kas'))
+    await kasSourceBtn.trigger('click')
+    await nextTick()
+    // Pilih 200rb -> di Laci tidak cukup (50rb), tapi di Uang Kas cukup (300rb)!
+    await cashModal.findAll('button').find(b => b.text().trim() === '200rb').trigger('click')
+    await nextTick()
+    const submitCashBtn = cashModal.findAll('button').find(b => b.text().includes('Simpan Tarik Tunai'))
+    expect(submitCashBtn.attributes('disabled')).toBeUndefined()
+    await cashModal.find('form').trigger('submit')
+    expect(cashModal.emitted('recordCashService')?.[0]?.[0]).toMatchObject({
+      type: 'TARIK_TUNAI',
+      cashSource: 'KAS',
+      amount: 200000
+    })
   })
 })

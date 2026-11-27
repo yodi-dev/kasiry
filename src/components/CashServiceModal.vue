@@ -10,9 +10,11 @@ import {
   CheckCircle,
   AlertCircle,
   Trash2,
-  Receipt
+  Receipt,
+  Landmark
 } from '@lucide/vue'
 import { recordBelongsToShift } from '../utils/dailyStats'
+import { computeFinanceBalances } from '../utils/financeEngine'
 
 const props = defineProps({
   isOpen: {
@@ -20,6 +22,30 @@ const props = defineProps({
     default: false
   },
   cashServices: {
+    type: Array,
+    default: () => []
+  },
+  transactions: {
+    type: Array,
+    default: () => []
+  },
+  debtPayments: {
+    type: Array,
+    default: () => []
+  },
+  expenses: {
+    type: Array,
+    default: () => []
+  },
+  digitalProducts: {
+    type: Array,
+    default: () => []
+  },
+  fundMovements: {
+    type: Array,
+    default: () => []
+  },
+  customers: {
     type: Array,
     default: () => []
   },
@@ -45,6 +71,7 @@ const emit = defineEmits(['close', 'recordCashService', 'deleteCashService', 'op
 
 const activeTab = ref('form')
 const selectedType = ref('TARIK_TUNAI')
+const selectedCashSource = ref('LACI')
 const amountInput = ref('')
 const adminFeeInput = ref('5000')
 const selectedChannel = ref('QRIS')
@@ -64,6 +91,7 @@ watch(() => props.isOpen, (open) => {
   if (open) {
     activeTab.value = 'form'
     selectedType.value = 'TARIK_TUNAI'
+    selectedCashSource.value = 'LACI'
     amountInput.value = ''
     adminFeeInput.value = '5000'
     selectedChannel.value = 'QRIS'
@@ -111,17 +139,38 @@ const availableDrawerCash = computed(() => {
   return Number(props.stats?.todayNetCashDrawer ?? 0)
 })
 
+const financeBalances = computed(() => computeFinanceBalances({
+  transactions: props.transactions,
+  debtPayments: props.debtPayments,
+  expenses: props.expenses,
+  cashServices: props.cashServices,
+  digitalProducts: props.digitalProducts,
+  fundMovements: props.fundMovements,
+  customers: props.customers,
+  liveDrawerBalance: availableDrawerCash.value
+}))
+
+const availableKasCash = computed(() => Number(financeBalances.value.kasBalance || 0))
+
+const availableSourceCash = computed(() => (
+  selectedCashSource.value === 'KAS' ? availableKasCash.value : availableDrawerCash.value
+))
+
+const sourceLabel = computed(() => (
+  selectedCashSource.value === 'KAS' ? 'Uang Kas Toko' : 'Laci Kasir'
+))
+
 const isDrawerInsufficient = computed(() => {
   if (selectedType.value !== 'TARIK_TUNAI') return false
   if (parsedAmount.value <= 0) return false
-  return availableDrawerCash.value <= 0 || parsedAmount.value > availableDrawerCash.value
+  return availableSourceCash.value <= 0 || parsedAmount.value > availableSourceCash.value
 })
 
 const projectedDrawerAfter = computed(() => {
-  if (parsedAmount.value <= 0) return availableDrawerCash.value
+  if (parsedAmount.value <= 0) return availableSourceCash.value
   return selectedType.value === 'TRANSFER'
-    ? availableDrawerCash.value + totalPaidByCustomer.value
-    : availableDrawerCash.value - parsedAmount.value
+    ? availableSourceCash.value + totalPaidByCustomer.value
+    : availableSourceCash.value - parsedAmount.value
 })
 
 const periodServices = computed(() => {
@@ -150,7 +199,7 @@ const handleSubmit = () => {
     return
   }
   if (isDrawerInsufficient.value) {
-    errorBanner.value = `Uang tunai di laci tidak cukup (tersedia Rp ${Math.max(0, availableDrawerCash.value).toLocaleString('id-ID')}).`
+    errorBanner.value = `Uang tunai di ${sourceLabel.value} tidak cukup (tersedia Rp ${Math.max(0, availableSourceCash.value).toLocaleString('id-ID')}).`
     return
   }
 
@@ -160,7 +209,7 @@ const handleSubmit = () => {
     adminFee: parsedAdminFee.value,
     channel: resolvedChannel.value,
     customerName: customerNameInput.value.trim(),
-    cashSource: 'LACI',
+    cashSource: selectedCashSource.value,
     note: noteInput.value.trim(),
     openReceipt: autoOpenReceipt.value
   }
@@ -211,7 +260,7 @@ const triggerDelete = (id) => {
               Tarik Tunai &amp; Transfer
             </h3>
             <p class="text-xs text-slate-500 font-medium">
-              {{ activeShift ? `Shift ${activeShift.shiftCode} • Sumber Uang: Laci Kasir` : 'Hitung Harian • Sumber Uang: Laci Kasir' }}
+              {{ activeShift ? `Shift ${activeShift.shiftCode} • Sumber Uang: ${sourceLabel}` : `Hitung Harian • Sumber Uang: ${sourceLabel}` }}
             </p>
           </div>
         </div>
@@ -257,24 +306,24 @@ const triggerDelete = (id) => {
       <!-- 3. Body -->
       <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
 
-        <!-- Banner Sisa Tunai di Laci & Jasa Admin -->
+        <!-- Banner Sisa Tunai & Jasa Admin -->
         <div class="grid grid-cols-2 gap-2.5">
           <div
             :class="[
               'min-w-0 p-3 rounded-2xl border',
-              availableDrawerCash > 0 ? 'bg-sky-50/75 border-sky-200/75' : 'bg-amber-50/85 border-amber-200'
+              availableSourceCash > 0 ? 'bg-sky-50/75 border-sky-200/75' : 'bg-amber-50/85 border-amber-200'
             ]"
           >
             <span class="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
-              {{ activeShift ? 'Uang Tunai di Laci' : 'Tunai Masuk Hari Ini' }}
+              {{ selectedCashSource === 'KAS' ? 'Uang Kas Toko' : (activeShift ? 'Uang Tunai di Laci' : 'Tunai Masuk Hari Ini') }}
             </span>
             <p
               :class="[
                 'text-base sm:text-lg font-bold font-mono mt-0.5 break-words',
-                availableDrawerCash > 0 ? 'text-[#0a193d]' : 'text-amber-800'
+                availableSourceCash > 0 ? 'text-[#0a193d]' : 'text-amber-800'
               ]"
             >
-              Rp {{ availableDrawerCash.toLocaleString('id-ID') }}
+              Rp {{ availableSourceCash.toLocaleString('id-ID') }}
             </p>
           </div>
 
@@ -328,7 +377,7 @@ const triggerDelete = (id) => {
                     <Banknote :class="['w-4 h-4', selectedType === 'TARIK_TUNAI' ? 'text-sky-400' : 'text-slate-400']" />
                   </div>
                   <p :class="['text-[11px] mt-1 leading-snug', selectedType === 'TARIK_TUNAI' ? 'text-sky-200' : 'text-slate-500']">
-                    Transfer/QRIS masuk, tunai keluar laci
+                    Transfer/QRIS masuk, tunai keluar {{ selectedCashSource === 'KAS' ? 'Uang Kas' : 'laci' }}
                   </p>
                 </button>
 
@@ -347,7 +396,53 @@ const triggerDelete = (id) => {
                     <Send :class="['w-4 h-4', selectedType === 'TRANSFER' ? 'text-emerald-400' : 'text-slate-400']" />
                   </div>
                   <p :class="['text-[11px] mt-1 leading-snug', selectedType === 'TRANSFER' ? 'text-sky-200' : 'text-slate-500']">
-                    Tunai masuk laci, saldo dikirim
+                    Tunai masuk {{ selectedCashSource === 'KAS' ? 'Uang Kas' : 'laci' }}, saldo dikirim
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            <!-- Sumber / Tujuan Uang Tunai Fisik (Laci Kasir vs Uang Kas Toko) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                {{ selectedType === 'TARIK_TUNAI' ? 'Ambil Tunai Dari' : 'Simpan Tunai Ke' }}
+              </label>
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  @click="selectedCashSource = 'LACI'"
+                  :class="[
+                    'p-2.5 rounded-2xl border-2 text-left cursor-pointer transition-all',
+                    selectedCashSource === 'LACI'
+                      ? 'bg-sky-50 border-[#0284c7] text-[#0a193d] shadow-2xs'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                  ]"
+                >
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="text-xs font-bold">Laci Kasir</span>
+                    <Banknote :class="['w-3.5 h-3.5', selectedCashSource === 'LACI' ? 'text-[#0284c7]' : 'text-slate-400']" />
+                  </div>
+                  <p class="text-[11px] font-mono font-bold mt-0.5 text-slate-600">
+                    Rp {{ availableDrawerCash.toLocaleString('id-ID') }}
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  @click="selectedCashSource = 'KAS'"
+                  :class="[
+                    'p-2.5 rounded-2xl border-2 text-left cursor-pointer transition-all',
+                    selectedCashSource === 'KAS'
+                      ? 'bg-sky-50 border-[#0284c7] text-[#0a193d] shadow-2xs'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                  ]"
+                >
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="text-xs font-bold">Uang Kas</span>
+                    <Landmark :class="['w-3.5 h-3.5', selectedCashSource === 'KAS' ? 'text-[#0284c7]' : 'text-slate-400']" />
+                  </div>
+                  <p class="text-[11px] font-mono font-bold mt-0.5 text-slate-600">
+                    Rp {{ availableKasCash.toLocaleString('id-ID') }}
                   </p>
                 </button>
               </div>
@@ -388,17 +483,17 @@ const triggerDelete = (id) => {
               </div>
             </div>
 
-            <!-- Guard Saldo Laci Kurang -->
+            <!-- Guard Saldo Sumber Kurang -->
             <div
               v-if="isDrawerInsufficient"
               class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5"
             >
               <AlertCircle class="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div class="space-y-0.5 leading-snug">
-                <p class="font-bold">Uang tunai di laci tidak cukup untuk Tarik Tunai ini.</p>
+                <p class="font-bold">Uang tunai di {{ sourceLabel }} tidak cukup untuk Tarik Tunai ini.</p>
                 <p>
-                  Tersedia di laci: <strong class="font-mono">Rp {{ Math.max(0, availableDrawerCash).toLocaleString('id-ID') }}</strong>.
-                  Buka Shift / isi modal awal laci atau catat penjualan tunai dulu.
+                  Tersedia di {{ sourceLabel }}: <strong class="font-mono">Rp {{ Math.max(0, availableSourceCash).toLocaleString('id-ID') }}</strong>.
+                  Pilih kantong tunai lain atau tambah saldo melalui menu Keuangan.
                 </p>
               </div>
             </div>
@@ -499,11 +594,11 @@ const triggerDelete = (id) => {
             <!-- Ringkasan Live Aliran Dana (Cara A) -->
             <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5 text-xs">
               <div class="flex justify-between text-slate-600">
-                <span>{{ selectedType === 'TARIK_TUNAI' ? 'Pelanggan Transfer / QRIS:' : 'Pelanggan Bayar Tunai ke Laci:' }}</span>
+                <span>{{ selectedType === 'TARIK_TUNAI' ? 'Pelanggan Transfer / QRIS:' : `Pelanggan Bayar Tunai ke ${sourceLabel}:` }}</span>
                 <span class="font-bold font-mono text-[#0a193d]">Rp {{ totalPaidByCustomer.toLocaleString('id-ID') }}</span>
               </div>
               <div class="flex justify-between text-slate-600">
-                <span>{{ selectedType === 'TARIK_TUNAI' ? 'Uang Tunai Keluar Dari Laci:' : 'Saldo Dikirim Toko:' }}</span>
+                <span>{{ selectedType === 'TARIK_TUNAI' ? `Uang Tunai Keluar Dari ${sourceLabel}:` : 'Saldo Dikirim Toko:' }}</span>
                 <span class="font-bold font-mono">Rp {{ parsedAmount.toLocaleString('id-ID') }}</span>
               </div>
               <div class="flex justify-between text-emerald-700 font-semibold">
@@ -511,7 +606,7 @@ const triggerDelete = (id) => {
                 <span class="font-mono">+Rp {{ parsedAdminFee.toLocaleString('id-ID') }}</span>
               </div>
               <div class="pt-1.5 border-t border-slate-200/80 flex justify-between font-bold text-[#0a193d]">
-                <span>Perkiraan Sisa Laci Setelah Transaksi:</span>
+                <span>Perkiraan Sisa {{ sourceLabel }} Setelah Transaksi:</span>
                 <span class="font-mono">Rp {{ projectedDrawerAfter.toLocaleString('id-ID') }}</span>
               </div>
             </div>
@@ -569,6 +664,12 @@ const triggerDelete = (id) => {
                   </span>
                   <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold">
                     {{ svc.channel || 'QRIS' }}
+                  </span>
+                  <span
+                    v-if="svc.cashSource === 'KAS'"
+                    class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold"
+                  >
+                    Uang Kas
                   </span>
                   <span class="text-[11px] font-mono text-slate-400">
                     {{ svc.serviceNumber }} • {{ formatTime(svc.createdAt) }}
