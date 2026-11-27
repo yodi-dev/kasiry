@@ -16,6 +16,7 @@
 
 | Versi | Tanggal | Ringkasan Milestone |
 | :---: | :---: | :--- |
+| **v2.15.1–v2.15.2** | 27 November 2026 | **Branding `Kasiry by Awanbeo`, Tautan Portofolio & PWA Auto-Reload:** Penyeragaman footer **`Kasiry by Awanbeo`** + tautan `https://awanbeo.my.id` di struk fisik/HTML/preview, WhatsApp nota/laporan/shift, footer desktop, & SEO `index.html`, serta reload otomatis saat Service Worker memperbarui cache lama (`src/main.js`). |
 | **v2.15.0** | 27 November 2026 | **Dukungan Printer USB/OTG (`WebUSB`), Port Serial (`Web Serial`) & Cetak Browser Iframe Terisolasi:** Ekspansi `useThermalPrinter.js` & `thermalPrinter.js` dengan `WebUSB` + `Web Serial` (auto-reconnect di `App.vue`, panduan Android OTG vs Windows `WinUSB`/`POS-58`), cetak HTML `iframe` terisolasi `58mm`/`80mm` bebas backdrop modal, serta tombol **`BT`** / **`USB`** / **`Serial`** di `SettingsModal` & `ReceiptModal`. |
 | **v2.14.0** | 27 November 2026 | **Roadmap #7 (Printer Thermal Bluetooth ESC/POS) + Hotfix Harga Keranjang:** Encoder ESC/POS murni (`thermalPrinter.js`), composable Web Bluetooth (`useThermalPrinter.js`) dg fallback `window.print()`, tab **`Printer`** di `SettingsModal.vue` (`58mm`/`80mm`, *auto-print*, catatan bawah struk, *Tes Cetak*), pembaruan `ReceiptModal.vue` (hide `WA:` kosong, `.thermal-80mm`, `Cetak BT`), serta perbaikan penguncian tier saat simpan Grosir/Agen di mode nota `Ecer`. |
 | **v2.13.1** | 27 November 2026 | **Hotfix Live Sync Multi-Harga Keranjang:** Memastikan perubahan harga Ecer/Grosir/Agen langsung berlaku real-time saat ganti `Harga Nota` tanpa perlu mengosongkan keranjang (`repriceCartItems` + guard `Ecer (Kosong)`). |
@@ -169,16 +170,16 @@ Status terbaru sebelum rilis penuh ke pemilik warung:
 - [x] Automated tests Vitest lulus (`npm test`: 10 suite, 42 skenario).
 - [x] Verifikasi domain Google Search Console aktif (`public/google50a425d7a5de8ecd.html`).
 - [x] Halaman `/privacy.html`, `/terms.html`, ikon OAuth (`kasiry-oauth-120x120.png`), serta COOP header tersedia di `public/`.
-- [ ] **Uji Perangkat Fisik Manual (Final Field Check):**
-  - Test hardware barcode scanner USB OTG / Bluetooth di HP Android & PC.
-  - Test kamera belakang & depan langsung di HP terhadap barcode kemasan nyata (`CameraScannerModal`).
-  - Test pairing & cetak langsung ke printer thermal Bluetooth BLE, Kabel USB / Android OTG (`WebUSB`), Serial COM (`Web Serial`), maupun fallback browser `iframe` (`ReceiptModal`), serta alur kirim nota/tagihan WhatsApp.
+- [x] Test cetak printer thermal kabel USB langsung (`WebUSB` + `WinUSB`) terkonfirmasi berhasil oleh pemilik produk.
+- [ ] **Uji Fungsional & UI Per Modul (Tahap Aktif Sekarang):**
+  - Verifikasi browser E2E per modul (Modul 1–10: Kasa/Katalog, Pembayaran, Struk/Printer, Shift, Kas Keluar, Kulakan, Buku Utang/Pelanggan, Kelola Barang Pasif, Laporan/Excel, & Pengaturan/Cloud Sync) sekaligus kumpulkan list revisi UI.
+  - Test hardware barcode scanner USB OTG / Bluetooth, kamera belakang/depan HP, USB OTG Android & Bluetooth BLE printer pada perangkat fisik tambahan.
   - Test mode restore **Timpa Total (Reset)**, **Arsip Tahunan + Drive**, dan reload offline PWA (`npm run preview` / `https://kasiry.pages.dev`).
   - Pastikan status **Google OAuth Consent Screen** di Google Cloud Console berstatus *Published / Verified* agar akun Google toko baru tidak terkena batasan *Testing mode*.
 
 ---
 
-## 8. Roadmap Pengembangan (Backlog v2.8–v2.15 Selesai)
+## 8. Roadmap Pengembangan (Backlog v2.8–v2.15.2 Selesai)
 
 Seluruh fitur utama pada backlog v2.8–v2.15 telah selesai diimplementasikan dan terintegrasi menyeluruh:
 

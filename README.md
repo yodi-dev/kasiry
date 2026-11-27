@@ -57,7 +57,7 @@ kasiryy/
 ├── tests/                  # 10 suite test Vitest (42 skenario: DB, migrasi, pricing, printer BT/USB/Serial, usage, sync, stats, Excel, UI)
 ├── CHANGELOG.md            # Riwayat rilis SemVer (Keep a Changelog)
 ├── DESIGN_SYSTEM.md        # Panduan visual & token warna/komponen
-├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.15)
+├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.15.2)
 ├── SITEMAP.md              # Alur interaksi & arsitektur komponen
 └── vite.config.js          # Rolldown vendor splitting & PWA Workbox configuration
 ```
