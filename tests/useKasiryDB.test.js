@@ -363,4 +363,50 @@ describe('useKasiryDB (IndexedDB, Accounting, Windowing, Restore & Archive)', ()
     expect(payload.data.shifts).toHaveLength(1)
     expect(kasiry.inspectBackupJSON(payload).shiftCount).toBe(1)
   })
+
+  it('saves multi-tier product prices and customer priceTier (guarding Umum as ecer)', async () => {
+    const savedProd = await kasiry.saveProduct({
+      name: 'Indomie Special Test',
+      sellPrice: 3500,
+      buyPrice: 3000,
+      wholesalePrice: 3200,
+      wholesaleMinQty: 5,
+      agentPrice: 3050,
+      category: 'Makanan'
+    })
+    expect(savedProd.wholesalePrice).toBe(3200)
+    expect(savedProd.wholesaleMinQty).toBe(5)
+    expect(savedProd.agentPrice).toBe(3050)
+
+    const agenCust = await kasiry.saveCustomer({
+      name: 'Warung Maju',
+      phone: '081234567899',
+      priceTier: 'agen'
+    })
+    expect(agenCust.priceTier).toBe('agen')
+
+    // Akun Umum tetap dikunci pada tier 'ecer'
+    const umumBefore = kasiry.customers.value.find(c => c.name === 'Umum')
+    const umumUpdated = await kasiry.saveCustomer({ ...umumBefore, priceTier: 'agen' })
+    expect(umumUpdated.priceTier).toBe('ecer')
+
+    await kasiry.recordTransaction({
+      invoiceNumber: 'KSR-MULTI-1',
+      totalAmount: 15250,
+      paymentMethod: 'TUNAI',
+      cashGiven: 20000,
+      changeAmount: 4750,
+      customer: agenCust,
+      items: [{
+        ...savedProd,
+        sellPrice: 3050,
+        baseSellPrice: 3500,
+        qty: 5,
+        appliedTier: 'agen',
+        tierLabel: 'Agen'
+      }]
+    })
+    expect(kasiry.transactions.value[0].items[0].priceTier).toBe('agen')
+    expect(kasiry.transactions.value[0].items[0].priceLabel).toBe('Agen')
+  })
 })

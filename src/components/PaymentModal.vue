@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { buildCustomerStatsMap } from '../utils/customerStats'
+import { normalizePriceTier, getPriceTierMeta } from '../utils/pricing'
 import { X, CheckCircle, Banknote, QrCode, UserCheck, Plus, AlertCircle, CreditCard, User, Search, ChevronRight } from '@lucide/vue'
 
 const props = defineProps({
@@ -12,6 +13,10 @@ const props = defineProps({
     type: Number,
     default: 0
   },
+  cartPriceTier: {
+    type: String,
+    default: 'ecer'
+  },
   savedCustomers: {
     type: Array,
     default: () => []
@@ -22,7 +27,14 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'processCashPayment', 'processQrisPayment', 'processDebtPayment', 'saveCustomer'])
+const emit = defineEmits([
+  'close',
+  'processCashPayment',
+  'processQrisPayment',
+  'processDebtPayment',
+  'saveCustomer',
+  'changeCustomerPriceTier'
+])
 
 // Active Tab: 'cash' | 'debt'
 const activeTab = ref('cash')
@@ -108,6 +120,14 @@ watch(() => props.isOpen, (newVal) => {
     newCustPhone.value = ''
   }
 }, { immediate: true })
+
+// Jika total tagihan berubah saat memilih pelanggan Grosir/Agen & kasir belum ubah nominal uang pas, ikut sesuaikan
+watch(() => props.totalAmount, (newTotal, oldTotal) => {
+  if (props.isOpen && cashGiven.value === oldTotal) {
+    cashGiven.value = newTotal
+    cashInputStr.value = String(newTotal)
+  }
+})
 
 // Sinkronkan jika data savedCustomers tiba atau pelanggan baru mendapat ID dari IndexedDB
 watch(() => props.savedCustomers, (newCustomers) => {
@@ -205,6 +225,10 @@ const selectCashCustomer = (c) => {
   selectedCashCustomer.value = c
   cashCustomerQuery.value = ''
   isCustomerDropdownOpen.value = false
+  emit('changeCustomerPriceTier', {
+    customer: c,
+    priceTier: normalizePriceTier(c?.priceTier)
+  })
 }
 
 // Buka form cepat tambah pelanggan
@@ -275,10 +299,15 @@ const createAndSelectCashCustomer = () => {
 
 // Reset pelanggan kembali ke "Umum"
 const resetToUmum = () => {
-  selectedCashCustomer.value = getUmumCustomer()
+  const umum = getUmumCustomer()
+  selectedCashCustomer.value = umum
   isCustomerDropdownOpen.value = false
   isAddingCustomer.value = false
   cashCustomerQuery.value = ''
+  emit('changeCustomerPriceTier', {
+    customer: umum,
+    priceTier: 'ecer'
+  })
 }
 
 // Filter pelanggan di mode utang (diurutkan frekuensi belanja, mengecualikan "Umum")
@@ -322,6 +351,10 @@ const onDebtCustomerQueryInput = () => {
 const selectCustomer = (c) => {
   selectedCustomer.value = c
   customerQuery.value = c.name
+  emit('changeCustomerPriceTier', {
+    customer: c,
+    priceTier: normalizePriceTier(c?.priceTier)
+  })
 }
 
 const createAndSelectCustomer = () => {
@@ -448,7 +481,15 @@ const submitPayment = () => {
       <!-- KPI Strip Atas (Selalu Terlihat Tanpa Scroll di Laptop & HP: Total Tagihan | Kembalian / Status) -->
       <div class="mx-5 my-2.5 grid grid-cols-2 gap-2.5 shrink-0">
         <div class="min-w-0 p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 to-[#0a193d] text-white shadow-xs flex flex-col justify-center">
-          <span class="text-[10px] sm:text-xs font-bold text-sky-300 uppercase tracking-wider">Total Tagihan</span>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[10px] sm:text-xs font-bold text-sky-300 uppercase tracking-wider">Total Tagihan</span>
+            <span
+              v-if="normalizePriceTier(cartPriceTier) !== 'ecer'"
+              class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/15 text-amber-300 uppercase tracking-wide"
+            >
+              {{ getPriceTierMeta(cartPriceTier).label }}
+            </span>
+          </div>
           <span class="text-base sm:text-xl lg:text-2xl font-extrabold tracking-tight text-white font-mono mt-0.5 leading-tight break-words">
             Rp {{ totalAmount.toLocaleString('id-ID') }}
           </span>
@@ -594,9 +635,22 @@ const submitPayment = () => {
                   {{ selectedCashCustomer?.name ? selectedCashCustomer.name.charAt(0).toUpperCase() : 'U' }}
                 </div>
                 <div class="min-w-0 truncate">
-                  <h4 class="font-bold text-[#0a193d] group-hover:text-[#0284c7] text-sm truncate transition-colors leading-tight">
-                    {{ selectedCashCustomer?.name || 'Umum' }}
-                  </h4>
+                  <div class="flex items-center gap-1.5">
+                    <h4 class="font-bold text-[#0a193d] group-hover:text-[#0284c7] text-sm truncate transition-colors leading-tight">
+                      {{ selectedCashCustomer?.name || 'Umum' }}
+                    </h4>
+                    <span
+                      v-if="normalizePriceTier(selectedCashCustomer?.priceTier) !== 'ecer'"
+                      :class="[
+                        'text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0',
+                        selectedCashCustomer?.priceTier === 'agen'
+                          ? 'bg-sky-50 text-[#0284c7] border-sky-200/80'
+                          : 'bg-amber-50 text-amber-800 border-amber-200/80'
+                      ]"
+                    >
+                      {{ getPriceTierMeta(selectedCashCustomer?.priceTier).label }}
+                    </span>
+                  </div>
                   <p v-if="selectedCashCustomer?.phone" class="text-slate-400 font-mono text-[11px] truncate mt-0.5">
                     {{ selectedCashCustomer.phone }}
                   </p>
@@ -652,6 +706,17 @@ const submitPayment = () => {
                 >
                   <div class="flex items-center gap-1.5 min-w-0">
                     <span class="font-bold text-[#0a193d] group-hover:text-[#0284c7] truncate">{{ c.name }}</span>
+                    <span
+                      v-if="normalizePriceTier(c.priceTier) !== 'ecer'"
+                      :class="[
+                        'text-[9px] font-bold px-1.5 py-0.5 rounded-md border shrink-0',
+                        c.priceTier === 'agen'
+                          ? 'bg-sky-50 text-[#0284c7] border-sky-200/80'
+                          : 'bg-amber-50 text-amber-800 border-amber-200/80'
+                      ]"
+                    >
+                      {{ getPriceTierMeta(c.priceTier).label }}
+                    </span>
                     <span v-if="getCustomerTxCount(c) > 0" class="text-[10px] font-semibold px-1.5 py-0.5 bg-sky-50 text-[#0284c7] rounded-md shrink-0">
                       {{ getCustomerTxCount(c) }}x belanja
                     </span>
@@ -817,6 +882,17 @@ const submitPayment = () => {
                 <div class="min-w-0 pr-1">
                   <div class="flex items-center gap-1.5">
                     <p class="text-xs font-bold truncate">{{ c.name }}</p>
+                    <span
+                      v-if="normalizePriceTier(c.priceTier) !== 'ecer'"
+                      :class="[
+                        'text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0',
+                        c.priceTier === 'agen'
+                          ? 'bg-sky-50 text-[#0284c7] border-sky-200/80'
+                          : 'bg-amber-50 text-amber-800 border-amber-200/80'
+                      ]"
+                    >
+                      {{ getPriceTierMeta(c.priceTier).label }}
+                    </span>
                     <span v-if="getCustomerTxCount(c) > 0" class="text-[9px] font-semibold px-1.5 py-0.5 bg-sky-50 text-[#0284c7] rounded shrink-0">
                       {{ getCustomerTxCount(c) }}x
                     </span>

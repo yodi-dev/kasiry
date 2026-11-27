@@ -91,7 +91,7 @@ App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud S
 ├── TopBar.vue (Desktop: Chip Shift + `Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Laporan`, `⚙️`; HP: Chip Shift + Drawer 3 seksi)
 │
 ├── Workspace Kasa Utama (Eager Load — Tampil Instan di Frame Pertama):
-│   ├── CartSection.vue (Struk belanjaan, stepper qty, subtotal, kosongkan & tombol bayar desktop)
+│   ├── CartSection.vue (Struk belanjaan, saklar Ecer/Grosir/Agen, inline editor harga manual, stepper qty, bayar)
 │   ├── FrequentProductsSection.vue (Grid tombol cepat + tab kategori & slot pencarian desktop)
 │   ├── BarcodeInputBar.vue (Floating di mobile dengan touch keyboard lock; Inline autofocus di desktop)
 │   └── StickyBottomBar.vue (Bar total & tombol Pembayaran khusus mobile saat cart > 0)

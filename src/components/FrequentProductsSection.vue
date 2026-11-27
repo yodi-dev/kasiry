@@ -157,9 +157,17 @@ const displayedProducts = computed(() => {
           </span>
 
           <div class="min-w-0" :class="cartQtyMap[item.id] > 0 ? 'pr-8' : 'pr-1'">
-            <span v-if="item.category" class="hidden md:block text-[10px] font-semibold text-slate-400 truncate mb-0.5">
-              {{ item.category }}
-            </span>
+            <div v-if="item.category || item.wholesalePrice > 0 || item.agentPrice > 0" class="hidden md:flex items-center gap-1 mb-0.5">
+              <span v-if="item.category" class="text-[10px] font-semibold text-slate-400 truncate">
+                {{ item.category }}
+              </span>
+              <span
+                v-if="item.wholesalePrice > 0 || item.agentPrice > 0"
+                class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-800 border border-amber-200/70 shrink-0"
+              >
+                {{ item.agentPrice > 0 && !(item.wholesalePrice > 0) ? 'Agen' : 'Grosir' }}
+              </span>
+            </div>
             <p class="font-semibold text-[#0a193d] text-xs sm:text-[13px] leading-snug line-clamp-2 group-hover:text-sky-800 transition-colors">
               {{ item.name }}
             </p>

@@ -1,6 +1,7 @@
 import { ref, shallowRef, computed } from 'vue'
 import { db, initDatabase } from '../db/index'
 import { computeShiftClosingPreview } from '../utils/dailyStats'
+import { normalizePriceTier, sanitizeOptionalPrice, sanitizeMinQty } from '../utils/pricing'
 
 // Helper agar objek/array reaktif Vue (Proxy) selalu dikonversi menjadi plain JS sebelum disimpan ke IndexedDB
 const toPlain = (val) => {
@@ -209,11 +210,16 @@ export function useKasiryDB() {
     return products.value.slice(0, 8)
   })
 
-  // CRUD Produk
+  // CRUD Produk (mendukung harga ecer + opsional multi harga grosir/agen)
   const saveProduct = async (productData) => {
     const now = Date.now()
     const payload = toPlain({
       ...productData,
+      sellPrice: Math.max(0, Number(productData.sellPrice || 0)),
+      buyPrice: Math.max(0, Number(productData.buyPrice || 0)),
+      wholesalePrice: sanitizeOptionalPrice(productData.wholesalePrice),
+      wholesaleMinQty: sanitizeMinQty(productData.wholesaleMinQty),
+      agentPrice: sanitizeOptionalPrice(productData.agentPrice),
       updatedAt: now,
       deleted: false
     })
@@ -240,11 +246,14 @@ export function useKasiryDB() {
     }
   }
 
-  // CRUD Pelanggan (Buku Utang)
+  // CRUD Pelanggan (Buku Utang & Level Harga Pelanggan)
   const saveCustomer = async (custData) => {
     const now = Date.now()
+    const isSystemUmum = (custData.name || '').trim().toLowerCase() === 'umum'
+    const normalizedTier = isSystemUmum ? 'ecer' : normalizePriceTier(custData.priceTier)
     const payload = toPlain({
       ...custData,
+      priceTier: normalizedTier,
       updatedAt: now,
       deleted: false
     })
@@ -259,6 +268,7 @@ export function useKasiryDB() {
       if (existing) {
         existing.phone = payload.phone || existing.phone
         existing.address = payload.address || existing.address
+        existing.priceTier = custData.priceTier ? normalizedTier : normalizePriceTier(existing.priceTier)
         existing.updatedAt = now
         await db.customers.put(toPlain(existing))
         await refreshCustomers()
@@ -532,9 +542,12 @@ export function useKasiryDB() {
         id: item.id,
         name: item.name,
         sellPrice: item.sellPrice,
+        baseSellPrice: item.baseSellPrice ?? item.sellPrice,
         buyPrice: item.buyPrice ?? Math.round(item.sellPrice * 0.8),
         qty: item.qty,
-        subtotal: item.sellPrice * item.qty
+        subtotal: item.sellPrice * item.qty,
+        priceTier: item.appliedTier || 'ecer',
+        priceLabel: item.tierLabel || 'Ecer'
       })),
       updatedAt: now
     })

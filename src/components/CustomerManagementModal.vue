@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { buildCustomerStatsMap } from '../utils/customerStats'
+import { PRICE_TIERS, normalizePriceTier, getPriceTierMeta } from '../utils/pricing'
 import { 
   X, 
   Users, 
@@ -57,7 +58,8 @@ const customerForm = ref({
   name: '',
   phone: '',
   address: '',
-  totalDebt: ''
+  totalDebt: '',
+  priceTier: 'ecer'
 })
 
 // Reset tampilan ke list setiap kali modal dibuka
@@ -170,7 +172,8 @@ const openAddForm = () => {
     name: '',
     phone: '',
     address: '',
-    totalDebt: ''
+    totalDebt: '',
+    priceTier: 'ecer'
   }
   currentView.value = 'form'
 }
@@ -182,7 +185,8 @@ const openEditForm = (c) => {
     name: c.name,
     phone: c.phone || '',
     address: c.address || '',
-    totalDebt: c.totalDebt ? String(c.totalDebt) : '0'
+    totalDebt: c.totalDebt ? String(c.totalDebt) : '0',
+    priceTier: normalizePriceTier(c.priceTier)
   }
   currentView.value = 'form'
 }
@@ -217,6 +221,9 @@ const handleSave = () => {
     phone: customerForm.value.phone.trim(),
     address: customerForm.value.address.trim(),
     totalDebt: debtVal,
+    priceTier: customerForm.value.name.trim().toLowerCase() === 'umum'
+      ? 'ecer'
+      : normalizePriceTier(customerForm.value.priceTier),
     lastDate: 'Hari ini'
   }
 
@@ -375,10 +382,21 @@ const openWhatsAppChat = (c) => {
             <!-- Kolom Kiri: Nama Jelas & Kontak di bawahnya -->
             <div class="min-w-0 flex-1 space-y-1">
               <!-- NAMA PELANGGAN: Paling menonjol & jelas + tag frekuensi belanja -->
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <h4 class="font-bold text-base text-[#0a193d] group-hover:text-[#0284c7] transition-colors leading-tight truncate">
                   {{ c.name }}
                 </h4>
+                <span
+                  v-if="normalizePriceTier(c.priceTier) !== 'ecer'"
+                  :class="[
+                    'text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0',
+                    c.priceTier === 'agen'
+                      ? 'bg-sky-50 text-[#0284c7] border-sky-200/70'
+                      : 'bg-amber-50 text-amber-800 border-amber-200/70'
+                  ]"
+                >
+                  Harga {{ getPriceTierMeta(c.priceTier).label }}
+                </span>
                 <span 
                   v-if="getCustomerStats(c.id, c.name).count > 0" 
                   class="text-[10px] font-bold px-2 py-0.5 bg-sky-50 text-[#0284c7] rounded-full shrink-0"
@@ -500,6 +518,32 @@ const openWhatsAppChat = (c) => {
             </div>
           </div>
 
+          <!-- Level Harga Pelanggan (Kecuali akun sistem Umum) -->
+          <div v-if="customerForm.name.trim().toLowerCase() !== 'umum'">
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Level Harga Default Pelanggan
+            </label>
+            <div class="p-1 bg-slate-100 rounded-2xl grid grid-cols-3 gap-1">
+              <button
+                v-for="tier in PRICE_TIERS"
+                :key="tier.id"
+                type="button"
+                @click="customerForm.priceTier = tier.id"
+                :class="[
+                  'h-10 rounded-xl text-xs font-bold cursor-pointer transition-all',
+                  customerForm.priceTier === tier.id
+                    ? 'bg-[#0a193d] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                ]"
+              >
+                {{ tier.label }}
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">
+              Saat pelanggan ini dipilih di kasir, harga barang otomatis menyesuaikan level yang dipilih.
+            </p>
+          </div>
+
           <!-- Saldo Bon Awal -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -562,7 +606,20 @@ const openWhatsAppChat = (c) => {
                 {{ selectedCustomer?.name ? selectedCustomer.name.charAt(0) : 'P' }}
               </div>
               <div class="min-w-0">
-                <h4 class="font-bold text-base text-[#0a193d] truncate">{{ selectedCustomer?.name }}</h4>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h4 class="font-bold text-base text-[#0a193d] truncate">{{ selectedCustomer?.name }}</h4>
+                  <span
+                    v-if="selectedCustomer && normalizePriceTier(selectedCustomer.priceTier) !== 'ecer'"
+                    :class="[
+                      'text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0',
+                      selectedCustomer.priceTier === 'agen'
+                        ? 'bg-sky-50 text-[#0284c7] border-sky-200/70'
+                        : 'bg-amber-50 text-amber-800 border-amber-200/70'
+                    ]"
+                  >
+                    Harga {{ getPriceTierMeta(selectedCustomer.priceTier).label }}
+                  </span>
+                </div>
                 <p v-if="selectedCustomer?.phone" class="text-xs text-slate-500 font-mono mt-0.5">
                   {{ formatPhone(selectedCustomer.phone) }}
                 </p>

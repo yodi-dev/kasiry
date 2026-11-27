@@ -32,7 +32,10 @@ const shareToWhatsApp = () => {
 
   let itemsText = ''
   r.items.forEach(item => {
-    itemsText += `• ${item.qty}x ${item.name} = Rp ${(item.sellPrice * item.qty).toLocaleString('id-ID')}\n`
+    const tierNote = item.priceTier && item.priceTier !== 'ecer'
+      ? ` [${item.priceLabel || item.priceTier}]`
+      : ''
+    itemsText += `• ${item.qty}x ${item.name}${tierNote} = Rp ${(item.sellPrice * item.qty).toLocaleString('id-ID')}\n`
   })
 
   let bayarText = ''
@@ -123,7 +126,12 @@ const shareToWhatsApp = () => {
           >
             <div class="min-w-0 pr-1">
               <p class="font-medium text-slate-900 truncate">{{ item.name }}</p>
-              <p class="text-[10px] text-slate-500">{{ item.qty }} x Rp {{ item.sellPrice.toLocaleString('id-ID') }}</p>
+              <p class="text-[10px] text-slate-500">
+                {{ item.qty }} x Rp {{ item.sellPrice.toLocaleString('id-ID') }}
+                <span v-if="item.priceTier && item.priceTier !== 'ecer'" class="font-bold">
+                  ({{ item.priceLabel || item.priceTier }})
+                </span>
+              </p>
             </div>
             <div class="text-right shrink-0 font-medium">
               Rp {{ (item.sellPrice * item.qty).toLocaleString('id-ID') }}

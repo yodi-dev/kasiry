@@ -93,6 +93,7 @@ import { useHardwareScanner } from './composables/useHardwareScanner'
 import { playBeepSound } from './utils/sound'
 import { exportKasiryExcel } from './utils/excelExport'
 import { computeDailyStats } from './utils/dailyStats'
+import { buildPricedCartItem, normalizePriceTier } from './utils/pricing'
 import { useGoogleSync } from './composables/useGoogleSync'
 
 // Dexie Database Composable (IndexedDB Engine)
@@ -189,6 +190,9 @@ if (typeof window !== 'undefined') {
   window.addEventListener('offline', () => { isOnline.value = false })
 }
 const cart = ref([])
+const cartPriceTier = ref('ecer')
+const activeCartCustomer = ref(null)
+const tierAppliedByCustomer = ref(false)
 
 // State Pencarian Barcode / Barang
 const searchQuery = ref('')
@@ -262,31 +266,47 @@ const totalCartCount = computed(() => {
   return cart.value.reduce((acc, item) => acc + item.qty, 0)
 })
 
-// Cart Actions
+// Cart Actions (mendukung Multi Harga Ecer / Grosir / Agen, Auto Qty & Edit Manual)
 const addToCart = (product) => {
   const existingIndex = cart.value.findIndex(item => item.id === product.id)
   if (existingIndex > -1) {
-    cart.value[existingIndex].qty += 1
+    const existing = cart.value[existingIndex]
+    cart.value[existingIndex] = buildPricedCartItem(
+      { ...existing, qty: existing.qty + 1 },
+      cartPriceTier.value
+    )
   } else {
-    cart.value.push({
-      ...product,
-      qty: 1
-    })
+    cart.value.push(
+      buildPricedCartItem(
+        { ...product, baseSellPrice: product.sellPrice, qty: 1 },
+        cartPriceTier.value
+      )
+    )
   }
   ensureKasaFocus()
 }
 
 const increaseQty = (productId) => {
-  const item = cart.value.find(i => i.id === productId)
-  if (item) item.qty += 1
+  const idx = cart.value.findIndex(i => i.id === productId)
+  if (idx > -1) {
+    const current = cart.value[idx]
+    cart.value[idx] = buildPricedCartItem(
+      { ...current, qty: current.qty + 1 },
+      cartPriceTier.value
+    )
+  }
   if (isTouchViewport()) blurKasaInputs()
 }
 
 const decreaseQty = (productId) => {
-  const item = cart.value.find(i => i.id === productId)
-  if (!item) return
-  if (item.qty > 1) {
-    item.qty -= 1
+  const idx = cart.value.findIndex(i => i.id === productId)
+  if (idx === -1) return
+  const current = cart.value[idx]
+  if (current.qty > 1) {
+    cart.value[idx] = buildPricedCartItem(
+      { ...current, qty: current.qty - 1 },
+      cartPriceTier.value
+    )
     if (isTouchViewport()) blurKasaInputs()
   } else {
     removeItem(productId)
@@ -300,12 +320,89 @@ const removeItem = (productId) => {
 
 const clearCart = () => {
   cart.value = []
+  cartPriceTier.value = 'ecer'
+  activeCartCustomer.value = null
+  tierAppliedByCustomer.value = false
   ensureKasaFocus()
 }
 
-// Product Management (CRUD dengan Dexie.js)
+const handleChangeCartPriceTier = (tier) => {
+  cartPriceTier.value = normalizePriceTier(tier)
+  tierAppliedByCustomer.value = false
+  cart.value = cart.value.map(item => buildPricedCartItem(item, cartPriceTier.value))
+}
+
+const handleCustomerPriceTierChange = ({ customer, priceTier }) => {
+  activeCartCustomer.value = customer || null
+  const normalized = normalizePriceTier(priceTier)
+  if (normalized !== 'ecer') {
+    cartPriceTier.value = normalized
+    tierAppliedByCustomer.value = true
+    cart.value = cart.value.map(item => buildPricedCartItem(item, cartPriceTier.value))
+  } else if (tierAppliedByCustomer.value) {
+    cartPriceTier.value = 'ecer'
+    tierAppliedByCustomer.value = false
+    cart.value = cart.value.map(item => buildPricedCartItem(item, 'ecer'))
+  }
+}
+
+const handleUpdateItemPrice = async ({ productId, priceMode, customPrice, saveToCatalogTier = 'none' }) => {
+  let updatedCatalog = null
+  if (saveToCatalogTier !== 'none' && customPrice > 0) {
+    const existingProd = products.value.find(p => p.id === productId)
+    if (existingProd) {
+      const nextProd = { ...existingProd }
+      if (saveToCatalogTier === 'ecer') nextProd.sellPrice = customPrice
+      if (saveToCatalogTier === 'grosir') nextProd.wholesalePrice = customPrice
+      if (saveToCatalogTier === 'agen') nextProd.agentPrice = customPrice
+      updatedCatalog = await saveProduct(nextProd)
+      triggerCloudAutoBackup()
+    }
+  }
+
+  const nextMode = updatedCatalog && (saveToCatalogTier === 'ecer' || saveToCatalogTier === 'grosir' || saveToCatalogTier === 'agen')
+    ? saveToCatalogTier
+    : priceMode
+
+  cart.value = cart.value.map(item => {
+    if (item.id !== productId) return item
+    const baseProd = updatedCatalog || item
+    return buildPricedCartItem(
+      {
+        ...item,
+        baseSellPrice: baseProd.sellPrice ?? item.baseSellPrice,
+        wholesalePrice: baseProd.wholesalePrice ?? item.wholesalePrice,
+        wholesaleMinQty: baseProd.wholesaleMinQty ?? item.wholesaleMinQty,
+        agentPrice: baseProd.agentPrice ?? item.agentPrice,
+        priceMode: nextMode,
+        customPrice: nextMode === 'manual' ? customPrice : null
+      },
+      cartPriceTier.value
+    )
+  })
+}
+
+// Product Management (CRUD dengan Dexie.js + sinkronkan item aktif di keranjang)
 const handleSaveProduct = async (prodData) => {
-  await saveProduct(prodData)
+  const saved = await saveProduct(prodData)
+  if (saved) {
+    cart.value = cart.value.map(item => {
+      if (item.id !== saved.id) return item
+      return buildPricedCartItem(
+        {
+          ...item,
+          name: saved.name,
+          category: saved.category,
+          buyPrice: saved.buyPrice,
+          baseSellPrice: saved.sellPrice,
+          wholesalePrice: saved.wholesalePrice,
+          wholesaleMinQty: saved.wholesaleMinQty,
+          agentPrice: saved.agentPrice
+        },
+        cartPriceTier.value
+      )
+    })
+  }
   triggerCloudAutoBackup()
 }
 
@@ -926,10 +1023,14 @@ onUnmounted(() => {
             :cartItems="cart"
             :totalAmount="totalCartAmount"
             :totalCount="totalCartCount"
+            :cartPriceTier="cartPriceTier"
+            :selectedCustomerName="activeCartCustomer?.name || ''"
             @increaseQty="increaseQty"
             @decreaseQty="decreaseQty"
             @removeItem="removeItem"
             @clearCart="clearCart"
+            @changePriceTier="handleChangeCartPriceTier"
+            @updateItemPrice="handleUpdateItemPrice"
             @openPayment="isPaymentOpen = true"
           />
         </div>
@@ -1014,6 +1115,7 @@ onUnmounted(() => {
       v-if="activatedModals.payment || isPaymentOpen"
       :isOpen="isPaymentOpen"
       :totalAmount="totalCartAmount"
+      :cartPriceTier="cartPriceTier"
       :savedCustomers="customers"
       :transactions="transactions"
       @close="isPaymentOpen = false"
@@ -1021,6 +1123,7 @@ onUnmounted(() => {
       @processQrisPayment="handleProcessQrisPayment"
       @processDebtPayment="handleProcessDebtPayment"
       @saveCustomer="handleSaveCustomer"
+      @changeCustomerPriceTier="handleCustomerPriceTierChange"
     />
 
     <!-- Modal Input Cepat Barcode Baru (Lazy Inventory) -->

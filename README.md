@@ -14,7 +14,8 @@
   - **Tablet & Desktop (`md+` / `lg+`):** *Bento POS Workstation* 2-kolom dengan TopBar kompak (`Chip Shift` | `Stok & Data ▾`, `Buku Utang`, `Kas Keluar`, `Laporan`, `⚙️`), filter kategori pill, input pencarian inline berfokus otomatis, serta pintasan keyboard `/` (Cari) dan `F2` (Pembayaran).
 - **Hardware Barcode Scanner (HID) & Kamera Hybrid:** Mendukung scanner USB/Bluetooth OTG secara global sekaligus kamera depan/belakang browser menggunakan kombinasi `BarcodeDetector` native + `@zxing/library`, lengkap dengan zoom, lampu kilat (*torch*), dan panduan jarak fokus.
 - **Lazy Inventory + Kategori Dinamis:** Scan barcode barang yang belum terdaftar akan membuka modal input kilat — kini sekaligus bisa menambah kategori baru secara inline dan langsung memasukkan barang ke keranjang.
-- **Pembayaran Cerdas (Tunai, QRIS, & Utang) + Manajemen Pelanggan:**
+- **Pembayaran & Multi Harga Cerdas (Ecer / Grosir / Agen):**
+  - **Multi Harga Fleksibel:** Harga Ecer wajib sebagai default; tiap barang opsional memiliki **Harga Grosir**, **Min. Qty Grosir** (otomatis turun harga saat jumlah beli tercapai), dan **Harga Agen**. Kasir dapat berpindah tier untuk seluruh nota di `CartSection`, memilih pelanggan berlevel `Grosir`/`Agen`, atau mengetuk harga barang untuk ubah/simpan harga manual secara langsung.
   - **Tunai:** Pelanggan default **"Umum"**, nominal cepat & pembulatan ke atas otomatis, hitung kembalian real-time, serta daftar pelanggan diurutkan berdasarkan loyalitas ($O(N)$ `buildCustomerStatsMap`).
   - **QRIS:** Pembayaran non-tunai uang pas otomatis (`QRS-...`) terpisah bersih dari uang tunai laci.
   - **Utang / Bon:** Cari atau daftarkan pelanggan baru secara cepat (akun `"Umum"` otomatis diblokir agar tidak mencatat piutang), catat cicilan atau pelunasan Tunai/QRIS dengan kembalian presisi, dan kirim pengingat tagihan via WhatsApp.
@@ -47,13 +48,13 @@ kasiryy/
 │   ├── components/         # 16 komponen aktif UI Kasa & 11 modal (lazy-loaded via defineAsyncComponent)
 │   ├── composables/        # useKasiryDB.js, useGoogleSync.js, useHardwareScanner.js
 │   ├── db/                 # KasiryDatabase schema v4 & seed produk/pelanggan awal
-│   ├── utils/              # customerStats.js, dailyStats.js, expenseConstants.js, excelExport.js, sound.js
+│   ├── utils/              # customerStats.js, dailyStats.js, expenseConstants.js, pricing.js, excelExport.js, sound.js
 │   ├── App.vue             # Orkestrator Kasa, prewarm jalur checkout, & state global
 │   └── style.css           # Tailwind CSS v4, Bento container queries & content-visibility
-├── tests/                  # 7 suite test Vitest (DB, migrasi v1->v4, cloud sync, dailyStats, Excel, UI)
+├── tests/                  # 8 suite test Vitest (27 skenario: DB, migrasi, pricing, sync, stats, Excel, UI)
 ├── CHANGELOG.md            # Riwayat rilis SemVer (Keep a Changelog)
 ├── DESIGN_SYSTEM.md        # Panduan visual & token warna/komponen
-├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.10)
+├── PRD_v2.0.md             # Spesifikasi produk & arsitektur (diperbarui hingga v2.11)
 ├── SITEMAP.md              # Alur interaksi & arsitektur komponen
 └── vite.config.js          # Rolldown vendor splitting & PWA Workbox configuration
 ```

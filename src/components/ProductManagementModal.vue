@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Info 
 } from '@lucide/vue'
+import { sanitizeOptionalPrice, sanitizeMinQty } from '../utils/pricing'
 
 const props = defineProps({
   isOpen: {
@@ -68,6 +69,9 @@ const currentProduct = ref({
   name: '',
   sellPrice: '',
   buyPrice: '',
+  wholesalePrice: '',
+  wholesaleMinQty: '',
+  agentPrice: '',
   barcode: '',
   category: 'Sembako',
   isMacro: false
@@ -117,6 +121,9 @@ const openAddForm = () => {
     name: '',
     sellPrice: '',
     buyPrice: '',
+    wholesalePrice: '',
+    wholesaleMinQty: '',
+    agentPrice: '',
     barcode: '',
     category: selectedCategory.value !== 'Semua' ? selectedCategory.value : (availableCategories.value[0] || 'Sembako'),
     isMacro: false
@@ -131,6 +138,9 @@ const openEditForm = (p) => {
     name: p.name,
     sellPrice: String(p.sellPrice),
     buyPrice: p.buyPrice ? String(p.buyPrice) : '',
+    wholesalePrice: p.wholesalePrice > 0 ? String(p.wholesalePrice) : '',
+    wholesaleMinQty: p.wholesaleMinQty >= 2 ? String(p.wholesaleMinQty) : '',
+    agentPrice: p.agentPrice > 0 ? String(p.agentPrice) : '',
     barcode: p.barcode || '',
     category: p.category || (availableCategories.value[0] || 'Sembako'),
     isMacro: !!p.isMacro
@@ -149,6 +159,9 @@ const handleSave = () => {
     name: currentProduct.value.name.trim(),
     sellPrice: sell,
     buyPrice: buy > 0 ? buy : Math.round(sell * 0.8),
+    wholesalePrice: sanitizeOptionalPrice(currentProduct.value.wholesalePrice),
+    wholesaleMinQty: sanitizeMinQty(currentProduct.value.wholesaleMinQty),
+    agentPrice: sanitizeOptionalPrice(currentProduct.value.agentPrice),
     barcode: currentProduct.value.barcode.trim(),
     category: currentProduct.value.category,
     isMacro: currentProduct.value.isMacro || false
@@ -339,6 +352,20 @@ const handleDeleteCategory = (cat) => {
                     Modal: Rp {{ p.buyPrice.toLocaleString('id-ID') }}
                   </span>
 
+                  <span
+                    v-if="p.wholesalePrice > 0"
+                    class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/70 font-mono"
+                  >
+                    Grosir: Rp {{ p.wholesalePrice.toLocaleString('id-ID') }}<template v-if="p.wholesaleMinQty >= 2"> (≥{{ p.wholesaleMinQty }})</template>
+                  </span>
+
+                  <span
+                    v-if="p.agentPrice > 0"
+                    class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-[#0284c7] border border-sky-200/70 font-mono"
+                  >
+                    Agen: Rp {{ p.agentPrice.toLocaleString('id-ID') }}
+                  </span>
+
                   <span v-if="p.category" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
                     {{ p.category }}
                   </span>
@@ -423,12 +450,12 @@ const handleDeleteCategory = (cat) => {
             </div>
           </div>
 
-          <!-- Harga Jual & Harga Modal Grid -->
+          <!-- Harga Jual Ecer & Harga Modal Grid -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div class="flex items-center justify-between mb-1.5">
                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Harga Jual (Rp)
+                  Harga Ecer / Umum (Rp)
                 </label>
                 <span v-if="estimatedProfit > 0" class="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
                   <TrendingUp class="w-3 h-3" /> Untung Rp {{ estimatedProfit.toLocaleString('id-ID') }}
@@ -460,6 +487,60 @@ const handleDeleteCategory = (cat) => {
                   v-model="currentProduct.buyPrice"
                   placeholder="12000"
                   class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-base font-medium text-slate-700 text-right font-mono outline-hidden transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Multi Harga (Opsional: Harga Grosir & Harga Agen) -->
+          <div class="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold text-[#0a193d] uppercase tracking-wider">
+                Multi Harga (Opsional)
+              </span>
+              <span class="text-[11px] text-slate-500 font-medium">
+                Kosongkan jika hanya dijual harga ecer
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">
+                  Harga Grosir (Rp)
+                </label>
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  v-model="currentProduct.wholesalePrice"
+                  placeholder="Opsional"
+                  class="w-full h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-sm font-bold text-amber-800 text-right font-mono outline-hidden transition-all"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">
+                  Min. Qty Grosir
+                </label>
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  min="2"
+                  v-model="currentProduct.wholesaleMinQty"
+                  placeholder="Misal: 5 (opsional)"
+                  class="w-full h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-sm font-semibold text-[#0a193d] text-right font-mono outline-hidden transition-all"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">
+                  Harga Agen (Rp)
+                </label>
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  v-model="currentProduct.agentPrice"
+                  placeholder="Opsional"
+                  class="w-full h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-sm font-bold text-[#0284c7] text-right font-mono outline-hidden transition-all"
                 />
               </div>
             </div>

@@ -6,6 +6,22 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.11.0] - 2026-11-27 (Roadmap #4: Multi Harga Ecer / Grosir / Agen & Edit Harga Manual)
+
+### Added
+- **Mesin Multi Harga (`src/utils/pricing.js`):**
+  - Mendukung 3 tingkatan harga per produk (**Ecer** sebagai harga wajib/default, plus opsional **Harga Grosir**, **Min. Qty Grosir**, dan **Harga Agen**) dengan fallback aman berjenjang (`Agen -> Grosir -> Ecer`) agar barang tanpa tier grosir/agen tidak pernah terhitung `Rp 0`.
+  - **Aturan Otomatis Qty:** Ketika mode nota `Ecer` aktif dan `qty >= wholesaleMinQty`, harga satuan item di keranjang otomatis beralih menjadi `Grosir (Auto)`.
+- **Kontrol Harga Lengkap di Keranjang (`src/components/CartSection.vue` & `src/App.vue`):**
+  - Saklar cepat **`Harga Nota: Ecer | Grosir | Agen`** pada header `Struk Belanjaan`.
+  - **Editor Harga Inline Per Item:** Mengetuk harga satuan baris belanjaan membuka kontrol cepat untuk pindah tier khusus item tersebut (`Auto Nota`, `Ecer`, `Grosir`, `Agen`) **atau ketik harga manual/nego**, lengkap dengan opsi sekali pakai (*Nota ini saja*) maupun **simpan permanen** ke harga `Ecer` / `Grosir` / `Agen` di katalog barang.
+- **Integrasi Produk, Lazy Inventory, Pelanggan, Pembayaran & Struk:**
+  - `ProductManagementModal.vue` & `LazyInventoryModal.vue` menyediakan input opsional `Harga Grosir`, `Min. Qty Grosir`, dan `Harga Agen` (+ badge tier di daftar barang & kartu cepat `FrequentProductsSection.vue`).
+  - `CustomerManagementModal.vue` menambahkan pilihan **Level Harga Default Pelanggan** (`Ecer`, `Grosir`, `Agen`), dan memilih pelanggan di `PaymentModal.vue` otomatis menyesuaikan mode harga keranjang & tagihan secara live (dengan proteksi akun `"Umum"` tetap `'ecer'`).
+  - `useKasiryDB.js` (`recordTransaction`) menyimpan `baseSellPrice`, `priceTier`, dan `priceLabel`, sedangkan `ReceiptModal.vue` menampilkan label tier non-ecer (`Grosir` / `Agen` / `Khusus`) pada struk 58mm & pesan WhatsApp.
+
+---
+
 ## [2.10.0] - 2026-11-27 (Roadmap #3: Sistem Buka & Tutup Shift / Tutup Buku Harian)
 
 ### Added

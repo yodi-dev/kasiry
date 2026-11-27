@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { X, Plus, Barcode, Check } from '@lucide/vue'
+import { sanitizeOptionalPrice, sanitizeMinQty } from '../utils/pricing'
 
 const props = defineProps({
   isOpen: {
@@ -26,6 +27,10 @@ const newCategoryInputRef = ref(null)
 const productName = ref('')
 const sellPrice = ref('')
 const buyPrice = ref('')
+const wholesalePrice = ref('')
+const wholesaleMinQty = ref('')
+const agentPrice = ref('')
+const showMultiPrice = ref(false)
 const category = ref('Makanan')
 const isAddingCategoryInline = ref(false)
 const newCategoryInput = ref('')
@@ -42,6 +47,10 @@ watch(() => props.isOpen, (newVal) => {
     productName.value = ''
     sellPrice.value = ''
     buyPrice.value = ''
+    wholesalePrice.value = ''
+    wholesaleMinQty.value = ''
+    agentPrice.value = ''
+    showMultiPrice.value = false
     isAddingCategoryInline.value = false
     newCategoryInput.value = ''
     category.value = availableCategories.value.includes('Makanan')
@@ -94,6 +103,9 @@ const handleSave = () => {
     name: productName.value.trim(),
     sellPrice: sell,
     buyPrice: buy > 0 ? buy : Math.round(sell * 0.8),
+    wholesalePrice: sanitizeOptionalPrice(wholesalePrice.value),
+    wholesaleMinQty: sanitizeMinQty(wholesaleMinQty.value),
+    agentPrice: sanitizeOptionalPrice(agentPrice.value),
     isMacro: false,
     category: category.value
   })
@@ -170,6 +182,55 @@ const handleSave = () => {
               placeholder="10000"
               class="w-full h-11 px-3.5 bg-white border border-slate-200 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 rounded-xl text-base sm:text-sm font-medium text-slate-700 text-right tabular-nums outline-hidden transition-all"
             />
+          </div>
+        </div>
+
+        <!-- Opsi Lipat Multi Harga Grosir/Agen -->
+        <div>
+          <button
+            type="button"
+            @click="showMultiPrice = !showMultiPrice"
+            class="text-[11px] font-bold text-[#0284c7] hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            <Plus aria-hidden="true" class="w-3 h-3" />
+            <span>{{ showMultiPrice ? 'Tutup Harga Grosir / Agen' : 'Atur Harga Grosir / Agen (Opsional)' }}</span>
+          </button>
+
+          <div
+            v-if="showMultiPrice"
+            class="mt-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 grid grid-cols-3 gap-2"
+          >
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Harga Grosir</label>
+              <input
+                type="number"
+                inputmode="numeric"
+                v-model="wholesalePrice"
+                placeholder="Rp"
+                class="w-full h-9 px-2.5 bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-xs font-bold text-amber-800 text-right font-mono outline-hidden"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Min. Qty</label>
+              <input
+                type="number"
+                inputmode="numeric"
+                min="2"
+                v-model="wholesaleMinQty"
+                placeholder="5"
+                class="w-full h-9 px-2.5 bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-xs font-semibold text-[#0a193d] text-right font-mono outline-hidden"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Harga Agen</label>
+              <input
+                type="number"
+                inputmode="numeric"
+                v-model="agentPrice"
+                placeholder="Rp"
+                class="w-full h-9 px-2.5 bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-xs font-bold text-[#0284c7] text-right font-mono outline-hidden"
+              />
+            </div>
           </div>
         </div>
 

@@ -8,6 +8,7 @@ import ReceiptModal from '../src/components/ReceiptModal.vue'
 import DailyReportModal from '../src/components/DailyReportModal.vue'
 import ExpenseModal from '../src/components/ExpenseModal.vue'
 import ShiftModal from '../src/components/ShiftModal.vue'
+import CartSection from '../src/components/CartSection.vue'
 import FrequentProductsSection from '../src/components/FrequentProductsSection.vue'
 import TopBar from '../src/components/TopBar.vue'
 import CustomerManagementModal from '../src/components/CustomerManagementModal.vue'
@@ -488,5 +489,91 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     expect(shiftCloseModal.text()).toContain('Shift Berhasil Ditutup')
     await shiftCloseModal.findAll('button').find(b => b.text().includes('Buka Shift Baru')).trigger('click')
     expect(shiftCloseModal.emitted('startNextShift')).toHaveLength(1)
+  })
+
+  it('handles CartSection tier switching, inline manual price editing, and Payment/Receipt multi-tier display', async () => {
+    const cart = mount(CartSection, {
+      props: {
+        cartPriceTier: 'ecer',
+        totalAmount: 3500,
+        totalCount: 1,
+        cartItems: [{
+          id: 50,
+          name: 'Indomie Goreng',
+          sellPrice: 3500,
+          baseSellPrice: 3500,
+          wholesalePrice: 3200,
+          wholesaleMinQty: 5,
+          agentPrice: 3000,
+          qty: 1,
+          priceMode: 'auto',
+          appliedTier: 'ecer',
+          tierLabel: 'Ecer'
+        }]
+      }
+    })
+
+    // 1. Ganti harga nota seluruh keranjang ke Agen
+    const tierGroup = cart.find('[role="group"][aria-label="Level Harga Keranjang"]')
+    await tierGroup.findAll('button').find(b => b.text().trim() === 'Agen').trigger('click')
+    expect(cart.emitted('changePriceTier')?.[0]).toEqual(['agen'])
+
+    // 2. Buka inline editor harga satuan & simpan manual menjadi Harga Grosir katalog
+    const unitBtn = cart.findAll('button').find(b => b.text().includes('Rp 3.500') && b.text().includes('Ecer'))
+    await unitBtn.trigger('click')
+    await nextTick()
+    expect(cart.text()).toContain('Atur Harga: Indomie Goreng')
+
+    const manualInput = cart.find('input[aria-label="Harga manual satuan"]')
+    await manualInput.setValue('3100')
+    await cart.findAll('button').find(b => b.text().trim() === 'Jadi Grosir').trigger('click')
+    await cart.findAll('button').find(b => b.text().trim() === 'Pakai').trigger('click')
+
+    expect(cart.emitted('updateItemPrice')?.[0]?.[0]).toEqual({
+      productId: 50,
+      priceMode: 'manual',
+      customPrice: 3100,
+      saveToCatalogTier: 'grosir'
+    })
+
+    // 3. PaymentModal meneruskan level harga pelanggan saat dipilih
+    const agenCustomers = [
+      { id: 1, name: 'Umum', phone: '', totalDebt: 0, priceTier: 'ecer' },
+      { id: 8, name: 'Warung Jaya', phone: '08199', totalDebt: 0, priceTier: 'agen' }
+    ]
+    const payModal = mount(PaymentModal, {
+      props: {
+        isOpen: true,
+        totalAmount: 35000,
+        cartPriceTier: 'ecer',
+        savedCustomers: agenCustomers,
+        transactions: []
+      }
+    })
+    await payModal.find('[title="Sentuh untuk ganti pelanggan"]').trigger('click')
+    await nextTick()
+    const agenCustBtn = payModal.findAll('button').find(b => b.text().includes('Warung Jaya'))
+    expect(agenCustBtn.text()).toContain('Agen')
+    await agenCustBtn.trigger('click')
+    expect(payModal.emitted('changeCustomerPriceTier')?.[0]?.[0]?.priceTier).toBe('agen')
+
+    // 4. ReceiptModal menampilkan label tier non-ecer pada nota
+    const receiptGrosir = mount(ReceiptModal, {
+      props: {
+        isOpen: true,
+        storeProfile: { name: 'Habiba Store', phone: '081234567890' },
+        receiptData: {
+          invoiceNumber: 'KSR-777',
+          time: '10:00',
+          totalAmount: 16000,
+          paymentMethod: 'TUNAI',
+          cashGiven: 20000,
+          changeAmount: 4000,
+          customer: { name: 'Warung Jaya' },
+          items: [{ id: 50, name: 'Indomie Goreng', sellPrice: 3200, qty: 5, priceTier: 'grosir', priceLabel: 'Grosir (Auto)' }]
+        }
+      }
+    })
+    expect(receiptGrosir.text()).toContain('Grosir (Auto)')
   })
 })
