@@ -1793,4 +1793,70 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
       })
     }
   })
+
+  it('releases camera stream immediately without idle standby in standalone PWA mode', async () => {
+    const originalMediaDevices = navigator.mediaDevices
+    const originalPlay = HTMLMediaElement.prototype.play
+    const originalSrcObjectDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject')
+    const originalStandaloneDesc = Object.getOwnPropertyDescriptor(navigator, 'standalone')
+    const mockTrack = {
+      readyState: 'live',
+      muted: false,
+      enabled: true,
+      stop: vi.fn(),
+      getSettings: () => ({ deviceId: 'cam-back-1' }),
+      getCapabilities: () => ({}),
+      applyConstraints: vi.fn().mockResolvedValue(undefined)
+    }
+    const mockStream = {
+      getTracks: () => [mockTrack],
+      getVideoTracks: () => [mockTrack]
+    }
+    const getUserMediaMock = vi.fn().mockResolvedValue(mockStream)
+
+    Object.defineProperty(navigator, 'standalone', {
+      configurable: true,
+      value: true
+    })
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: getUserMediaMock }
+    })
+    Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
+      configurable: true,
+      writable: true,
+      value: null
+    })
+    HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+
+    let wrapper
+    try {
+      wrapper = mount(CameraScannerModal, {
+        props: { isOpen: true }
+      })
+      await nextTick()
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(getUserMediaMock).toHaveBeenCalledTimes(1)
+
+      // Tutup modal di mode standalone PWA -> langsung stop track (tidak ditahan idle standby)
+      await wrapper.setProps({ isOpen: false })
+      await nextTick()
+      expect(mockTrack.stop).toHaveBeenCalledTimes(1)
+    } finally {
+      if (wrapper) wrapper.unmount()
+      HTMLMediaElement.prototype.play = originalPlay
+      if (originalSrcObjectDesc) {
+        Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', originalSrcObjectDesc)
+      }
+      if (originalStandaloneDesc) {
+        Object.defineProperty(navigator, 'standalone', originalStandaloneDesc)
+      } else {
+        delete navigator.standalone
+      }
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: originalMediaDevices
+      })
+    }
+  })
 })

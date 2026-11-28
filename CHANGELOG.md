@@ -6,6 +6,15 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.24.1] - 2026-11-28 (Matikan Idle Standby Kamera di iOS & PWA Standalone)
+
+### Fixed
+- **Nonaktifkan *Idle Standby Stream* & Cache `deviceId` pada iOS/PWA Standalone (`CameraScannerModal.vue`):**
+  - Menambahkan deteksi `isAppleMobileOrStandalone()` (iPhone/iPad atau mode `display-mode: standalone` / `navigator.standalone`) agar `pauseCameraToStandby()` langsung melepas stream (`track.stop()`) alih-alih menahannya dalam mode siaga 3 menit yang dapat membuat `AVCaptureSession` WebKit macet.
+  - Melewati cache `deviceId: { exact }` pada iOS/PWA standalone agar WebKit tidak tertahan pada `deviceId` sesi sebelumnya.
+
+---
+
 ## [2.24.0] - 2026-11-28 (Perbaikan Kamera PWA iOS & Scanner Kamera di Manajemen Barang)
 
 ### Added

@@ -35,6 +35,22 @@ const STANDBY_IDLE_TIMEOUT_MS = 180000 // 3 menit siaga agar izin kamera cukup s
 const CAMERA_ACQUIRE_TIMEOUT_MS = 8000 // Cegah getUserMedia menggantung selamanya di PWA iOS
 const VIDEO_PLAY_TIMEOUT_MS = 2500 // Cegah video.play() menggantung di WebKit standalone
 
+// Di iOS/iPadOS atau mode PWA standalone, menahan track siaga (enabled=false)
+// sering membuat AVCaptureSession WebKit macet/loading terus saat dibuka ulang.
+const isAppleMobileOrStandalone = () => {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  const isAppleTouch =
+    /iPad|iPhone|iPod/i.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const isStandalone =
+    navigator.standalone === true ||
+    (typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(display-mode: standalone)').matches)
+  return isAppleTouch || isStandalone
+}
+
 let stream = null
 let standbyStream = null
 let standbyFacing = null
@@ -378,7 +394,8 @@ const playVideoSafely = async (video, mediaStream) => {
 }
 
 const acquireCameraStream = async (targetFacing) => {
-  const savedDeviceId = grantedDeviceIds[targetFacing]
+  const useSavedDeviceId = !isAppleMobileOrStandalone()
+  const savedDeviceId = useSavedDeviceId ? grantedDeviceIds[targetFacing] : null
   const attempts = []
   if (savedDeviceId) {
     attempts.push({
@@ -591,7 +608,7 @@ const pauseCameraToStandby = () => {
     isTorchOn.value = false
 
     const hasLiveTrack = tracks.some(track => track.readyState === 'live')
-    if (hasLiveTrack) {
+    if (hasLiveTrack && !isAppleMobileOrStandalone()) {
       tracks.forEach(track => {
         track.enabled = false
       })
