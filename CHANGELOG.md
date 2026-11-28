@@ -6,6 +6,15 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.3] - 2026-11-28 (Perapihan Header Identitas Toko, Status Dot & Shift TopBar)
+
+### Changed
+- **Penyederhanaan Lockup Identitas `TopBar.vue` (Opsi A):**
+  - Menghilangkan pengulangan label `KASIRY` dan pil teks `Cloud Aktif / Online / Offline` dari baris atas TopBar agar header utama hanya menampilkan 2 baris bersih: **Nama Toko** (`<h1>`) dan **Tanggal + Chip Shift**.
+  - Status koneksi & sinkronisasi Google Cloud tetap ditunjukkan melalui **dot indikator di pojok Avatar** lengkap dengan tooltip hover, serta ditampilkan dalam bentuk pil teks pada header **Mobile Drawer**.
+
+---
+
 ## [2.20.2] - 2026-11-28 (Penyelarasan Branding, Dynamic Browser Title, Footer & OG Meta)
 
 ### Changed

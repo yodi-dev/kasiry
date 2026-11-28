@@ -83,7 +83,7 @@ const emit = defineEmits([
   'drawerClosed'
 ])
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.2'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.3'
 const isDrawerOpen = ref(false)
 const openMenuKey = ref(null) // 'data' | 'service' | 'finance' | null
 const desktopMenusRef = ref(null)
@@ -114,6 +114,31 @@ const todayFormatted = computed(() => {
     day: 'numeric',
     month: 'short'
   }).format(new Date())
+})
+
+const connectionStatus = computed(() => {
+  if (props.isGoogleConnected) {
+    return {
+      label: 'Cloud Aktif',
+      tooltip: 'Cloud Sync Aktif — Klik untuk Pengaturan',
+      dotClass: 'bg-emerald-500',
+      pillClass: 'bg-emerald-50 text-emerald-700'
+    }
+  }
+  if (props.isOnline) {
+    return {
+      label: 'Online',
+      tooltip: 'Online (Data Lokal) — Klik untuk Pengaturan',
+      dotClass: 'bg-sky-500',
+      pillClass: 'bg-sky-50 text-sky-700'
+    }
+  }
+  return {
+    label: 'Offline',
+    tooltip: 'Mode Offline — Tetap Bisa Transaksi',
+    dotClass: 'bg-slate-400',
+    pillClass: 'bg-slate-100 text-slate-600'
+  }
 })
 
 const shiftChipInfo = computed(() => {
@@ -451,14 +476,14 @@ const drawerGroups = computed(() => [
         <span aria-hidden="true" class="w-3.5 h-0.5 bg-[#0a193d] rounded-full"></span>
       </button>
 
-      <!-- Brand Identity Lockup (Mobile: Centered | Tablet & Desktop: Left with Mini Avatar) -->
+      <!-- Brand Identity Lockup (Opsi A: 2 Baris Rapi — Nama Toko + Tanggal/Shift; Status Cloud/Online di Dot Avatar) -->
       <div class="min-w-0 flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-2.5">
         <button
           type="button"
           @click="emit('openSettings')"
           class="hidden md:flex relative shrink-0 rounded-xl cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0284c7]"
           aria-label="Profil Toko dan Status Sinkron"
-          :title="isGoogleConnected ? 'Cloud Sync Aktif — Klik untuk Pengaturan' : 'Pengaturan Toko & Cadangan'"
+          :title="connectionStatus.tooltip"
         >
           <div class="size-9 rounded-xl bg-linear-to-tr from-[#0284c7] to-[#38bdf8] p-0.5 shadow-xs border border-white/80 flex items-center justify-center overflow-hidden">
             <img
@@ -475,42 +500,27 @@ const drawerGroups = computed(() => [
           <span
             aria-hidden="true"
             class="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white"
-            :class="isGoogleConnected ? 'bg-emerald-500' : isOnline ? 'bg-sky-500' : 'bg-slate-400'"
+            :class="connectionStatus.dotClass"
           ></span>
         </button>
 
         <div class="min-w-0 text-center md:text-left leading-tight">
-          <div class="flex items-center justify-center md:justify-start gap-1.5 flex-wrap">
-            <span class="text-[10px] font-bold tracking-[0.14em] uppercase text-[#0284c7]">Kasiry</span>
-            <span
-              class="hidden xl:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
-              :class="isGoogleConnected ? 'bg-emerald-50 text-emerald-700' : isOnline ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-600'"
-            >
-              <span aria-hidden="true" class="size-1.5 rounded-full" :class="isGoogleConnected ? 'bg-emerald-500' : isOnline ? 'bg-sky-500' : 'bg-slate-400'"></span>
-              {{ isGoogleConnected ? 'Cloud Aktif' : isOnline ? 'Online' : 'Offline' }}
-            </span>
+          <h1 class="text-sm sm:text-base font-bold text-[#0a193d] tracking-tight truncate max-w-[205px] sm:max-w-[250px] md:max-w-[220px] lg:max-w-[260px]">
+            {{ storeName }}
+          </h1>
+          <div class="flex items-center justify-center md:justify-start gap-1.5 mt-0.5">
+            <span class="md:hidden lg:inline text-[11px] text-slate-500 font-medium whitespace-nowrap">{{ todayFormatted }}</span>
+            <span aria-hidden="true" class="hidden lg:inline text-slate-300">•</span>
             <button
               type="button"
               @click="triggerAction('openShift')"
-              class="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
+              class="inline-flex items-center gap-1 px-1.5 md:px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
               :class="shiftChipInfo.chipClass"
               :title="activeShift ? 'Lihat Info / Tutup Shift Kasir' : 'Klik untuk Buka Shift & Atur Modal Awal'"
             >
               <span aria-hidden="true" class="size-1.5 rounded-full" :class="shiftChipInfo.dotClass"></span>
-              <span class="whitespace-nowrap">{{ shiftChipInfo.label }}</span>
-            </button>
-          </div>
-          <h1 class="text-sm sm:text-base font-bold text-[#0a193d] tracking-tight truncate max-w-[190px] sm:max-w-[230px]">{{ storeName }}</h1>
-          <div class="md:hidden flex items-center justify-center gap-1.5 mt-0.5">
-            <span class="text-[11px] text-slate-500 font-medium">{{ todayFormatted }}</span>
-            <button
-              type="button"
-              @click="triggerAction('openShift')"
-              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
-              :class="shiftChipInfo.chipClass"
-            >
-              <span aria-hidden="true" class="size-1.5 rounded-full" :class="shiftChipInfo.dotClass"></span>
-              <span>{{ shiftChipInfo.shortLabel }}</span>
+              <span class="md:hidden whitespace-nowrap">{{ shiftChipInfo.shortLabel }}</span>
+              <span class="hidden md:inline whitespace-nowrap">{{ shiftChipInfo.label }}</span>
             </button>
           </div>
         </div>
@@ -633,7 +643,7 @@ const drawerGroups = computed(() => [
         class="md:hidden relative cursor-pointer shrink-0 rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0284c7]"
         @click="emit('openSettings')"
         aria-label="Profil dan Pengaturan Toko"
-        title="Profil & Pengaturan Toko"
+        :title="connectionStatus.tooltip"
       >
         <div class="w-11 h-11 rounded-2xl bg-linear-to-tr from-[#0284c7] to-[#38bdf8] p-0.5 shadow-sm border border-white/80 flex items-center justify-center overflow-hidden">
           <img
@@ -651,8 +661,7 @@ const drawerGroups = computed(() => [
         <span
           aria-hidden="true"
           class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center text-[7px] text-white"
-          :class="isGoogleConnected ? 'bg-emerald-500' : isOnline ? 'bg-sky-500' : 'bg-slate-400'"
-          :title="isGoogleConnected ? 'Cloud Sync Aktif' : isOnline ? 'Online' : 'Offline'"
+          :class="connectionStatus.dotClass"
         ></span>
       </button>
     </div>
@@ -667,10 +676,19 @@ const drawerGroups = computed(() => [
         class="w-full max-w-xs bg-white h-full shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-left duration-200"
       >
         <div>
-          <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Toko</p>
-              <p class="text-base font-bold text-[#0a193d]">{{ storeName }}</p>
+          <div class="p-4 border-b border-slate-100 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Toko</p>
+                <span
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
+                  :class="connectionStatus.pillClass"
+                >
+                  <span aria-hidden="true" class="size-1.5 rounded-full" :class="connectionStatus.dotClass"></span>
+                  {{ connectionStatus.label }}
+                </span>
+              </div>
+              <p class="text-base font-bold text-[#0a193d] truncate mt-0.5">{{ storeName }}</p>
             </div>
             <button
               type="button"

@@ -1371,13 +1371,16 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     expect(getStoreInitials('Toko Berkah')).toBe('TO')
 
     const topBarBlank = mount(TopBar, {
-      props: { storeName: '' }
+      props: { storeName: '', isGoogleConnected: true }
     })
     expect(topBarBlank.text()).toContain('KS')
     expect(topBarBlank.text()).not.toContain('HS')
+    // Pil teks status Cloud/Online dipindah ke dot avatar & Drawer agar header utama tetap ringkas
+    expect(topBarBlank.find('header > div').text()).not.toContain('Cloud Aktif')
 
     await topBarBlank.find('button[aria-label="Buka Menu"]').trigger('click')
     await nextTick()
+    expect(topBarBlank.text()).toContain('Cloud Aktif')
     expect(topBarBlank.text()).toContain(APP_BRAND_NAME)
     expect(topBarBlank.text()).toContain(APP_BRAND_TAGLINE)
     expect(topBarBlank.text()).toContain('Kebijakan Privasi')
