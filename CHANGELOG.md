@@ -6,6 +6,16 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.22.3] - 2026-11-28 (Kamera Scanner Siaga 1 Sesi agar Izin Tidak Ditanya Berulang)
+
+### Improved
+- **Stream Siaga 1 Sesi & Cache `deviceId` di `CameraScannerModal.vue`:**
+  - Saat hasil barcode terdeteksi atau modal scanner ditutup sementara, stream kamera tidak langsung dimatikan (`track.stop()`), melainkan dijeda ke mode siaga (`track.enabled = false`) dengan batas waktu idle 3 menit (`STANDBY_IDLE_TIMEOUT_MS = 180000`) dan otomatis dilepas saat tab ditutup (`pagehide` / `beforeunload`), ganti kamera, atau unmount.
+  - Membuka scanner lagi dalam sesi yang sama langsung memakai ulang stream siaga tanpa memanggil `getUserMedia()` ulang, sehingga dialog izin kamera tidak muncul berulang kali.
+  - Menyimpan `deviceId` kamera per `facingMode` dari `track.getSettings()?.deviceId` untuk diprioritaskan saat mengakuisisi stream baru, serta menambahkan petunjuk di pesan `NotAllowedError` agar pengguna memilih **"Izinkan saat mengunjungi situs"**.
+
+---
+
 ## [2.22.2] - 2026-11-28 (Perbaikan Prefill Nama vs Barcode pada Tambah Barang Kasa)
 
 ### Fixed

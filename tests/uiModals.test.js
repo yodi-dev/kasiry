@@ -20,6 +20,7 @@ import SettingsModal from '../src/components/SettingsModal.vue'
 import CashServiceModal from '../src/components/CashServiceModal.vue'
 import DigitalProductModal from '../src/components/DigitalProductModal.vue'
 import FinanceModal from '../src/components/FinanceModal.vue'
+import CameraScannerModal from '../src/components/CameraScannerModal.vue'
 import { APP_BRAND_NAME, APP_BRAND_TAGLINE, DEFAULT_DOCUMENT_TITLE, formatDocumentTitle, getStoreInitials } from '../src/utils/branding'
 
 const sampleCustomers = [
@@ -1617,5 +1618,66 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await nextTick()
     const nameField = prodModal.find('input[placeholder="Contoh: Beras Ramos 5 Kg"]')
     expect(nameField.element.value).toBe('Kopi Tubruk')
+  })
+
+  it('keeps standby camera stream across close/reopen so getUserMedia is requested once per session', async () => {
+    const originalMediaDevices = navigator.mediaDevices
+    const originalPlay = HTMLMediaElement.prototype.play
+    const mockTrack = {
+      readyState: 'live',
+      enabled: true,
+      stop: vi.fn(),
+      getSettings: () => ({ deviceId: 'cam-back-1' }),
+      getCapabilities: () => ({}),
+      applyConstraints: vi.fn().mockResolvedValue(undefined)
+    }
+    const mockStream = {
+      getTracks: () => [mockTrack],
+      getVideoTracks: () => [mockTrack]
+    }
+    const getUserMediaMock = vi.fn().mockResolvedValue(mockStream)
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: getUserMediaMock }
+    })
+    HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+
+    let wrapper
+    try {
+      wrapper = mount(CameraScannerModal, {
+        props: { isOpen: true }
+      })
+      await nextTick()
+      await new Promise(resolve => setTimeout(resolve, 20))
+
+      expect(getUserMediaMock).toHaveBeenCalledTimes(1)
+      expect(mockTrack.enabled).toBe(true)
+      expect(mockTrack.stop).not.toHaveBeenCalled()
+
+      // Tutup modal -> stream masuk mode siaga (track paused, tidak distop)
+      await wrapper.setProps({ isOpen: false })
+      await nextTick()
+      expect(mockTrack.enabled).toBe(false)
+      expect(mockTrack.stop).not.toHaveBeenCalled()
+
+      // Buka lagi di sesi yang sama -> pakai ulang standby stream tanpa panggil getUserMedia lagi
+      await wrapper.setProps({ isOpen: true })
+      await nextTick()
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(getUserMediaMock).toHaveBeenCalledTimes(1)
+      expect(mockTrack.enabled).toBe(true)
+
+      // Unmount -> stream benar-benar dimatikan
+      wrapper.unmount()
+      expect(mockTrack.stop).toHaveBeenCalledTimes(1)
+    } finally {
+      if (wrapper) wrapper.unmount()
+      HTMLMediaElement.prototype.play = originalPlay
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: originalMediaDevices
+      })
+    }
   })
 })

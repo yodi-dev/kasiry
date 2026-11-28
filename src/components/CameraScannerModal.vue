@@ -31,7 +31,13 @@ const isZoomed = ref(false)
 const hasHardwareZoom = ref(false)
 const facingMode = ref('environment') // Kamera belakang secara default
 
+const STANDBY_IDLE_TIMEOUT_MS = 180000 // 3 menit siaga agar izin kamera cukup sekali per sesi
+
 let stream = null
+let standbyStream = null
+let standbyFacing = null
+let standbyIdleTimer = null
+const grantedDeviceIds = {}
 let scanTimerId = null
 let nativeDetector = null
 let zxingReader = null
@@ -121,7 +127,7 @@ const handleDetectedCode = (rawCode) => {
   if (!cleanCode || !isScanning.value) return
   isScanning.value = false
   playBeep()
-  stopCamera()
+  pauseCameraToStandby()
   emit('scan', cleanCode)
 }
 
@@ -294,8 +300,36 @@ const releaseStream = (targetStream) => {
   targetStream.getTracks().forEach(track => track.stop())
 }
 
+const clearStandbyIdleTimer = () => {
+  if (standbyIdleTimer) {
+    clearTimeout(standbyIdleTimer)
+    standbyIdleTimer = null
+  }
+}
+
+const releaseStandbyStream = () => {
+  clearStandbyIdleTimer()
+  if (standbyStream) {
+    releaseStream(standbyStream)
+    standbyStream = null
+    standbyFacing = null
+  }
+}
+
 const acquireCameraStream = async (targetFacing) => {
-  const attempts = [
+  const savedDeviceId = grantedDeviceIds[targetFacing]
+  const attempts = []
+  if (savedDeviceId) {
+    attempts.push({
+      audio: false,
+      video: {
+        deviceId: { exact: savedDeviceId },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    })
+  }
+  attempts.push(
     {
       audio: false,
       video: {
@@ -316,16 +350,21 @@ const acquireCameraStream = async (targetFacing) => {
       audio: false,
       video: { facingMode: targetFacing }
     }
-  ]
+  )
 
   let lastErr = null
-  for (const constraints of attempts) {
+  for (let i = 0; i < attempts.length; i++) {
+    const constraints = attempts[i]
     try {
       return await navigator.mediaDevices.getUserMedia(constraints)
     } catch (err) {
       lastErr = err
       const isConstraintIssue = err?.name === 'OverconstrainedError' || err?.name === 'ConstraintNotSatisfiedError'
-      if (!isConstraintIssue) throw err
+      const isSavedDeviceMissing = savedDeviceId && i === 0 && err?.name === 'NotFoundError'
+      if (isSavedDeviceMissing) {
+        delete grantedDeviceIds[targetFacing]
+      }
+      if (!isConstraintIssue && !isSavedDeviceMissing) throw err
     }
   }
   throw lastErr
@@ -347,7 +386,15 @@ const applyZoomConstraint = async (zoomEnabled) => {
 }
 
 const startCamera = async (delayMs = 0) => {
-  stopCamera()
+  isScanning.value = false
+  if (scanTimerId) {
+    clearTimeout(scanTimerId)
+    scanTimerId = null
+  }
+  if (stream) {
+    releaseStream(stream)
+    stream = null
+  }
   const session = ++cameraSessionId
   hasError.value = false
   errorMessage.value = ''
@@ -356,7 +403,17 @@ const startCamera = async (delayMs = 0) => {
   isTorchSupported.value = false
   isZoomed.value = false
   hasHardwareZoom.value = false
+  hwZoomRange = { min: 1, max: 1 }
   frameCounter = 0
+
+  const canReuseStandby =
+    !!standbyStream &&
+    standbyFacing === facingMode.value &&
+    standbyStream.getVideoTracks().some(track => track.readyState === 'live')
+
+  if (!canReuseStandby) {
+    releaseStandbyStream()
+  }
 
   if (delayMs > 0) {
     await new Promise(resolve => window.setTimeout(resolve, delayMs))
@@ -371,7 +428,18 @@ const startCamera = async (delayMs = 0) => {
   }
 
   try {
-    const acquiredStream = await acquireCameraStream(facingMode.value)
+    let acquiredStream = null
+    if (canReuseStandby && standbyStream) {
+      clearStandbyIdleTimer()
+      acquiredStream = standbyStream
+      standbyStream = null
+      standbyFacing = null
+      acquiredStream.getVideoTracks().forEach(track => {
+        track.enabled = true
+      })
+    } else {
+      acquiredStream = await acquireCameraStream(facingMode.value)
+    }
 
     // Jika modal ditutup atau kamera diganti lagi saat izin/stream menunggu, langsung matikan stream
     if (!props.isOpen || session !== cameraSessionId) {
@@ -393,8 +461,12 @@ const startCamera = async (delayMs = 0) => {
       return
     }
 
-    // Periksa dukungan senter, zoom optik/digital, & autofokus kontinu
+    // Simpan deviceId & periksa dukungan senter, zoom optik/digital, serta autofokus kontinu
     const track = stream.getVideoTracks()[0]
+    const detectedDeviceId = track && typeof track.getSettings === 'function' ? track.getSettings()?.deviceId : null
+    if (detectedDeviceId) {
+      grantedDeviceIds[facingMode.value] = detectedDeviceId
+    }
     if (track && 'getCapabilities' in track) {
       const capabilities = track.getCapabilities()
       isTorchSupported.value = !!capabilities.torch
@@ -426,7 +498,7 @@ const startCamera = async (delayMs = 0) => {
     isLoading.value = false
     hasError.value = true
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      errorMessage.value = 'Izin kamera ditolak. Silakan berikan izin akses kamera pada peramban Anda.'
+      errorMessage.value = "Izin kamera ditolak. Silakan berikan izin akses kamera pada peramban Anda (pilih 'Izinkan saat mengunjungi situs' agar tidak ditanya ulang)."
     } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
       errorMessage.value = 'Perangkat kamera yang dipilih tidak ditemukan di perangkat ini.'
     } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
@@ -437,8 +509,43 @@ const startCamera = async (delayMs = 0) => {
   }
 }
 
+const pauseCameraToStandby = () => {
+  isScanning.value = false
+  if (scanTimerId) {
+    clearTimeout(scanTimerId)
+    scanTimerId = null
+  }
+  if (stream) {
+    const tracks = stream.getVideoTracks()
+    const activeTrack = tracks[0]
+    if (isTorchOn.value && activeTrack && typeof activeTrack.applyConstraints === 'function') {
+      activeTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {})
+    }
+    isTorchOn.value = false
+
+    const hasLiveTrack = tracks.some(track => track.readyState === 'live')
+    if (hasLiveTrack) {
+      tracks.forEach(track => {
+        track.enabled = false
+      })
+      clearStandbyIdleTimer()
+      standbyStream = stream
+      standbyFacing = facingMode.value
+      stream = null
+      standbyIdleTimer = window.setTimeout(releaseStandbyStream, STANDBY_IDLE_TIMEOUT_MS)
+    } else {
+      releaseStream(stream)
+      stream = null
+    }
+  }
+  if (videoRef.value) {
+    videoRef.value.srcObject = null
+  }
+}
+
 const stopCamera = () => {
   isScanning.value = false
+  isTorchOn.value = false
   if (scanTimerId) {
     clearTimeout(scanTimerId)
     scanTimerId = null
@@ -447,6 +554,7 @@ const stopCamera = () => {
     releaseStream(stream)
     stream = null
   }
+  releaseStandbyStream()
   if (videoRef.value) {
     videoRef.value.srcObject = null
   }
@@ -476,8 +584,14 @@ const toggleZoom = async () => {
 }
 
 const toggleCamera = () => {
+  releaseStandbyStream()
   facingMode.value = facingMode.value === 'environment' ? 'user' : 'environment'
   startCamera(150)
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', releaseStandbyStream)
+  window.addEventListener('beforeunload', releaseStandbyStream)
 }
 
 watch(() => props.isOpen, (newVal, oldVal) => {
@@ -487,12 +601,16 @@ watch(() => props.isOpen, (newVal, oldVal) => {
     })
   } else if (oldVal) {
     cameraSessionId += 1
-    stopCamera()
+    pauseCameraToStandby()
   }
 }, { immediate: true })
 
 onUnmounted(() => {
   cameraSessionId += 1
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('pagehide', releaseStandbyStream)
+    window.removeEventListener('beforeunload', releaseStandbyStream)
+  }
   stopCamera()
   zxingReader = null
   nativeDetector = null

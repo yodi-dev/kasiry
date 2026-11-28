@@ -188,7 +188,7 @@ const {
   importBackupJSON
 } = useKasiryDB()
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.22.2'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.22.3'
 
 const {
   isPinEnabled: isOwnerPinEnabled,
