@@ -6,6 +6,16 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.1] - 2026-11-28 (Konsolidasi Dropdown Keuangan TopBar)
+
+### Changed
+- **Reorganisasi Navigasi TopBar (`src/components/TopBar.vue`):**
+  - Menyatukan **Manajemen Keuangan & Tabungan**, **Buku Utang**, dan **Kas Keluar** ke dalam satu dropdown **`Keuangan ▾`** (dengan lencana gabungan jumlah bon & kas keluar hari ini).
+  - Merampingkan dropdown **`Layanan ▾`** khusus untuk layanan konter (**Pulsa & Token PLN** dan **Tarik Tunai & Transfer**) sehingga TopBar Desktop/Tablet lebih lega (**`Stok & Data ▾`** | **`Layanan ▾`** | **`Keuangan ▾`** | **`Laporan`** | **`⚙️`**).
+  - Menyelaraskan pengelompokan Mobile Drawer menjadi **`Shift & Layanan Konter`** dan **`Keuangan & Laporan`** (memindahkan `Kas Keluar` ke grup keuangan).
+
+---
+
 ## [2.20.0] - 2026-11-27 (Audit & Penyempurnaan Menyeluruh: Kantong Pihak Ketiga, Akuntansi >90 Hari & Sinkronisasi Antar Modal)
 
 ### Added

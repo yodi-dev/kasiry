@@ -313,20 +313,35 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await manageBarangBtn.trigger('click')
     expect(topBar.emitted('openProductManage')).toHaveLength(1)
 
-    // Dropdown Layanan Konter & Kas di TopBar membuka Pulsa/PLN, Tarik Tunai, & Kas Keluar
-    const layananDropdownBtn = topBar.find('button[title="Layanan Konter, Tarik Tunai & Kas Keluar"]')
+    // Dropdown Layanan Konter di TopBar membuka Pulsa/PLN & Tarik Tunai
+    const layananDropdownBtn = topBar.find('button[title="Pulsa, Token PLN & Tarik Tunai"]')
     await layananDropdownBtn.trigger('click')
     await nextTick()
     expect(topBar.text()).toContain('Pulsa & Token PLN')
     expect(topBar.text()).toContain('Tarik Tunai & Transfer')
+    expect(topBar.findAll('button[role="menuitem"]').find(b => b.text().includes('Kas Keluar'))).toBeUndefined()
+
+    // Dropdown Keuangan di TopBar membuka Manajemen Keuangan, Buku Utang, & Kas Keluar
+    const financeDropdownBtn = topBar.find('button[title="Keuangan, Buku Utang & Kas Keluar"]')
+    await financeDropdownBtn.trigger('click')
+    await nextTick()
+    expect(topBar.text()).toContain('Manajemen Keuangan & Tabungan')
+    expect(topBar.text()).toContain('Buku Utang')
     const kasKeluarItem = topBar.findAll('button[role="menuitem"]').find(b => b.text().includes('Kas Keluar'))
     await kasKeluarItem.trigger('click')
     expect(topBar.emitted('openExpense')).toHaveLength(1)
 
+    // Uji Buku Utang dari dropdown Keuangan
+    await financeDropdownBtn.trigger('click')
+    await nextTick()
+    const debtBookItem = topBar.findAll('button[role="menuitem"]').find(b => b.text().includes('Buku Utang'))
+    await debtBookItem.trigger('click')
+    expect(topBar.emitted('openDebtBook')).toHaveLength(1)
+
     // Mobile drawer menampilkan grup rapi tanpa dropdown
     await topBar.find('button[aria-label="Buka Menu"]').trigger('click')
     await nextTick()
-    expect(topBar.text()).toContain('Layanan Konter & Kas')
+    expect(topBar.text()).toContain('Shift & Layanan Konter')
     expect(topBar.text()).toContain('Keuangan & Laporan')
     expect(topBar.text()).toContain('Stok & Pelanggan')
 
@@ -887,7 +902,7 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
         todayCashServiceCount: 3
       }
     })
-    const navBtn = topBar.find('button[title="Layanan Konter, Tarik Tunai & Kas Keluar"]')
+    const navBtn = topBar.find('button[title="Pulsa, Token PLN & Tarik Tunai"]')
     expect(navBtn).toBeTruthy()
     await navBtn.trigger('click')
     await nextTick()
@@ -982,7 +997,7 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
         todayDigitalCount: 2
       }
     })
-    await topBar.find('button[title="Layanan Konter, Tarik Tunai & Kas Keluar"]').trigger('click')
+    await topBar.find('button[title="Pulsa, Token PLN & Tarik Tunai"]').trigger('click')
     await nextTick()
     await topBar.findAll('button[role="menuitem"]').find(b => b.text().includes('Pulsa & Token PLN')).trigger('click')
     expect(topBar.emitted('openDigitalProduct')).toBeTruthy()
@@ -1138,13 +1153,17 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
   })
 
   it('opens FinanceModal from TopBar, renders 4 pockets + period selector, validates overdraft, and emits Tambah Tabungan & KAS CashService source', async () => {
-    // 1. TopBar memiliki tombol Keuangan (openFinance)
+    // 1. TopBar memiliki dropdown Keuangan yang memuat Manajemen Keuangan & Tabungan (openFinance)
     const topBar = mount(TopBar, {
       props: { storeName: 'Warung Kasiry' }
     })
-    const financeNav = topBar.find('button[title="Keuangan"]')
+    const financeNav = topBar.find('button[title="Keuangan, Buku Utang & Kas Keluar"]')
     expect(financeNav.exists()).toBe(true)
     await financeNav.trigger('click')
+    await nextTick()
+    const financeItem = topBar.findAll('button[role="menuitem"]').find(b => b.text().includes('Manajemen Keuangan & Tabungan'))
+    expect(financeItem).toBeTruthy()
+    await financeItem.trigger('click')
     expect(topBar.emitted('openFinance')).toBeTruthy()
 
     // 2. FinanceModal menampilkan 4 kantong saldo, periode, dan form Tambah Tabungan

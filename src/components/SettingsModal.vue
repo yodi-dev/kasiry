@@ -122,7 +122,7 @@ const emit = defineEmits([
 
 // 3 Tabs: 'profile' (Profil Toko) | 'printer' (Printer Thermal) | 'backup' (Cadangan & Google)
 const activeTab = ref('profile')
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.0'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.1'
 
 const formName = ref(props.storeProfile?.name || 'Warung Kasiry')
 const formOwner = ref(props.storeProfile?.owner || 'Pemilik Toko')

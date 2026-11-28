@@ -88,7 +88,7 @@ stateDiagram-v2
 
 ```text
 App.vue (Orchestrator Kasa, Prewarm Checkout Chunks, Auto-Prompt Shift & Cloud Sync)
-├── TopBar.vue (Desktop: Chip Shift + `Stok & Data ▾`, `Layanan ▾`, `Buku Utang`, `Keuangan`, `Laporan`, `⚙️`; HP: Chip Shift + Drawer 4 seksi)
+├── TopBar.vue (Desktop: Chip Shift + `Stok & Data ▾`, `Layanan ▾`, `Keuangan ▾`, `Laporan`, `⚙️`; HP: Chip Shift + Drawer 4 seksi)
 │
 ├── Workspace Kasa Utama (Eager Load — Tampil Instan di Frame Pertama):
 │   ├── CartSection.vue (Struk belanjaan, saklar Ecer/Grosir/Agen, inline editor harga manual, stepper qty, bayar)
