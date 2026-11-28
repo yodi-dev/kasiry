@@ -298,7 +298,9 @@ const completedShiftSummary = ref(null)
 const isSettingsOpen = ref(false)
 const isReceiptOpen = ref(false)
 const isCameraOpen = ref(false)
+const cameraScanTarget = ref('pos')
 const isProductManageOpen = ref(false)
+const productManageModalRef = ref(null)
 const isCustomerManageOpen = ref(false)
 const isShortcutHelpOpen = ref(false)
 
@@ -1144,10 +1146,29 @@ const handleStartNextShift = () => {
   isShiftAutoPrompt.value = false
 }
 
+const openCameraFor = (target = 'pos') => {
+  cameraScanTarget.value = target
+  isCameraOpen.value = true
+}
+
+const closeCamera = () => {
+  isCameraOpen.value = false
+  cameraScanTarget.value = 'pos'
+}
+
 // Handler Scan Barcode (Hardware Scanner maupun Kamera)
 const handleBarcodeScan = (code) => {
   isCameraOpen.value = false
+  const target = cameraScanTarget.value
+  cameraScanTarget.value = 'pos'
   const cleanCode = String(code).trim()
+
+  if (target === 'productForm' || target === 'productSearch') {
+    playBeepSound('beep')
+    productManageModalRef.value?.applyScannedBarcode(cleanCode, target)
+    return
+  }
+
   const found = products.value.find(p => p.barcode === cleanCode)
   if (found) {
     playBeepSound('beep')
@@ -1790,6 +1811,7 @@ onUnmounted(() => {
     <!-- 4. Modals & Overlays (Dimuat malas / code-split agar booting kasir cepat) -->
     <!-- Modal Kelola Barang (Tambah, Edit, Hapus, Kebersihan Katalog) -->
     <ProductManagementModal 
+      ref="productManageModalRef"
       v-if="activatedModals.productManage || isProductManageOpen"
       :isOpen="isProductManageOpen"
       :products="products"
@@ -1801,6 +1823,7 @@ onUnmounted(() => {
       @deleteProductsBulk="handleDeleteProductsBulk"
       @addCategory="handleAddCategory"
       @deleteCategory="handleDeleteCategory"
+      @openCamera="openCameraFor"
     />
 
     <!-- Modal Verifikasi PIN / Kata Sandi Pemilik -->
@@ -2111,7 +2134,7 @@ onUnmounted(() => {
     <CameraScannerModal 
       v-if="activatedModals.camera || isCameraOpen"
       :isOpen="isCameraOpen"
-      @close="isCameraOpen = false"
+      @close="closeCamera"
       @scan="handleBarcodeScan"
     />
   </div>

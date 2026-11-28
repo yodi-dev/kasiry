@@ -10,6 +10,7 @@ import {
   Check, 
   Package, 
   Barcode, 
+  Camera,
   Tag, 
   ArrowLeft, 
   TrendingUp,
@@ -47,7 +48,8 @@ const emit = defineEmits([
   'deleteProduct', 
   'deleteProductsBulk',
   'addCategory', 
-  'deleteCategory'
+  'deleteCategory',
+  'openCamera'
 ])
 
 const defaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Jajanan & Kopi', 'Bumbu Dapur', 'Kebersihan', 'Rokok', 'Curah', 'Obat & Lainnya']
@@ -61,6 +63,18 @@ const handleClose = () => {
   confirmBulkDelete.value = false
   emit('close')
 }
+
+const applyScannedBarcode = (code, target = 'productForm') => {
+  const cleanCode = String(code || '').trim()
+  if (!cleanCode) return
+  if (target === 'productForm' || currentView.value === 'form') {
+    currentProduct.value.barcode = cleanCode
+    return
+  }
+  searchQuery.value = cleanCode
+}
+
+defineExpose({ applyScannedBarcode })
 
 const searchQuery = ref('')
 const searchInputRef = ref(null)
@@ -449,6 +463,16 @@ const handleDeleteCategory = (cat) => {
                 <X class="w-4 h-4" />
               </button>
             </div>
+
+            <button
+              type="button"
+              @click="emit('openCamera', 'productSearch')"
+              aria-label="Scan barcode cari barang dengan kamera"
+              title="Scan barcode dengan kamera"
+              class="h-11 w-11 shrink-0 rounded-2xl bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200 flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+            >
+              <Camera class="w-4 h-4" />
+            </button>
 
             <button 
               @click="openAddForm()"
@@ -1008,16 +1032,27 @@ const handleDeleteCategory = (cat) => {
               <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                 Kode Barcode (Opsional)
               </label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Barcode class="w-4 h-4" />
-                </span>
-                <input 
-                  type="text" 
-                  v-model="currentProduct.barcode"
-                  placeholder="Scan atau ketik barcode..."
-                  class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-xs font-mono font-semibold text-[#0a193d] outline-hidden transition-all"
-                />
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Barcode class="w-4 h-4" />
+                  </span>
+                  <input 
+                    type="text" 
+                    v-model="currentProduct.barcode"
+                    placeholder="Scan atau ketik barcode..."
+                    class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-xs font-mono font-semibold text-[#0a193d] outline-hidden transition-all"
+                  />
+                </div>
+                <button
+                  type="button"
+                  @click="emit('openCamera', 'productForm')"
+                  aria-label="Scan barcode dengan kamera"
+                  title="Scan barcode dengan kamera"
+                  class="h-11 w-11 shrink-0 rounded-2xl bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200 flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+                >
+                  <Camera class="w-4 h-4" />
+                </button>
               </div>
             </div>
 

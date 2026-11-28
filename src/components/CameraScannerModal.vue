@@ -32,6 +32,8 @@ const hasHardwareZoom = ref(false)
 const facingMode = ref('environment') // Kamera belakang secara default
 
 const STANDBY_IDLE_TIMEOUT_MS = 180000 // 3 menit siaga agar izin kamera cukup sekali per sesi
+const CAMERA_ACQUIRE_TIMEOUT_MS = 8000 // Cegah getUserMedia menggantung selamanya di PWA iOS
+const VIDEO_PLAY_TIMEOUT_MS = 2500 // Cegah video.play() menggantung di WebKit standalone
 
 let stream = null
 let standbyStream = null
@@ -316,6 +318,65 @@ const releaseStandbyStream = () => {
   }
 }
 
+const acquireCameraWithTimeout = async (constraints) => {
+  let timerId = null
+  let timedOut = false
+  const streamPromise = navigator.mediaDevices.getUserMedia(constraints).then((resolvedStream) => {
+    if (timedOut) {
+      releaseStream(resolvedStream)
+      return null
+    }
+    return resolvedStream
+  })
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = window.setTimeout(() => {
+      timedOut = true
+      const err = new Error('Waktu tunggu pembukaan kamera habis.')
+      err.name = 'CameraTimeoutError'
+      reject(err)
+    }, CAMERA_ACQUIRE_TIMEOUT_MS)
+  })
+
+  try {
+    return await Promise.race([streamPromise, timeoutPromise])
+  } finally {
+    if (timerId !== null) clearTimeout(timerId)
+  }
+}
+
+const playVideoSafely = async (video, mediaStream) => {
+  video.muted = true
+  video.defaultMuted = true
+  video.playsInline = true
+  video.setAttribute('playsinline', 'true')
+  video.setAttribute('webkit-playsinline', 'true')
+  video.setAttribute('muted', '')
+  video.srcObject = mediaStream
+
+  let timerId = null
+  try {
+    const playPromise = video.play()
+    if (playPromise && typeof playPromise.then === 'function') {
+      await Promise.race([
+        playPromise,
+        new Promise((resolve) => {
+          timerId = window.setTimeout(resolve, VIDEO_PLAY_TIMEOUT_MS)
+        })
+      ])
+    }
+  } catch (err) {
+    if (err?.name === 'NotAllowedError') {
+      const playErr = new Error('Pemutaran pratinjau kamera diblokir oleh mode PWA.')
+      playErr.name = 'VideoPlayNotAllowedError'
+      throw playErr
+    }
+    throw err
+  } finally {
+    if (timerId !== null) clearTimeout(timerId)
+  }
+}
+
 const acquireCameraStream = async (targetFacing) => {
   const savedDeviceId = grantedDeviceIds[targetFacing]
   const attempts = []
@@ -356,7 +417,7 @@ const acquireCameraStream = async (targetFacing) => {
   for (let i = 0; i < attempts.length; i++) {
     const constraints = attempts[i]
     try {
-      return await navigator.mediaDevices.getUserMedia(constraints)
+      return await acquireCameraWithTimeout(constraints)
     } catch (err) {
       lastErr = err
       const isConstraintIssue = err?.name === 'OverconstrainedError' || err?.name === 'ConstraintNotSatisfiedError'
@@ -409,7 +470,7 @@ const startCamera = async (delayMs = 0) => {
   const canReuseStandby =
     !!standbyStream &&
     standbyFacing === facingMode.value &&
-    standbyStream.getVideoTracks().some(track => track.readyState === 'live')
+    standbyStream.getVideoTracks().some(track => track.readyState === 'live' && !track.muted)
 
   if (!canReuseStandby) {
     releaseStandbyStream()
@@ -450,9 +511,7 @@ const startCamera = async (delayMs = 0) => {
     stream = acquiredStream
     const video = videoRef.value
     if (video) {
-      video.setAttribute('playsinline', 'true')
-      video.srcObject = stream
-      await video.play()
+      await playVideoSafely(video, stream)
       await waitForVideoReady(video)
     }
 
@@ -495,9 +554,17 @@ const startCamera = async (delayMs = 0) => {
     scanTimerId = window.setTimeout(scanFrame, 120)
   } catch (err) {
     if (session !== cameraSessionId) return
+    if (stream) {
+      releaseStream(stream)
+      stream = null
+    }
     isLoading.value = false
     hasError.value = true
-    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+    if (err.name === 'CameraTimeoutError') {
+      errorMessage.value = 'Kamera tidak merespons. Di PWA iOS, pastikan izin kamera aktif di Pengaturan → Safari → Kamera, lalu ketuk "Coba Lagi" atau tutup & buka ulang aplikasi PWA.'
+    } else if (err.name === 'VideoPlayNotAllowedError') {
+      errorMessage.value = 'Mode PWA menahan pemutaran pratinjau kamera otomatis. Ketuk "Coba Lagi" untuk menyalakan kamera.'
+    } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
       errorMessage.value = "Izin kamera ditolak. Silakan berikan izin akses kamera pada peramban Anda (pilih 'Izinkan saat mengunjungi situs' agar tidak ditanya ulang)."
     } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
       errorMessage.value = 'Perangkat kamera yang dipilih tidak ditemukan di perangkat ini.'
@@ -669,7 +736,7 @@ onUnmounted(() => {
           <AlertCircle class="w-8 h-8 text-rose-500" />
           <p class="text-xs text-slate-300 font-medium leading-relaxed">{{ errorMessage }}</p>
           <button 
-            @click="startCamera" 
+            @click="() => startCamera()" 
             class="mt-2 h-9 px-4 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
           >
             Coba Lagi

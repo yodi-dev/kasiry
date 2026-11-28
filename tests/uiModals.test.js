@@ -1621,11 +1621,36 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await nextTick()
     const nameField = prodModal.find('input[placeholder="Contoh: Beras Ramos 5 Kg"]')
     expect(nameField.element.value).toBe('Kopi Tubruk')
+
+    // 3. Tombol kamera di form Tambah Barang memancarkan openCamera('productForm') & mengisi input barcode
+    const formCamBtn = prodModal.find('button[aria-label="Scan barcode dengan kamera"]')
+    expect(formCamBtn.exists()).toBe(true)
+    await formCamBtn.trigger('click')
+    expect(prodModal.emitted('openCamera')?.[0]).toEqual(['productForm'])
+
+    prodModal.vm.applyScannedBarcode('8991234567890', 'productForm')
+    await nextTick()
+    const formBarcodeField = prodModal.find('input[placeholder="Scan atau ketik barcode..."]')
+    expect(formBarcodeField.element.value).toBe('8991234567890')
+
+    // 4. Tombol kamera di daftar pencarian memancarkan openCamera('productSearch') & mengisi searchQuery
+    await prodModal.findAll('button').find(b => b.text().includes('Kembali')).trigger('click')
+    await nextTick()
+    const searchCamBtn = prodModal.find('button[aria-label="Scan barcode cari barang dengan kamera"]')
+    expect(searchCamBtn.exists()).toBe(true)
+    await searchCamBtn.trigger('click')
+    expect(prodModal.emitted('openCamera')?.[1]).toEqual(['productSearch'])
+
+    prodModal.vm.applyScannedBarcode('8990001112223', 'productSearch')
+    await nextTick()
+    const searchInput3 = prodModal.find('input[placeholder="Cari nama barang atau scan barcode..."]')
+    expect(searchInput3.element.value).toBe('8990001112223')
   })
 
   it('keeps standby camera stream across close/reopen so getUserMedia is requested once per session', async () => {
     const originalMediaDevices = navigator.mediaDevices
     const originalPlay = HTMLMediaElement.prototype.play
+    const originalSrcObjectDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject')
     const mockTrack = {
       readyState: 'live',
       enabled: true,
@@ -1643,6 +1668,11 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: { getUserMedia: getUserMediaMock }
+    })
+    Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
+      configurable: true,
+      writable: true,
+      value: null
     })
     HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
 
@@ -1677,6 +1707,86 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     } finally {
       if (wrapper) wrapper.unmount()
       HTMLMediaElement.prototype.play = originalPlay
+      if (originalSrcObjectDesc) {
+        Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', originalSrcObjectDesc)
+      }
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: originalMediaDevices
+      })
+    }
+  })
+
+  it('recovers from hanging getUserMedia and hanging/blocked video.play() in PWA standalone mode', async () => {
+    vi.useFakeTimers()
+    const originalMediaDevices = navigator.mediaDevices
+    const originalPlay = HTMLMediaElement.prototype.play
+    const originalSrcObjectDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject')
+    const mockTrack = {
+      readyState: 'live',
+      muted: false,
+      enabled: true,
+      stop: vi.fn(),
+      getSettings: () => ({ deviceId: 'cam-back-1' }),
+      getCapabilities: () => ({}),
+      applyConstraints: vi.fn().mockResolvedValue(undefined)
+    }
+    const mockStream = {
+      getTracks: () => [mockTrack],
+      getVideoTracks: () => [mockTrack]
+    }
+
+    Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
+      configurable: true,
+      writable: true,
+      value: null
+    })
+
+    let wrapper
+    try {
+      // 1. getUserMedia menggantung (never resolves) -> harus timeout dan menampilkan error, bukan loading terus
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: { getUserMedia: vi.fn(() => new Promise(() => {})) }
+      })
+
+      wrapper = mount(CameraScannerModal, {
+        props: { isOpen: true }
+      })
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(8100)
+      await nextTick()
+
+      expect(wrapper.text()).toContain('Kamera tidak merespons')
+      expect(wrapper.text()).toContain('Coba Lagi')
+      wrapper.unmount()
+      wrapper = null
+
+      // 2. video.play() melempar NotAllowedError (diblokir autoplay PWA) -> pesan khusus + stream dilepas
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: { getUserMedia: vi.fn().mockResolvedValue(mockStream) }
+      })
+      HTMLMediaElement.prototype.play = vi.fn().mockRejectedValue(
+        Object.assign(new Error('play() failed'), { name: 'NotAllowedError' })
+      )
+
+      wrapper = mount(CameraScannerModal, {
+        props: { isOpen: true }
+      })
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(50)
+      await nextTick()
+
+      expect(wrapper.text()).toContain('Mode PWA menahan pemutaran pratinjau kamera otomatis')
+      expect(mockTrack.stop).toHaveBeenCalled()
+    } finally {
+      if (wrapper) wrapper.unmount()
+      vi.useRealTimers()
+      HTMLMediaElement.prototype.play = originalPlay
+      if (originalSrcObjectDesc) {
+        Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', originalSrcObjectDesc)
+      }
       Object.defineProperty(navigator, 'mediaDevices', {
         configurable: true,
         value: originalMediaDevices

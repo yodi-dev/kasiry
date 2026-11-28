@@ -6,6 +6,20 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.24.0] - 2026-11-28 (Perbaikan Kamera PWA iOS & Scanner Kamera di Manajemen Barang)
+
+### Added
+- **Scanner Barcode Kamera di Manajemen Barang (`ProductManagementModal.vue`, `App.vue`):**
+  - Menambahkan tombol kamera pada input **Kode Barcode (Opsional)** di form Tambah/Edit Barang (`openCamera('productForm')`) serta pada kolom pencarian daftar barang (`openCamera('productSearch')`).
+  - Memakai ulang instance `CameraScannerModal` dan *standby stream* yang sama lewat `App.vue` sehingga tidak meminta izin kamera ulang.
+
+### Fixed
+- **Kamera Menggantung ("Membuka kamera..." Terus) di PWA iOS (`CameraScannerModal.vue`):**
+  - Menambahkan batas waktu akuisisi kamera (`CAMERA_ACQUIRE_TIMEOUT_MS = 8000` ms) dan pemutaran video (`VIDEO_PLAY_TIMEOUT_MS = 2500` ms) agar `getUserMedia()` maupun `video.play()` yang tertahan di WebKit *standalone* PWA tidak membuat loading menggantung selamanya.
+  - Menyetel properti DOM `video.muted = true`, `video.defaultMuted = true`, `video.playsInline = true`, dan `webkit-playsinline` secara eksplisit sebelum `srcObject = stream`, memisahkan error autoplay PWA (`VideoPlayNotAllowedError`) dari penolakan izin kamera, melepas stream saat error, serta mengecek `!track.muted` sebelum memakai ulang *standby stream*.
+
+---
+
 ## [2.23.1] - 2026-11-28 (Autofokus Alur Tambah Barang Cepat & Belum Harga)
 
 ### Improved
