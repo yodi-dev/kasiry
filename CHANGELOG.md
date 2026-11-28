@@ -6,6 +6,23 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.8] - 2026-11-28 (Paket Pintasan Keyboard Standar POS Lengkap)
+
+### Added
+- **Pintasan Kasa Utama (`src/App.vue`):**
+  - **`F1`**: Membuka/menutup popup panduan cepat pintasan keyboard POS.
+  - **`F3`** *(pendamping `/`)*: Memfokuskan input pencarian / scan barcode barang.
+  - **`F4`**: Berpindah tier harga keranjang (**Ecer → Grosir → Agen**).
+  - **`F8`**: Mengosongkan keranjang (dengan dialog konfirmasi aman).
+  - **`+` / `-`**: Menambah atau mengurangi Qty barang terakhir di keranjang saat tidak sedang mengetik kata pencarian.
+- **Pintasan Pembayaran (`src/components/PaymentModal.vue`):**
+  - **`Alt + 1` / `Alt + 2` / `Alt + 3`**: Pindah cepat metode **Tunai** | **QRIS** | **Utang / Bon**.
+  - **`F9`**: Fokus & sorot langsung nominal **Uang Diterima** di tab Tunai.
+- **Pintasan Struk (`src/components/ReceiptModal.vue`):**
+  - **`Enter`**: Cetak struk langsung (ESC/POS atau dialog browser) dan **`Esc`**: Tutup struk & lanjut transaksi baru (otomatis mengembalikan fokus ke input kasa).
+
+---
+
 ## [2.20.7] - 2026-11-28 (Shortcut Keyboard Enter & Esc di Modal Pembayaran)
 
 ### Added

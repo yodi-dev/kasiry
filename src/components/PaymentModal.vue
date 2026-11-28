@@ -59,6 +59,7 @@ const selectedCustomer = ref(null)
 const customerSearchInputRef = ref(null)
 const quickAddNameInputRef = ref(null)
 const debtCustomerInputRef = ref(null)
+const cashInputRef = ref(null)
 const submitButtonRef = ref(null)
 
 // Buka pencarian pelanggan dan langsung aktifkan kursor
@@ -493,6 +494,22 @@ const handleModalKeydown = (e) => {
     return
   }
 
+  if (e.key === 'F9') {
+    e.preventDefault()
+    activeTab.value = 'cash'
+    nextTick(() => {
+      cashInputRef.value?.focus?.()
+      cashInputRef.value?.select?.()
+    })
+    return
+  }
+
+  if (e.altKey && ['1', '2', '3'].includes(e.key)) {
+    e.preventDefault()
+    activeTab.value = e.key === '1' ? 'cash' : e.key === '2' ? 'qris' : 'debt'
+    return
+  }
+
   if (e.key === 'Enter') {
     if (isAddingCustomer.value || isCustomerDropdownOpen.value) return
     const activeEl = typeof document !== 'undefined' ? document.activeElement : null
@@ -903,6 +920,7 @@ onUnmounted(() => {
                 <div class="relative">
                   <span class="absolute inset-y-0 left-0 pl-4 flex items-center font-bold text-slate-400 text-base">Rp</span>
                   <input 
+                    ref="cashInputRef"
                     type="text" 
                     :value="cashInputStr ? parseInt(cashInputStr).toLocaleString('id-ID') : ''"
                     @input="onManualCashInput"

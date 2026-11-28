@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { X, Printer, Bluetooth, Usb, Cable, Check, ArrowRight, Share2, CheckCircle, AlertCircle } from '@lucide/vue'
 import { useThermalPrinter } from '../composables/useThermalPrinter'
 import { RECEIPT_BRAND_FOOTER } from '../utils/thermalPrinter'
@@ -40,6 +40,53 @@ const {
 } = useThermalPrinter()
 
 const printNotice = ref('')
+const printButtonRef = ref(null)
+
+watch(
+  () => props.isOpen,
+  (open) => {
+    if (open) {
+      nextTick(() => {
+        printButtonRef.value?.focus?.({ preventScroll: true })
+      })
+    }
+  },
+  { immediate: true }
+)
+
+const handleReceiptKeydown = (e) => {
+  if (!props.isOpen) return
+  if (e?.isComposing || e?.keyCode === 229) return
+
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    emit('newTransaction')
+    return
+  }
+
+  if (e.key === 'Enter') {
+    const activeEl = typeof document !== 'undefined' ? document.activeElement : null
+    if (activeEl && activeEl !== printButtonRef.value && activeEl.tagName === 'BUTTON') {
+      return
+    }
+    e.preventDefault()
+    if (!isPrinting.value) {
+      printReceipt(false)
+    }
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', handleReceiptKeydown)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('keydown', handleReceiptKeydown)
+  }
+})
 
 const transportLabel = computed(() => {
   if (connectionType.value === 'bluetooth') return 'BT'
@@ -372,17 +419,19 @@ const shareToWhatsApp = () => {
       <!-- Action Buttons (disembunyikan saat cetak) -->
       <div class="print:hidden p-3 bg-white flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 flex-wrap">
         <button 
+          ref="printButtonRef"
           type="button"
           :disabled="isPrinting"
           @click="printReceipt(false)"
           class="h-10 px-3 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-slate-200 transition-colors disabled:opacity-50"
-          :title="isPrinterConnected ? 'Cetak langsung ESC/POS ke printer terhubung' : 'Cetak struk ke printer thermal/browser'"
+          :title="isPrinterConnected ? 'Cetak langsung ESC/POS ke printer terhubung (Enter)' : 'Cetak struk ke printer thermal/browser (Enter)'"
         >
           <Bluetooth v-if="connectionType === 'bluetooth'" class="w-3.5 h-3.5 text-emerald-600" />
           <Usb v-else-if="connectionType === 'usb'" class="w-3.5 h-3.5 text-emerald-600" />
           <Cable v-else-if="connectionType === 'serial'" class="w-3.5 h-3.5 text-emerald-600" />
           <Printer v-else class="w-3.5 h-3.5 text-slate-500" />
           <span>{{ isPrinting ? 'Mencetak...' : (isPrinterConnected ? `Cetak ${transportLabel}` : 'Cetak') }}</span>
+          <kbd class="hidden lg:inline-flex px-1 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[9px] text-slate-500">Enter</kbd>
         </button>
 
         <button
@@ -408,10 +457,12 @@ const shareToWhatsApp = () => {
         <button 
           type="button"
           @click="emit('newTransaction')"
-          class="flex-1 h-10 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-xs transition-colors min-w-[115px]"
+          class="flex-1 h-10 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors min-w-[115px]"
+          title="Tutup struk & lanjut transaksi baru (Esc)"
         >
           <span>Transaksi Baru</span>
           <ArrowRight class="w-3.5 h-3.5" />
+          <kbd class="hidden lg:inline-flex px-1 py-0.5 rounded bg-white/15 border border-white/20 font-mono text-[9px] text-sky-200">Esc</kbd>
         </button>
       </div>
     </div>

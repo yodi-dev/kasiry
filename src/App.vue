@@ -185,7 +185,7 @@ const {
   importBackupJSON
 } = useKasiryDB()
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.7'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.8'
 
 // Sinkronkan <title> tab browser secara dinamis mengikuti nama toko aktif
 watch(
@@ -283,6 +283,7 @@ const isReceiptOpen = ref(false)
 const isCameraOpen = ref(false)
 const isProductManageOpen = ref(false)
 const isCustomerManageOpen = ref(false)
+const isShortcutHelpOpen = ref(false)
 
 // State Transaksi Struk
 const receiptData = ref(null)
@@ -303,7 +304,8 @@ const isAnyModalOpen = computed(() => {
     isCameraOpen.value ||
     isLazyInventoryOpen.value ||
     isPaymentOpen.value ||
-    isReceiptOpen.value
+    isReceiptOpen.value ||
+    isShortcutHelpOpen.value
 })
 
 // Jumlah pelanggan aktif yang masih memiliki sisa bon (mengecualikan "Umum")
@@ -1330,11 +1332,64 @@ const ensureKasaFocus = () => {
   })
 }
 
-// Shortcut keyboard kasir Desktop (F2 langsung buka modal Pembayaran jika keranjang ada isi)
+// Shortcut keyboard kasir Desktop (F1 Bantuan, F2 Bayar, F3 Cari, F4 Tier Harga, F8 Kosongkan, +/- Qty item terakhir)
 const handleGlobalCheckoutShortcut = (e) => {
-  if (e.key === 'F2' && !isAnyModalOpen.value && cart.value.length > 0) {
+  if (e.key === 'F1') {
+    e.preventDefault()
+    isShortcutHelpOpen.value = !isShortcutHelpOpen.value
+    return
+  }
+
+  if (e.key === 'Escape' && isShortcutHelpOpen.value) {
+    e.preventDefault()
+    isShortcutHelpOpen.value = false
+    ensureKasaFocus()
+    return
+  }
+
+  if (isAnyModalOpen.value) return
+
+  if (e.key === 'F2' && cart.value.length > 0) {
     e.preventDefault()
     handleAttemptOpenPayment()
+    return
+  }
+
+  if (e.key === 'F3') {
+    e.preventDefault()
+    desktopBarcodeRef.value?.focusInput(true)
+    mobileBarcodeRef.value?.focusInput(true)
+    return
+  }
+
+  if (e.key === 'F4') {
+    e.preventDefault()
+    const order = ['ecer', 'grosir', 'agen']
+    const nextTier = order[(order.indexOf(cartPriceTier.value) + 1) % order.length]
+    handleChangeCartPriceTier(nextTier)
+    return
+  }
+
+  if (e.key === 'F8' && cart.value.length > 0) {
+    e.preventDefault()
+    if (typeof window !== 'undefined' && window.confirm('Kosongkan seluruh barang di keranjang?')) {
+      clearCart()
+    }
+    return
+  }
+
+  const activeEl = typeof document !== 'undefined' ? document.activeElement : null
+  const isTypingField = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')
+  const isEmptySearchInput = isTypingField && searchQuery.value.trim() === '' && activeEl.getAttribute('role') === 'combobox'
+
+  if ((!isTypingField || isEmptySearchInput) && cart.value.length > 0) {
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault()
+      increaseQty(cart.value[cart.value.length - 1].id)
+    } else if (e.key === '-') {
+      e.preventDefault()
+      decreaseQty(cart.value[cart.value.length - 1].id)
+    }
   }
 }
 
@@ -1582,7 +1637,13 @@ onUnmounted(() => {
             <span class="ml-1.5 font-mono text-[10px] text-slate-400">v{{ appVersion }}</span>
           </span>
           <span aria-hidden="true" class="hidden lg:inline text-slate-300">•</span>
-          <span class="hidden lg:inline text-slate-400">Pintasan: <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">/</kbd> Cari • <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">F2</kbd> Bayar</span>
+          <span class="hidden lg:inline text-slate-400">
+            Pintasan:
+            <button type="button" @click="isShortcutHelpOpen = true" class="px-1 py-0.5 rounded bg-white/80 hover:bg-sky-50 border border-slate-200 font-mono text-[10px] text-[#0a193d] cursor-pointer">F1</button>
+            Bantuan •
+            <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">/</kbd> / <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">F3</kbd> Cari •
+            <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">F2</kbd> Bayar
+          </span>
         </div>
         <nav class="flex items-center gap-3 shrink-0" aria-label="Tautan Kepatuhan">
           <a href="/privacy" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Kebijakan Privasi</a>
@@ -1627,6 +1688,63 @@ onUnmounted(() => {
       @addCategory="handleAddCategory"
       @deleteCategory="handleDeleteCategory"
     />
+
+    <!-- Modal Panduan Pintasan Keyboard POS (F1) -->
+    <div
+      v-if="isShortcutHelpOpen"
+      class="fixed inset-0 z-50 bg-[#0a193d]/50 backdrop-blur-xs flex items-center justify-center p-4"
+      @click.self="isShortcutHelpOpen = false"
+    >
+      <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-[#0a193d]">Pintasan Keyboard Kasir (POS)</h3>
+            <p class="text-xs text-slate-500">Bekerja cepat di kasa tanpa lepas keyboard</p>
+          </div>
+          <button
+            type="button"
+            @click="isShortcutHelpOpen = false"
+            class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-600 cursor-pointer"
+          >
+            Esc
+          </button>
+        </div>
+        <div class="p-4 space-y-2 text-xs">
+          <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-600">Fokus cari barang / scan</span>
+            <span class="font-mono font-bold text-[#0a193d]"><kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">/</kbd> atau <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">F3</kbd></span>
+          </div>
+          <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-600">Pilih hasil pencarian</span>
+            <span class="font-mono font-bold text-[#0a193d]"><kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">↑</kbd> <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">↓</kbd> + <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Enter</kbd></span>
+          </div>
+          <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-600">Tambah / kurangi Qty item terakhir</span>
+            <span class="font-mono font-bold text-[#0a193d]"><kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">+</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">-</kbd></span>
+          </div>
+          <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-600">Ganti tier harga (Ecer / Grosir / Agen)</span>
+            <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border font-mono font-bold text-[#0a193d]">F4</kbd>
+          </div>
+          <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-600">Kosongkan keranjang</span>
+            <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border font-mono font-bold text-[#0a193d]">F8</kbd>
+          </div>
+          <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-600">Buka Pembayaran → Bayar / Batal</span>
+            <span class="font-mono font-bold text-[#0a193d]"><kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">F2</kbd> → <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Enter</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Esc</kbd></span>
+          </div>
+          <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-600">Di Pembayaran: Tunai / QRIS / Utang &amp; Nominal</span>
+            <span class="font-mono font-bold text-[#0a193d]"><kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Alt+1/2/3</kbd> · <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">F9</kbd></span>
+          </div>
+          <div class="flex items-center justify-between py-1.5">
+            <span class="text-slate-600">Di Struk: Cetak / Transaksi Baru</span>
+            <span class="font-mono font-bold text-[#0a193d]"><kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Enter</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Esc</kbd></span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Modal Pembayaran (Tunai, QRIS, vs Utang) -->
     <PaymentModal 

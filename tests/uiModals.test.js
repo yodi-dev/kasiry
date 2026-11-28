@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import PaymentModal from '../src/components/PaymentModal.vue'
@@ -1460,6 +1460,51 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     expect(payModal.emitted('close')).toHaveLength(1)
 
+    // 3. Alt+2 pindah ke QRIS, Alt+3 ke Utang, F9 balik ke Tunai dan fokus ke input nominal
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', altKey: true, bubbles: true }))
+    await nextTick()
+    expect(payModal.text()).toContain('Konfirmasi Bayar QRIS')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '3', altKey: true, bubbles: true }))
+    await nextTick()
+    expect(payModal.text()).toContain('Catat ke Buku Utang')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F9', bubbles: true }))
+    await nextTick()
+    expect(payModal.text()).toContain('Uang Diterima dari Pembeli')
+
     payModal.unmount()
+  })
+
+  it('supports Enter (print receipt) and Escape (newTransaction) keyboard shortcuts in ReceiptModal', async () => {
+    const printSpy = vi.fn()
+    window.print = printSpy
+
+    const receiptModal = mount(ReceiptModal, {
+      attachTo: document.body,
+      props: {
+        isOpen: true,
+        storeProfile: { name: 'Warung Kasiry', phone: '' },
+        receiptData: {
+          invoiceNumber: 'KSR-KEY-1',
+          time: '10:15',
+          totalAmount: 15000,
+          cashGiven: 20000,
+          changeAmount: 5000,
+          paymentMethod: 'TUNAI',
+          items: [{ name: 'Gula 1 Kg', qty: 1, sellPrice: 15000 }]
+        }
+      }
+    })
+    await nextTick()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await nextTick()
+    expect(printSpy).toHaveBeenCalledTimes(1)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(receiptModal.emitted('newTransaction')).toHaveLength(1)
+
+    receiptModal.unmount()
   })
 })
