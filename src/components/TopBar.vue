@@ -16,7 +16,9 @@ import {
   ArrowLeftRight,
   Smartphone,
   Zap,
-  Landmark
+  Landmark,
+  Lock,
+  Unlock
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -63,6 +65,14 @@ const props = defineProps({
   isActiveShiftStale: {
     type: Boolean,
     default: false
+  },
+  isOwnerPinEnabled: {
+    type: Boolean,
+    default: false
+  },
+  isOwnerUnlocked: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -79,11 +89,13 @@ const emit = defineEmits([
   'openCamera',
   'openProductManage',
   'openCustomerManage',
+  'unlockOwner',
+  'lockOwner',
   'drawerOpened',
   'drawerClosed'
 ])
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.21.0'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.22.0'
 const isDrawerOpen = ref(false)
 const openMenuKey = ref(null) // 'data' | 'service' | 'finance' | null
 const desktopMenusRef = ref(null)
@@ -623,6 +635,24 @@ const drawerGroups = computed(() => [
           >
             {{ item.badge }}
           </span>
+        </button>
+
+        <!-- Tombol Gembok Mode Pemilik (hanya tampil bila sandi pemilik aktif) -->
+        <button
+          v-if="isOwnerPinEnabled"
+          type="button"
+          @click="triggerAction(isOwnerUnlocked ? 'lockOwner' : 'unlockOwner')"
+          :class="[
+            'w-9 h-9 rounded-xl border shadow-2xs flex items-center justify-center cursor-pointer transition-all shrink-0',
+            isOwnerUnlocked
+              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+              : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+          ]"
+          :aria-label="isOwnerUnlocked ? 'Kunci Mode Pemilik' : 'Buka Mode Pemilik'"
+          :title="isOwnerUnlocked ? 'Mode Pemilik Terbuka — Klik untuk Kunci Kembali' : 'Mode Kasir Terkunci — Klik untuk Buka Akses Pemilik'"
+        >
+          <Unlock v-if="isOwnerUnlocked" aria-hidden="true" class="size-4" />
+          <Lock v-else aria-hidden="true" class="size-4" />
         </button>
 
         <!-- Compact Icon-Only Gear Settings Button -->

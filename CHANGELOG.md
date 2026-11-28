@@ -6,6 +6,16 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.22.0] - 2026-11-28 (Sandi / PIN Pemilik untuk Proteksi Omzet, Keuangan & Hapus Data)
+
+### Added
+- **Modul Keamanan Pemilik (`src/composables/useOwnerLock.js`, `src/components/OwnerPinModal.vue`):**
+  - Fitur **PIN / Kata Sandi Pemilik** opsional (nonaktif secara default, dapat diaktifkan/diubah/dinonaktifkan di tab *Profil Toko* pada `SettingsModal.vue` dengan penyimpanan hash SHA-256).
+  - Melindungi akses ke **Laporan Kasir & Omzet** (`DailyReportModal`), **Manajemen Keuangan & Tabungan 5 Kantong** (`FinanceModal`), serta seluruh aksi **Hapus/Void** (transaksi, barang, kategori, pelanggan, kas keluar, kulakan, tarik tunai/transfer, pulsa/token, mutasi kas), **Timpa Backup JSON**, **Arsip Hapus**, dan **Reset Data Toko** — sementara kasa jualan tetap bebas tanpa sandi.
+  - Sesi terbuka selama **15 menit** setelah verifikasi, ditambah tombol **Gembok Mode Pemilik** (`Buka` / `Kunci`) di `TopBar.vue` untuk mengunci kembali 1-klik.
+
+---
+
 ## [2.21.0] - 2026-11-28 (Hapus Pelanggan & Void Nota Bon di Buku Utang)
 
 ### Added

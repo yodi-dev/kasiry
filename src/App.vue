@@ -5,6 +5,7 @@ import BarcodeInputBar from './components/BarcodeInputBar.vue'
 import CartSection from './components/CartSection.vue'
 import FrequentProductsSection from './components/FrequentProductsSection.vue'
 import StickyBottomBar from './components/StickyBottomBar.vue'
+import OwnerPinModal from './components/OwnerPinModal.vue'
 
 const AsyncModalLoading = {
   render() {
@@ -102,6 +103,7 @@ import { buildPricedCartItem, normalizePriceTier, repriceCartItems } from './uti
 import { APP_BRAND_TAGLINE, formatDocumentTitle } from './utils/branding'
 import { useGoogleSync } from './composables/useGoogleSync'
 import { useThermalPrinter } from './composables/useThermalPrinter'
+import { useOwnerLock } from './composables/useOwnerLock'
 
 const {
   printerSettings,
@@ -185,7 +187,19 @@ const {
   importBackupJSON
 } = useKasiryDB()
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.21.0'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.22.0'
+
+const {
+  isPinEnabled: isOwnerPinEnabled,
+  isOwnerUnlocked,
+  isPinModalOpen,
+  pinModalReason,
+  pinModalError,
+  lockOwnerMode,
+  requireOwnerAuth,
+  verifyAndUnlock,
+  cancelOwnerAuth
+} = useOwnerLock()
 
 // Sinkronkan <title> tab browser secara dinamis mengikuti nama toko aktif
 watch(
@@ -304,7 +318,8 @@ const isAnyModalOpen = computed(() => {
     isLazyInventoryOpen.value ||
     isPaymentOpen.value ||
     isReceiptOpen.value ||
-    isShortcutHelpOpen.value
+    isShortcutHelpOpen.value ||
+    isPinModalOpen.value
 })
 
 // Jumlah pelanggan aktif yang masih memiliki sisa bon (mengecualikan "Umum")
@@ -508,13 +523,13 @@ const handleSaveProduct = async (prodData) => {
   triggerCloudAutoBackup()
 }
 
-const handleDeleteProduct = async (prodId) => {
+const handleDeleteProduct = (prodId) => requireOwnerAuth(async () => {
   await deleteProduct(prodId)
   cart.value = cart.value.filter(c => c.id !== prodId)
   triggerCloudAutoBackup()
-}
+}, 'menghapus barang dari katalog')
 
-const handleDeleteProductsBulk = async (prodIds) => {
+const handleDeleteProductsBulk = (prodIds) => requireOwnerAuth(async () => {
   const removedCount = await deleteProductsBulk(prodIds)
   if (removedCount > 0) {
     const idSet = new Set(prodIds)
@@ -522,17 +537,17 @@ const handleDeleteProductsBulk = async (prodIds) => {
     playBeepSound('success')
     triggerCloudAutoBackup()
   }
-}
+}, 'menghapus barang secara massal')
 
 const handleAddCategory = async (catName) => {
   const ok = await addCategory(catName)
   if (ok) triggerCloudAutoBackup()
 }
 
-const handleDeleteCategory = async (catName) => {
+const handleDeleteCategory = (catName) => requireOwnerAuth(async () => {
   const res = await deleteCategory(catName)
   if (res?.success) triggerCloudAutoBackup()
-}
+}, 'menghapus kategori barang')
 
 // Lazy Inventory Handler (Produk baru langsung tersimpan permanen ke Dexie.js)
 const triggerLazyInventory = (barcode) => {
@@ -708,7 +723,7 @@ const handleRecordExpense = async (payload) => {
   }
 }
 
-const handleDeleteExpense = async (expenseId) => {
+const handleDeleteExpense = (expenseId) => requireOwnerAuth(async () => {
   const target = expenses.value.find(e => e.id === expenseId)
   const ok = await deleteExpense(expenseId)
   if (ok) {
@@ -722,21 +737,23 @@ const handleDeleteExpense = async (expenseId) => {
     }
     triggerCloudAutoBackup(true)
   }
-}
+}, 'menghapus catatan kas keluar')
 
-const handleDeleteTransaction = async (tx) => {
+const handleDeleteTransaction = (tx) => {
   if (!tx?.id) return
-  const voided = await deleteTransaction(tx.id)
-  if (voided) {
-    playBeepSound('success')
-    appendCancellationToSheet({
-      refNumber: voided.invoiceNumber || String(tx.id),
-      actionLabel: 'BATAL TRANSAKSI',
-      detail: `Void struk ${voided.invoiceNumber || ''} (${voided.paymentMethod || '-'})`,
-      amount: -Math.abs(Number(voided.totalAmount || 0))
-    }, storeProfile.value?.name)
-    triggerCloudAutoBackup(true)
-  }
+  return requireOwnerAuth(async () => {
+    const voided = await deleteTransaction(tx.id)
+    if (voided) {
+      playBeepSound('success')
+      appendCancellationToSheet({
+        refNumber: voided.invoiceNumber || String(tx.id),
+        actionLabel: 'BATAL TRANSAKSI',
+        detail: `Void struk ${voided.invoiceNumber || ''} (${voided.paymentMethod || '-'})`,
+        amount: -Math.abs(Number(voided.totalAmount || 0))
+      }, storeProfile.value?.name)
+      triggerCloudAutoBackup(true)
+    }
+  }, 'membatalkan / menghapus transaksi')
 }
 
 const handleOpenReportReceipt = (tx) => {
@@ -794,7 +811,7 @@ const handleRecordRestock = async (payload) => {
   triggerCloudAutoBackup(true)
 }
 
-const handleDeleteRestock = async (restockId) => {
+const handleDeleteRestock = (restockId) => requireOwnerAuth(async () => {
   const target = restocks.value.find(r => r.id === restockId)
   const ok = await deleteRestock(restockId)
   if (ok) {
@@ -808,7 +825,7 @@ const handleDeleteRestock = async (restockId) => {
     }
     triggerCloudAutoBackup(true)
   }
-}
+}, 'menghapus riwayat kulakan')
 
 const buildCashServiceReceiptData = (svc) => {
   const isTransfer = svc.type === 'TRANSFER'
@@ -883,7 +900,7 @@ const handleRecordCashService = async (payload) => {
   }
 }
 
-const handleDeleteCashService = async (serviceId) => {
+const handleDeleteCashService = (serviceId) => requireOwnerAuth(async () => {
   const target = cashServices.value.find(s => s.id === serviceId)
   const ok = await deleteCashService(serviceId)
   if (ok) {
@@ -897,7 +914,7 @@ const handleDeleteCashService = async (serviceId) => {
     }
     triggerCloudAutoBackup(true)
   }
-}
+}, 'menghapus transaksi tarik tunai / transfer')
 
 const handleOpenCashServiceReceipt = (svc) => {
   if (!svc) return
@@ -921,7 +938,7 @@ const handleRecordFundMovement = async (payload) => {
   }
 }
 
-const handleDeleteFundMovement = async (movementId) => {
+const handleDeleteFundMovement = (movementId) => requireOwnerAuth(async () => {
   const target = fundMovements.value.find(m => m.id === movementId)
   const ok = await deleteFundMovement(movementId)
   if (ok) {
@@ -935,7 +952,7 @@ const handleDeleteFundMovement = async (movementId) => {
     }
     triggerCloudAutoBackup(true)
   }
-}
+}, 'menghapus mutasi keuangan')
 
 const buildDigitalReceiptData = (rec) => {
   const sellPrice = Math.round(Number(rec.sellPrice || 0))
@@ -1010,7 +1027,7 @@ const handleUpdateDigitalTokenCode = async ({ id, tokenCode }) => {
   }
 }
 
-const handleDeleteDigitalProduct = async (digitalId) => {
+const handleDeleteDigitalProduct = (digitalId) => requireOwnerAuth(async () => {
   const target = digitalProducts.value.find(d => d.id === digitalId)
   const ok = await deleteDigitalProduct(digitalId)
   if (ok) {
@@ -1024,7 +1041,7 @@ const handleDeleteDigitalProduct = async (digitalId) => {
     }
     triggerCloudAutoBackup(true)
   }
-}
+}, 'menghapus transaksi pulsa / token PLN')
 
 const handleOpenDigitalReceipt = (rec) => {
   if (!rec) return
@@ -1112,26 +1129,34 @@ const handleExportBackup = async () => {
 }
 
 const handleImportBackup = async (payloadOrContent) => {
-  try {
-    const content = typeof payloadOrContent === 'object' && payloadOrContent !== null && 'content' in payloadOrContent
-      ? payloadOrContent.content
-      : payloadOrContent
-    const mode = typeof payloadOrContent === 'object' && payloadOrContent !== null && payloadOrContent.mode
-      ? payloadOrContent.mode
-      : 'merge'
+  const content = typeof payloadOrContent === 'object' && payloadOrContent !== null && 'content' in payloadOrContent
+    ? payloadOrContent.content
+    : payloadOrContent
+  const mode = typeof payloadOrContent === 'object' && payloadOrContent !== null && payloadOrContent.mode
+    ? payloadOrContent.mode
+    : 'merge'
 
-    const res = await importBackupJSON(content, mode)
-    playBeepSound('success')
-    triggerCloudAutoBackup()
-    alert(
-      mode === 'replace'
-        ? `Data berhasil diganti penuh dari cadangan (${res.productCount} barang, ${res.customerCount} pelanggan, ${res.transactionCount} transaksi)!`
-        : `Berhasil menggabungkan cadangan (${res.productCount} barang & ${res.transactionCount} transaksi)!`
-    )
-  } catch (err) {
-    playBeepSound('warning')
-    alert('Gagal memulihkan cadangan: ' + err.message)
+  const runImport = async () => {
+    try {
+      const res = await importBackupJSON(content, mode)
+      playBeepSound('success')
+      triggerCloudAutoBackup()
+      alert(
+        mode === 'replace'
+          ? `Data berhasil diganti penuh dari cadangan (${res.productCount} barang, ${res.customerCount} pelanggan, ${res.transactionCount} transaksi)!`
+          : `Berhasil menggabungkan cadangan (${res.productCount} barang & ${res.transactionCount} transaksi)!`
+      )
+    } catch (err) {
+      playBeepSound('warning')
+      alert('Gagal memulihkan cadangan: ' + err.message)
+    }
   }
+
+  if (mode === 'replace') {
+    requireOwnerAuth(runImport, 'menimpa seluruh data toko dari cadangan')
+    return
+  }
+  await runImport()
 }
 
 // Profile & Google Actions
@@ -1187,10 +1212,10 @@ const handleSaveCustomer = async (custData) => {
   triggerCloudAutoBackup()
 }
 
-const handleDeleteCustomer = async (custId) => {
+const handleDeleteCustomer = (custId) => requireOwnerAuth(async () => {
   await deleteCustomer(custId)
   triggerCloudAutoBackup()
-}
+}, 'menghapus data pelanggan')
 
 const isExportingExcel = ref(false)
 const handleDownloadExcel = async () => {
@@ -1237,7 +1262,7 @@ const handleDownloadExcel = async () => {
   }
 }
 
-const handleArchiveOldData = async (payload) => {
+const handleArchiveOldData = (payload) => requireOwnerAuth(async () => {
   const retentionDays = typeof payload === 'object' && payload !== null ? payload.retentionDays : payload
   const onComplete = typeof payload === 'object' && payload !== null ? payload.onComplete : null
   try {
@@ -1273,9 +1298,9 @@ const handleArchiveOldData = async (payload) => {
       await onComplete()
     }
   }
-}
+}, 'mengarsipkan & memangkas transaksi lama')
 
-const handleResetStoreData = async (mode) => {
+const handleResetStoreData = (mode) => requireOwnerAuth(async () => {
   try {
     const res = await resetStoreData({ mode })
     cart.value = []
@@ -1295,7 +1320,7 @@ const handleResetStoreData = async (mode) => {
     playBeepSound('warning')
     alert('Gagal mengatur ulang data toko: ' + err.message)
   }
-}
+}, 'mengatur ulang seluruh data toko')
 
 // Cek apakah perangkat dominan layar sentuh / mobile (jangan paksa virtual keyboard muncul otomatis)
 const isTouchViewport = () => {
@@ -1581,9 +1606,13 @@ onUnmounted(() => {
       :isActiveShiftStale="isActiveShiftStale"
       :isGoogleConnected="isGoogleConnected"
       :googleUser="googleUser"
+      :isOwnerPinEnabled="isOwnerPinEnabled"
+      :isOwnerUnlocked="isOwnerUnlocked"
       @openDebtBook="isDebtBookOpen = true"
-      @openDailyReport="isDailyReportOpen = true"
-      @openFinance="isFinanceOpen = true"
+      @openDailyReport="requireOwnerAuth(() => { isDailyReportOpen = true }, 'melihat Laporan Kasir & Omzet')"
+      @openFinance="requireOwnerAuth(() => { isFinanceOpen = true }, 'membuka Manajemen Keuangan & Saldo Toko')"
+      @unlockOwner="requireOwnerAuth(() => {}, 'membuka Mode Pemilik')"
+      @lockOwner="lockOwnerMode"
       @openExpense="isExpenseOpen = true"
       @openCashService="isCashServiceOpen = true"
       @openDigitalProduct="isDigitalProductOpen = true"
@@ -1713,6 +1742,15 @@ onUnmounted(() => {
       @deleteProductsBulk="handleDeleteProductsBulk"
       @addCategory="handleAddCategory"
       @deleteCategory="handleDeleteCategory"
+    />
+
+    <!-- Modal Verifikasi PIN / Kata Sandi Pemilik -->
+    <OwnerPinModal
+      :isOpen="isPinModalOpen"
+      :reason="pinModalReason"
+      :errorMessage="pinModalError"
+      @submit="verifyAndUnlock"
+      @cancel="cancelOwnerAuth"
     />
 
     <!-- Modal Panduan Pintasan Keyboard POS (F1) -->

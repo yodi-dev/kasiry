@@ -22,9 +22,11 @@ import {
   Bluetooth,
   Usb,
   Cable,
-  WifiOff
+  WifiOff,
+  Lock
 } from '@lucide/vue'
 import { useThermalPrinter } from '../composables/useThermalPrinter'
+import { useOwnerLock } from '../composables/useOwnerLock'
 
 const props = defineProps({
   isOpen: {
@@ -116,7 +118,7 @@ const emit = defineEmits([
 
 // 3 Tabs: 'profile' (Profil Toko) | 'printer' (Printer Thermal) | 'backup' (Cadangan & Google)
 const activeTab = ref('profile')
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.21.0'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.22.0'
 
 const formName = ref(props.storeProfile?.name || 'Warung Kasiry')
 const formOwner = ref(props.storeProfile?.owner || 'Pemilik Toko')
@@ -124,6 +126,47 @@ const formPhone = ref(props.storeProfile?.phone || '')
 const fileInputRef = ref(null)
 const isSaved = ref(false)
 const confirmingResetMode = ref(null) // 'empty' | 'starter' | null
+
+// Pengaturan Keamanan & Sandi Pemilik (PIN Opsional)
+const {
+  isPinEnabled,
+  setOwnerPin,
+  disableOwnerPin
+} = useOwnerLock()
+const ownerCurrentPin = ref('')
+const ownerNewPin = ref('')
+const ownerConfirmPin = ref('')
+const ownerPinFeedback = ref({ type: '', text: '' })
+
+const handleSaveOwnerPin = async () => {
+  ownerPinFeedback.value = { type: '', text: '' }
+  if (ownerNewPin.value.trim() !== ownerConfirmPin.value.trim()) {
+    ownerPinFeedback.value = { type: 'error', text: 'Konfirmasi sandi baru tidak cocok.' }
+    return
+  }
+  const res = await setOwnerPin(ownerNewPin.value, ownerCurrentPin.value)
+  if (!res.ok) {
+    ownerPinFeedback.value = { type: 'error', text: res.error || 'Gagal menyimpan sandi.' }
+    return
+  }
+  ownerCurrentPin.value = ''
+  ownerNewPin.value = ''
+  ownerConfirmPin.value = ''
+  ownerPinFeedback.value = { type: 'success', text: 'Sandi pemilik aktif! Omzet & aksi hapus kini terlindungi.' }
+}
+
+const handleDisableOwnerPin = async () => {
+  ownerPinFeedback.value = { type: '', text: '' }
+  const res = await disableOwnerPin(ownerCurrentPin.value)
+  if (!res.ok) {
+    ownerPinFeedback.value = { type: 'error', text: res.error || 'Sandi saat ini salah.' }
+    return
+  }
+  ownerCurrentPin.value = ''
+  ownerNewPin.value = ''
+  ownerConfirmPin.value = ''
+  ownerPinFeedback.value = { type: 'success', text: 'Sandi pemilik dinonaktifkan.' }
+}
 
 // Pengaturan & Koneksi Printer Thermal (Bluetooth BLE, Kabel USB/OTG, Port Serial COM + Fallback Browser)
 const {
@@ -593,6 +636,84 @@ const cancelImport = () => {
             <CheckCircle v-else class="w-4 h-4 text-sky-400" />
             <span>{{ isSaved ? 'Perubahan Berhasil Disimpan!' : 'Simpan Perubahan' }}</span>
           </button>
+
+          <!-- Keamanan & Kata Sandi Pemilik (Opsional) -->
+          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2 text-[#0a193d]">
+                <Lock class="w-4 h-4 text-[#0284c7] shrink-0" />
+                <div>
+                  <h4 class="text-xs font-bold uppercase tracking-wider">Keamanan &amp; Sandi Pemilik</h4>
+                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Lindungi Laporan Omzet, Keuangan 5 Kantong, serta aksi Hapus/Reset data. Kasa jualan tetap bebas tanpa sandi.
+                  </p>
+                </div>
+              </div>
+              <span
+                :class="[
+                  'shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border',
+                  isPinEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                ]"
+              >
+                {{ isPinEnabled ? 'Aktif ✓' : 'Nonaktif' }}
+              </span>
+            </div>
+
+            <div class="space-y-2">
+              <input
+                v-if="isPinEnabled"
+                type="password"
+                v-model="ownerCurrentPin"
+                autocomplete="current-password"
+                placeholder="Sandi pemilik saat ini..."
+                class="w-full h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-xs font-bold text-[#0a193d] outline-hidden"
+              />
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type="password"
+                  v-model="ownerNewPin"
+                  autocomplete="new-password"
+                  :placeholder="isPinEnabled ? 'Sandi baru (min. 4 karakter)' : 'Buat PIN / sandi (min. 4 karakter)'"
+                  class="w-full h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-xs font-bold text-[#0a193d] outline-hidden"
+                />
+                <input
+                  type="password"
+                  v-model="ownerConfirmPin"
+                  autocomplete="new-password"
+                  placeholder="Ulangi sandi baru..."
+                  class="w-full h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-xs font-bold text-[#0a193d] outline-hidden"
+                />
+              </div>
+            </div>
+
+            <div
+              v-if="ownerPinFeedback.text"
+              :class="[
+                'p-2 rounded-xl text-[11px] font-semibold border',
+                ownerPinFeedback.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              ]"
+            >
+              {{ ownerPinFeedback.text }}
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                @click="handleSaveOwnerPin"
+                class="h-9 px-3.5 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors"
+              >
+                {{ isPinEnabled ? 'Ubah Sandi' : 'Aktifkan Sandi Pemilik' }}
+              </button>
+              <button
+                v-if="isPinEnabled"
+                type="button"
+                @click="handleDisableOwnerPin"
+                class="h-9 px-3.5 bg-white hover:bg-red-50 text-red-600 font-bold text-xs rounded-xl border border-red-200 cursor-pointer transition-colors"
+              >
+                Nonaktifkan Sandi
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- ==================== TAB 2: PRINTER THERMAL ==================== -->
