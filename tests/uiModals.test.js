@@ -12,6 +12,7 @@ import ShiftModal from '../src/components/ShiftModal.vue'
 import CartSection from '../src/components/CartSection.vue'
 import FrequentProductsSection from '../src/components/FrequentProductsSection.vue'
 import TopBar from '../src/components/TopBar.vue'
+import BarcodeInputBar from '../src/components/BarcodeInputBar.vue'
 import CustomerManagementModal from '../src/components/CustomerManagementModal.vue'
 import LazyInventoryModal from '../src/components/LazyInventoryModal.vue'
 import ProductManagementModal from '../src/components/ProductManagementModal.vue'
@@ -1385,5 +1386,43 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     expect(topBarBlank.text()).toContain(APP_BRAND_TAGLINE)
     expect(topBarBlank.text()).toContain('Kebijakan Privasi')
     expect(topBarBlank.text()).toContain('Ketentuan Layanan')
+  })
+
+  it('supports ArrowDown, ArrowUp, Enter, and Escape keyboard navigation on BarcodeInputBar search results', async () => {
+    const searchResults = [
+      { id: 101, name: 'Beras Ramos 5 Kg', sellPrice: 72000, barcode: '8991001' },
+      { id: 102, name: 'Beras Pandan Wangi 5 Kg', sellPrice: 82000, barcode: '8991002' },
+      { id: 103, name: 'Beras Merah 1 Kg', sellPrice: 24000, barcode: '8991003' }
+    ]
+    const bar = mount(BarcodeInputBar, {
+      props: {
+        variant: 'inline',
+        searchQuery: 'Beras',
+        searchResults
+      }
+    })
+
+    const input = bar.find('input[role="combobox"]')
+    expect(input.attributes('aria-activedescendant')).toBe('search-option-inline-0')
+
+    // ArrowDown -> pindah ke item kedua (index 1)
+    await input.trigger('keydown.down')
+    await nextTick()
+    expect(input.attributes('aria-activedescendant')).toBe('search-option-inline-1')
+
+    // ArrowDown 2x -> wrap ke index 0
+    await input.trigger('keydown.down')
+    await input.trigger('keydown.down')
+    await nextTick()
+    expect(input.attributes('aria-activedescendant')).toBe('search-option-inline-0')
+
+    // ArrowUp dari index 0 -> wrap ke item terakhir (index 2), lalu Enter memilih item ke-3
+    await input.trigger('keydown.up')
+    await nextTick()
+    expect(input.attributes('aria-activedescendant')).toBe('search-option-inline-2')
+
+    await input.trigger('keydown.enter')
+    expect(bar.emitted('selectProduct')?.[0]?.[0]?.id).toBe(103)
+    expect(bar.emitted('update:searchQuery')?.[0]).toEqual([''])
   })
 })

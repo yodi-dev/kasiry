@@ -6,6 +6,14 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.6] - 2026-11-28 (Navigasi Keyboard Panah Atas/Bawah di Pencarian Barang Kasa)
+
+### Added
+- **Navigasi Keyboard `ArrowDown` / `ArrowUp` / `Enter` di `BarcodeInputBar.vue`:**
+  - Daftar hasil pencarian barang kini mendukung navigasi tombol panah **`↓`** / **`↑`** (termasuk wrap-around & auto-scroll `scrollIntoView({ block: 'nearest' })`), highlight visual baris aktif yang sinkron dengan hover mouse, atribut aksesibilitas ARIA (`role="combobox"`, `role="listbox"`, `role="option"`, `aria-activedescendant`), serta tombol **`Enter`** untuk langsung memasukkan barang yang sedang disorot ke keranjang.
+
+---
+
 ## [2.20.5] - 2026-11-28 (1 Spreadsheet Tunggal & Format Header Rapi di Google Sheets)
 
 ### Changed

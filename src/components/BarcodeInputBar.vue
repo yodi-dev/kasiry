@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { Search, Camera, X, PlusCircle } from '@lucide/vue'
 
 const props = defineProps({
@@ -30,6 +30,29 @@ const emit = defineEmits([
 
 const inputRef = ref(null)
 const isFocused = ref(false)
+const activeIndex = ref(0)
+const resultItemRefs = ref([])
+
+const setResultItemRef = (el, idx) => {
+  if (el) resultItemRefs.value[idx] = el
+}
+
+const scrollActiveResultIntoView = () => {
+  nextTick(() => {
+    const activeEl = resultItemRefs.value[activeIndex.value]
+    if (activeEl && typeof activeEl.scrollIntoView === 'function') {
+      activeEl.scrollIntoView({ block: 'nearest' })
+    }
+  })
+}
+
+watch(
+  () => [props.searchQuery, props.searchResults],
+  () => {
+    activeIndex.value = 0
+    resultItemRefs.value = []
+  }
+)
 
 const isVisibleInstance = () => {
   return Boolean(inputRef.value && inputRef.value.offsetParent !== null)
@@ -186,12 +209,25 @@ const onTriggerUnknown = () => {
   }
 }
 
+const handleArrowNavigation = (direction, e) => {
+  const count = props.searchResults?.length || 0
+  if (props.searchQuery.trim().length === 0 || count === 0) return
+  e?.preventDefault()
+  if (direction === 'down') {
+    activeIndex.value = (activeIndex.value + 1) % count
+  } else if (direction === 'up') {
+    activeIndex.value = (activeIndex.value - 1 + count) % count
+  }
+  scrollActiveResultIntoView()
+}
+
 const handleEnter = (e) => {
   // Jangan submit jika IME keyboard sedang menyusun kata/komposisi
   if (e?.isComposing || e?.keyCode === 229) return
   e?.preventDefault()
   if (props.searchResults && props.searchResults.length > 0) {
-    onSelect(props.searchResults[0])
+    const targetProduct = props.searchResults[activeIndex.value] || props.searchResults[0]
+    onSelect(targetProduct)
   } else if (props.searchQuery.trim().length > 0) {
     onTriggerUnknown()
   }
@@ -223,10 +259,16 @@ const handleEnter = (e) => {
           @pointerdown="handleInputTouchIntent"
           @touchstart.passive="handleInputTouchIntent"
           @input="handleInput"
+          @keydown.down="handleArrowNavigation('down', $event)"
+          @keydown.up="handleArrowNavigation('up', $event)"
           @keydown.enter="handleEnter"
           @keydown.esc="clearInput"
           @focus="handleInputFocus"
           @blur="handleInputBlur"
+          role="combobox"
+          aria-autocomplete="list"
+          :aria-expanded="searchQuery.trim().length > 0"
+          :aria-activedescendant="searchQuery.trim().length > 0 && searchResults.length > 0 ? `search-option-${variant}-${activeIndex}` : undefined"
           :placeholder="variant === 'inline' ? 'Cari nama barang atau scan barcode...' : 'Cari barang / scan barcode...'"
           aria-label="Cari nama barang atau scan barcode"
           class="w-full h-11 sm:h-11 pl-10 pr-10 text-base lg:text-sm font-medium bg-white/95 backdrop-blur-md text-[#0a193d] placeholder:text-slate-400 rounded-2xl border-2 transition-all outline-none"
@@ -272,14 +314,21 @@ const handleEnter = (e) => {
     <!-- Dropdown Hasil Pencarian Dinamis (Membuka ke Atas pada Mobile Floating, ke Bawah pada Tablet/Desktop Inline) -->
     <div 
       v-if="searchQuery.trim().length > 0"
+      role="listbox"
       class="kasiry-scroll-pane absolute left-0 right-0 bg-white/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/90 z-40 overflow-hidden divide-y divide-slate-100 max-h-[42dvh] sm:max-h-72 overflow-y-auto"
       :class="variant === 'inline' ? 'top-full mt-2' : 'bottom-full mb-2.5'"
     >
       <div 
-        v-for="product in searchResults" 
+        v-for="(product, idx) in searchResults" 
         :key="product.id"
+        :id="`search-option-${variant}-${idx}`"
+        :ref="el => setResultItemRef(el, idx)"
+        role="option"
+        :aria-selected="idx === activeIndex"
+        @mouseenter="activeIndex = idx"
         @click="onSelect(product)"
-        class="p-2.5 px-3 hover:bg-sky-50/60 flex items-center justify-between cursor-pointer transition-colors"
+        class="p-2.5 px-3 flex items-center justify-between cursor-pointer transition-colors"
+        :class="idx === activeIndex ? 'bg-sky-50 ring-1 ring-inset ring-sky-200' : 'hover:bg-sky-50/60'"
       >
         <div class="min-w-0 pr-2">
           <p class="font-semibold text-[#0a193d] text-sm leading-snug truncate">{{ product.name }}</p>
