@@ -6,6 +6,15 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.22.2] - 2026-11-28 (Perbaikan Prefill Nama vs Barcode pada Tambah Barang Kasa)
+
+### Fixed
+- **Deteksi Otomatis Nama vs Barcode di `LazyInventoryModal.vue` & `App.vue` (`src/utils/barcode.js`):**
+  - Mengetikkan nama barang yang belum terdaftar di kolom pencarian Kasa lalu menekan `Enter` / **Tambah Baru** kini otomatis mengisi kolom **Nama Produk** (dan membiarkan barcode kosong/opsional), tidak lagi salah masuk ke kolom `Kode:` barcode.
+  - Menyatukan helper `isLikelyBarcode()` di `src/utils/barcode.js` untuk dipakai bersama oleh `LazyInventoryModal.vue`, `ProductManagementModal.vue`, dan `App.vue`.
+
+---
+
 ## [2.22.1] - 2026-11-28 (Scan & Tambah Barang Cepat dari Pencarian Kelola Barang)
 
 ### Added

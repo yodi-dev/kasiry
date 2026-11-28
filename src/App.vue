@@ -100,6 +100,7 @@ import { exportKasiryExcel } from './utils/excelExport'
 import { computeDailyStats } from './utils/dailyStats'
 import { computeFinanceBalances } from './utils/financeEngine'
 import { buildPricedCartItem, normalizePriceTier, repriceCartItems } from './utils/pricing'
+import { isLikelyBarcode } from './utils/barcode'
 import { APP_BRAND_TAGLINE, formatDocumentTitle } from './utils/branding'
 import { useGoogleSync } from './composables/useGoogleSync'
 import { useThermalPrinter } from './composables/useThermalPrinter'
@@ -187,7 +188,7 @@ const {
   importBackupJSON
 } = useKasiryDB()
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.22.1'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.22.2'
 
 const {
   isPinEnabled: isOwnerPinEnabled,
@@ -275,6 +276,7 @@ const tierAppliedByCustomer = ref(false)
 // State Pencarian Barcode / Barang
 const searchQuery = ref('')
 const scannedBarcode = ref('')
+const prefillProductName = ref('')
 const mobileBarcodeRef = ref(null)
 const desktopBarcodeRef = ref(null)
 
@@ -550,8 +552,15 @@ const handleDeleteCategory = (catName) => requireOwnerAuth(async () => {
 }, 'menghapus kategori barang')
 
 // Lazy Inventory Handler (Produk baru langsung tersimpan permanen ke Dexie.js)
-const triggerLazyInventory = (barcode) => {
-  scannedBarcode.value = barcode
+const triggerLazyInventory = (rawInput = '') => {
+  const clean = String(rawInput || '').trim()
+  if (clean && isLikelyBarcode(clean)) {
+    scannedBarcode.value = clean
+    prefillProductName.value = ''
+  } else {
+    scannedBarcode.value = ''
+    prefillProductName.value = clean
+  }
   isLazyInventoryOpen.value = true
 }
 
@@ -1831,6 +1840,7 @@ onUnmounted(() => {
       v-if="activatedModals.lazyInventory || isLazyInventoryOpen"
       :isOpen="isLazyInventoryOpen"
       :scannedBarcode="scannedBarcode"
+      :initialName="prefillProductName"
       :categories="categories"
       @close="isLazyInventoryOpen = false"
       @saveAndAddToCart="saveAndAddToCart"

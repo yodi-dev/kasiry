@@ -19,6 +19,7 @@ import {
 } from '@lucide/vue'
 import { sanitizeOptionalPrice, sanitizeMinQty } from '../utils/pricing'
 import { buildProductUsageMap } from '../utils/productUsage'
+import { isLikelyBarcode } from '../utils/barcode'
 
 const props = defineProps({
   isOpen: {
@@ -241,11 +242,6 @@ const estimatedProfit = computed(() => {
   }
   return 0
 })
-
-const isLikelyBarcode = (raw = '') => {
-  const clean = String(raw || '').trim()
-  return /^\d{4,}$/.test(clean) || (!/\s/.test(clean) && /\d/.test(clean) && /^[A-Za-z0-9_-]{6,}$/.test(clean))
-}
 
 const openAddForm = (prefillQuery = '') => {
   const cleanPrefill = typeof prefillQuery === 'string' ? prefillQuery.trim() : ''

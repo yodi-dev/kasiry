@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { X, Plus, Barcode, Check } from '@lucide/vue'
 import { sanitizeOptionalPrice, sanitizeMinQty } from '../utils/pricing'
+import { isLikelyBarcode } from '../utils/barcode'
 
 const props = defineProps({
   isOpen: {
@@ -9,6 +10,10 @@ const props = defineProps({
     default: false
   },
   scannedBarcode: {
+    type: String,
+    default: ''
+  },
+  initialName: {
     type: String,
     default: ''
   },
@@ -25,6 +30,7 @@ const defaultCategories = ['Sembako', 'Makanan', 'Minuman', 'Kebersihan', 'Rokok
 const nameInputRef = ref(null)
 const newCategoryInputRef = ref(null)
 const productName = ref('')
+const barcodeValue = ref('')
 const sellPrice = ref('')
 const buyPrice = ref('')
 const wholesalePrice = ref('')
@@ -44,7 +50,12 @@ const availableCategories = computed(() => {
 
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
-    productName.value = ''
+    const cleanInitialName = String(props.initialName || '').trim()
+    const cleanScanned = String(props.scannedBarcode || '').trim()
+    const scannedIsCode = cleanScanned ? isLikelyBarcode(cleanScanned) : false
+
+    productName.value = cleanInitialName || (!scannedIsCode && cleanScanned ? cleanScanned : '')
+    barcodeValue.value = cleanInitialName ? '' : (scannedIsCode ? cleanScanned : '')
     sellPrice.value = ''
     buyPrice.value = ''
     wholesalePrice.value = ''
@@ -99,7 +110,7 @@ const handleSave = () => {
   if (!productName.value.trim() || sell <= 0) return
 
   emit('saveAndAddToCart', {
-    barcode: props.scannedBarcode,
+    barcode: barcodeValue.value.trim(),
     name: productName.value.trim(),
     sellPrice: sell,
     buyPrice: buy > 0 ? buy : Math.round(sell * 0.8),
@@ -134,8 +145,9 @@ const handleSave = () => {
 
       <!-- Kode Barcode Info -->
       <div class="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-        <Barcode aria-hidden="true" class="w-4 h-4 text-slate-500" />
-        <span class="text-xs font-mono font-medium text-slate-700">Kode: {{ scannedBarcode || '8999999888123' }}</span>
+        <Barcode aria-hidden="true" class="w-4 h-4 text-slate-500 shrink-0" />
+        <span v-if="barcodeValue" class="text-xs font-mono font-medium text-slate-700">Kode: {{ barcodeValue }}</span>
+        <span v-else class="text-xs font-medium text-slate-500">Tanpa barcode (opsional) • Nama otomatis terisi</span>
       </div>
 
       <!-- Form Kilat -->

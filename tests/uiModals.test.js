@@ -152,6 +152,14 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     })
     expect(lazy.text()).toContain('89912345')
 
+    // Jika kasir mengetik nama barang (bukan barcode) di pencarian kasa, masuk ke kolom Nama Produk, bukan Kode
+    const lazyByName = mount(LazyInventoryModal, {
+      props: { isOpen: true, scannedBarcode: 'Kopi Kapal Api', categories: ['Sembako', 'Makanan'] }
+    })
+    expect(lazyByName.text()).toContain('Tanpa barcode')
+    expect(lazyByName.text()).not.toContain('Kode: Kopi Kapal Api')
+    expect(lazyByName.find('#lazy-product-name').element.value).toBe('Kopi Kapal Api')
+
     const prodManage = mount(ProductManagementModal, {
       props: {
         isOpen: true,

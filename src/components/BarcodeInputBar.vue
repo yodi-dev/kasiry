@@ -201,7 +201,7 @@ const onSelect = (product) => {
 }
 
 const onTriggerUnknown = () => {
-  const code = props.searchQuery.trim() || '8999999888123'
+  const code = props.searchQuery.trim()
   emit('triggerLazyInventory', code)
   emit('update:searchQuery', '')
   if (!isDesktopAutoFocus()) {
