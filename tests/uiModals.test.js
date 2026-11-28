@@ -1576,4 +1576,38 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await delBtnAgain.trigger('click')
     expect(debtModal.emitted('deleteCustomer')?.[0]).toEqual([2])
   })
+
+  it('auto-opens Add Product form with prefilled barcode on Enter or empty-search CTA in ProductManagementModal', async () => {
+    const prodModal = mount(ProductManagementModal, {
+      props: {
+        isOpen: true,
+        products: [
+          { id: 1, name: 'Gula Pasir 1 Kg', sellPrice: 17500, buyPrice: 15000, category: 'Sembako', barcode: '8990001' }
+        ]
+      }
+    })
+
+    // 1. Scan barcode yang belum terdaftar + Enter -> langsung buka form Tambah Barang dengan barcode terisi
+    const searchInput = prodModal.find('input[placeholder="Cari nama barang atau scan barcode..."]')
+    await searchInput.setValue('8998887776661')
+    await nextTick()
+    expect(prodModal.text()).toContain('Tambah "8998887776661"')
+
+    await searchInput.trigger('keydown.enter')
+    await nextTick()
+    expect(prodModal.text()).toContain('Tambah Barang Baru')
+    const barcodeField = prodModal.find('input[placeholder="Scan atau ketik barcode..."]')
+    expect(barcodeField.element.value).toBe('8998887776661')
+
+    // 2. Kembali ke daftar & ketik nama barang baru -> klik tombol Tambah mengisi Nama Barang
+    await prodModal.findAll('button').find(b => b.text().includes('Kembali')).trigger('click')
+    await nextTick()
+    const searchInput2 = prodModal.find('input[placeholder="Cari nama barang atau scan barcode..."]')
+    await searchInput2.setValue('Kopi Tubruk')
+    await nextTick()
+    await prodModal.findAll('button').find(b => b.text().includes('Tambah "Kopi Tubruk"')).trigger('click')
+    await nextTick()
+    const nameField = prodModal.find('input[placeholder="Contoh: Beras Ramos 5 Kg"]')
+    expect(nameField.element.value).toBe('Kopi Tubruk')
+  })
 })

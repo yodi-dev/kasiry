@@ -6,6 +6,14 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.22.1] - 2026-11-28 (Scan & Tambah Barang Cepat dari Pencarian Kelola Barang)
+
+### Added
+- **Scan-to-Add di `ProductManagementModal.vue`:**
+  - Saat mencari atau men-scan barcode di kolom pencarian **Kelola Barang** lalu barang belum ada di katalog (`filteredProducts.length === 0`), menekan **`Enter`** atau mengklik tombol **`+ Tambah "<kode/nama>"`** di empty state langsung membuka form **Tambah Barang Baru** dengan kolom **Barcode** (bila input berupa kode barcode) atau **Nama Barang** sudah otomatis terisi.
+
+---
+
 ## [2.22.0] - 2026-11-28 (Sandi / PIN Pemilik untuk Proteksi Omzet, Keuangan & Hapus Data)
 
 ### Added

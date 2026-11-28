@@ -242,22 +242,39 @@ const estimatedProfit = computed(() => {
   return 0
 })
 
-const openAddForm = () => {
+const isLikelyBarcode = (raw = '') => {
+  const clean = String(raw || '').trim()
+  return /^\d{4,}$/.test(clean) || (!/\s/.test(clean) && /\d/.test(clean) && /^[A-Za-z0-9_-]{6,}$/.test(clean))
+}
+
+const openAddForm = (prefillQuery = '') => {
+  const cleanPrefill = typeof prefillQuery === 'string' ? prefillQuery.trim() : ''
+  const asBarcode = cleanPrefill ? isLikelyBarcode(cleanPrefill) : false
   currentProduct.value = {
     id: null,
-    name: '',
+    name: cleanPrefill && !asBarcode ? cleanPrefill : '',
     sellPrice: '',
     buyPrice: '',
     wholesalePrice: '',
     wholesaleMinQty: '',
     agentPrice: '',
     stock: '',
-    barcode: '',
+    barcode: asBarcode ? cleanPrefill : '',
     category: selectedCategory.value !== 'Semua' ? selectedCategory.value : (availableCategories.value[0] || 'Sembako'),
     isMacro: false
   }
   isAddingCategoryInline.value = false
   currentView.value = 'form'
+}
+
+const handleSearchEnter = (e) => {
+  if (e?.isComposing || e?.keyCode === 229) return
+  const q = searchQuery.value.trim()
+  if (!q) return
+  if (filteredProducts.value.length === 0) {
+    e?.preventDefault()
+    openAddForm(q)
+  }
 }
 
 const openEditForm = (p) => {
@@ -398,7 +415,8 @@ const handleDeleteCategory = (cat) => {
               <input 
                 type="text" 
                 v-model="searchQuery"
-                placeholder="Cari nama barang atau barcode..."
+                @keydown.enter="handleSearchEnter"
+                placeholder="Cari nama barang atau scan barcode..."
                 class="w-full h-11 pl-10 pr-8 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-xs sm:text-sm font-semibold text-[#0a193d] outline-hidden transition-all"
               />
               <button 
@@ -411,7 +429,7 @@ const handleDeleteCategory = (cat) => {
             </div>
 
             <button 
-              @click="openAddForm"
+              @click="openAddForm()"
               class="h-11 px-4 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-2xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95 shrink-0"
             >
               <Plus class="w-4 h-4 text-sky-400" />
@@ -566,11 +584,24 @@ const handleDeleteCategory = (cat) => {
           <!-- Empty State -->
           <div 
             v-if="filteredProducts.length === 0" 
-            class="h-48 flex flex-col items-center justify-center text-center p-4 text-slate-400"
+            class="min-h-48 flex flex-col items-center justify-center text-center p-4 text-slate-400"
           >
             <Package class="w-10 h-10 mb-2 text-slate-300" />
-            <p class="text-xs font-semibold text-slate-500">Tidak ada barang yang cocok</p>
-            <p class="text-[11px] text-slate-400 mt-0.5">Coba ubah kata kunci pencarian atau kategori filter</p>
+            <p class="text-xs font-semibold text-slate-500">
+              {{ searchQuery.trim() ? `Barang "${searchQuery.trim()}" belum ada di katalog` : 'Tidak ada barang yang cocok' }}
+            </p>
+            <p class="text-[11px] text-slate-400 mt-0.5">
+              {{ searchQuery.trim() ? 'Tekan Enter atau klik tombol di bawah untuk langsung mendaftarkannya.' : 'Coba ubah kata kunci pencarian atau kategori filter' }}
+            </p>
+            <button
+              v-if="searchQuery.trim()"
+              type="button"
+              @click="openAddForm(searchQuery.trim())"
+              class="mt-3 h-10 px-4 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-2xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95"
+            >
+              <Plus class="w-4 h-4 text-sky-400" />
+              <span>Tambah "{{ searchQuery.trim() }}"</span>
+            </button>
           </div>
 
           <!-- Product Item Card -->
