@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { formatNominalInput, parseNominalInput } from '../utils/currencyInput'
 import { X, Plus, Barcode, Check } from '@lucide/vue'
 import { sanitizeOptionalPrice, sanitizeMinQty } from '../utils/pricing'
 import { isLikelyBarcode } from '../utils/barcode'
@@ -173,11 +174,11 @@ const handleSave = () => {
             </label>
             <input 
               id="lazy-sell-price"
-              type="number" 
+              type="text" 
               inputmode="numeric"
-              min="1"
-              v-model="sellPrice"
-              placeholder="12000"
+              :value="formatNominalInput(sellPrice)"
+              @input="sellPrice = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(sellPrice)"
+              placeholder="12.000"
               class="w-full h-11 px-3.5 bg-white border border-slate-200 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 rounded-xl text-base sm:text-sm font-bold text-sky-800 text-right tabular-nums outline-hidden transition-all"
             />
           </div>
@@ -188,10 +189,11 @@ const handleSave = () => {
             </label>
             <input 
               id="lazy-buy-price"
-              type="number" 
+              type="text" 
               inputmode="numeric"
-              v-model="buyPrice"
-              placeholder="10000"
+              :value="formatNominalInput(buyPrice)"
+              @input="buyPrice = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(buyPrice)"
+              placeholder="10.000"
               class="w-full h-11 px-3.5 bg-white border border-slate-200 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 rounded-xl text-base sm:text-sm font-medium text-slate-700 text-right tabular-nums outline-hidden transition-all"
             />
           </div>
@@ -215,9 +217,10 @@ const handleSave = () => {
             <div>
               <label class="block text-[10px] font-bold text-slate-600 mb-1">Harga Grosir</label>
               <input
-                type="number"
+                type="text"
                 inputmode="numeric"
-                v-model="wholesalePrice"
+                :value="formatNominalInput(wholesalePrice)"
+                @input="wholesalePrice = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(wholesalePrice)"
                 placeholder="Rp"
                 class="w-full h-9 px-2.5 bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-xs font-bold text-amber-800 text-right font-mono outline-hidden"
               />
@@ -236,9 +239,10 @@ const handleSave = () => {
             <div>
               <label class="block text-[10px] font-bold text-slate-600 mb-1">Harga Agen</label>
               <input
-                type="number"
+                type="text"
                 inputmode="numeric"
-                v-model="agentPrice"
+                :value="formatNominalInput(agentPrice)"
+                @input="agentPrice = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(agentPrice)"
                 placeholder="Rp"
                 class="w-full h-9 px-2.5 bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-xs font-bold text-[#0284c7] text-right font-mono outline-hidden"
               />

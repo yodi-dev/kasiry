@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { formatNominalInput, parseNominalInput } from '../utils/currencyInput'
 import { 
   X, 
   BookOpen, 
@@ -722,8 +723,10 @@ const shareWhatsAppReminder = (c) => {
                 Rp
               </span>
               <input 
-                type="number" 
-                v-model="customerForm.totalDebt"
+                type="text"
+                inputmode="numeric"
+                :value="formatNominalInput(customerForm.totalDebt)"
+                @input="customerForm.totalDebt = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(customerForm.totalDebt)"
                 placeholder="0"
                 class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-base font-bold text-[#0a193d] text-right font-mono outline-hidden transition-all"
               />

@@ -1804,8 +1804,12 @@ onUnmounted(() => {
             <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border font-mono font-bold text-[#0a193d]">F8</kbd>
           </div>
           <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
-            <span class="text-slate-600">Buka Pembayaran → Bayar / Batal</span>
-            <span class="font-mono font-bold text-[#0a193d]"><kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">F2</kbd> → <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Enter</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Esc</kbd></span>
+            <span class="text-slate-600">Buka Pembayaran</span>
+            <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border font-mono font-bold text-[#0a193d]">F2</kbd>
+          </div>
+          <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-600">Bayar / Batal di Pembayaran</span>
+            <span class="font-mono font-bold text-[#0a193d]"><kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Enter</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-100 rounded border">Esc</kbd></span>
           </div>
           <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
             <span class="text-slate-600">Di Pembayaran: Tunai / QRIS / Utang &amp; Nominal</span>

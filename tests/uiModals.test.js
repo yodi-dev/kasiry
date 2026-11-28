@@ -698,7 +698,7 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     const supplierInput = restock.find('input[placeholder="Misal: Agen Sembako Jaya"]')
     await supplierInput.setValue('Agen Sumber Rezeki')
 
-    const numInputs = restock.findAll('input[type="number"]')
+    const numInputs = restock.findAll('input[inputmode="numeric"]')
     await numInputs[0].setValue('6')
     await numInputs[1].setValue('15500')
     await nextTick()

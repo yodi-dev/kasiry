@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { formatNominalInput, parseNominalInput } from '../utils/currencyInput'
 import { 
   X, 
   Plus, 
@@ -744,11 +745,11 @@ const handleDeleteCategory = (cat) => {
                   Rp
                 </span>
                 <input
-                  v-model="quickPriceDrafts[p.id]"
-                  type="number"
-                  min="1"
+                  :value="formatNominalInput(quickPriceDrafts[p.id])"
+                  @input="quickPriceDrafts[p.id] = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(quickPriceDrafts[p.id])"
+                  type="text"
                   inputmode="numeric"
-                  :placeholder="p.sellPrice > 0 ? String(p.sellPrice) : 'Misal: 3500'"
+                  :placeholder="p.sellPrice > 0 ? formatNominalInput(p.sellPrice) : 'Misal: 3.500'"
                   @keydown.enter.prevent="saveInlineQuickPrice(p)"
                   :aria-label="`Harga cepat ${p.name}`"
                   class="w-full h-8 pl-8 pr-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#0284c7] rounded-lg text-xs font-bold font-mono text-right text-[#0a193d] outline-hidden"
@@ -844,9 +845,11 @@ const handleDeleteCategory = (cat) => {
                   Rp
                 </span>
                 <input 
-                  type="number" 
-                  v-model="currentProduct.sellPrice"
-                  placeholder="15000"
+                  type="text"
+                  inputmode="numeric"
+                  :value="formatNominalInput(currentProduct.sellPrice)"
+                  @input="currentProduct.sellPrice = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(currentProduct.sellPrice)"
+                  placeholder="15.000"
                   class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-base font-bold text-[#0a193d] text-right font-mono outline-hidden transition-all"
                 />
               </div>
@@ -861,9 +864,11 @@ const handleDeleteCategory = (cat) => {
                   Rp
                 </span>
                 <input 
-                  type="number" 
-                  v-model="currentProduct.buyPrice"
-                  placeholder="12000"
+                  type="text"
+                  inputmode="numeric"
+                  :value="formatNominalInput(currentProduct.buyPrice)"
+                  @input="currentProduct.buyPrice = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(currentProduct.buyPrice)"
+                  placeholder="12.000"
                   class="w-full h-11 pl-10 pr-4 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-[#0284c7] focus:ring-4 focus:ring-sky-500/10 rounded-2xl text-base font-medium text-slate-700 text-right font-mono outline-hidden transition-all"
                 />
               </div>
@@ -887,9 +892,10 @@ const handleDeleteCategory = (cat) => {
                   Harga Grosir (Rp)
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   inputmode="numeric"
-                  v-model="currentProduct.wholesalePrice"
+                  :value="formatNominalInput(currentProduct.wholesalePrice)"
+                  @input="currentProduct.wholesalePrice = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(currentProduct.wholesalePrice)"
                   placeholder="Opsional"
                   class="w-full h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-sm font-bold text-amber-800 text-right font-mono outline-hidden transition-all"
                 />
@@ -914,9 +920,10 @@ const handleDeleteCategory = (cat) => {
                   Harga Agen (Rp)
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   inputmode="numeric"
-                  v-model="currentProduct.agentPrice"
+                  :value="formatNominalInput(currentProduct.agentPrice)"
+                  @input="currentProduct.agentPrice = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(currentProduct.agentPrice)"
                   placeholder="Opsional"
                   class="w-full h-10 px-3 bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-sm font-bold text-[#0284c7] text-right font-mono outline-hidden transition-all"
                 />

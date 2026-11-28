@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { formatNominalInput, parseNominalInput } from '../utils/currencyInput'
 import {
   X,
   PackagePlus,
@@ -580,9 +581,9 @@ const confirmDelete = (id) => {
                         Harga Beli / Unit (Rp)
                       </label>
                       <input
-                        v-model.number="item.unitBuyPrice"
-                        type="number"
-                        min="0"
+                        :value="formatNominalInput(item.unitBuyPrice)"
+                        @input="item.unitBuyPrice = parseNominalInput($event.target.value, { emptyAsZero: true }); $event.target.value = formatNominalInput(item.unitBuyPrice)"
+                        type="text"
                         inputmode="numeric"
                         class="w-full h-9 px-2.5 bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#0284c7] rounded-xl text-xs font-bold font-mono text-right text-[#0a193d] outline-hidden"
                       />
@@ -622,9 +623,9 @@ const confirmDelete = (id) => {
                     >
                       <span class="text-[10px] font-bold text-amber-800">Ubah Jual:</span>
                       <input
-                        v-model="item.newSellPrice"
-                        type="number"
-                        min="0"
+                        :value="formatNominalInput(item.newSellPrice)"
+                        @input="item.newSellPrice = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(item.newSellPrice)"
+                        type="text"
                         inputmode="numeric"
                         :placeholder="String(item.currentSellPrice)"
                         class="w-24 h-7 px-2 bg-amber-50/70 border border-amber-200 focus:border-[#0284c7] rounded-lg text-xs font-bold font-mono text-right text-[#0a193d] outline-hidden"
