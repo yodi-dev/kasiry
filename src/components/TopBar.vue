@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { APP_BRAND_NAME, APP_BRAND_TAGLINE, getStoreInitials } from '../utils/branding'
 import {
   X,
   BookOpen,
@@ -82,6 +83,7 @@ const emit = defineEmits([
   'drawerClosed'
 ])
 
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.2'
 const isDrawerOpen = ref(false)
 const openMenuKey = ref(null) // 'data' | 'service' | 'finance' | null
 const desktopMenusRef = ref(null)
@@ -467,7 +469,7 @@ const drawerGroups = computed(() => [
               class="w-full h-full rounded-[10px] object-cover"
             />
             <div v-else class="w-full h-full rounded-[10px] bg-[#0a193d] flex items-center justify-center text-white text-xs font-bold font-mono">
-              {{ storeName ? storeName.substring(0, 2).toUpperCase() : 'HS' }}
+              {{ getStoreInitials(storeName) }}
             </div>
           </div>
           <span
@@ -642,7 +644,7 @@ const drawerGroups = computed(() => [
             class="w-full h-full rounded-[14px] object-cover"
           />
           <div v-else class="w-full h-full rounded-[14px] bg-[#0a193d] flex items-center justify-center text-white text-xs font-bold font-mono">
-            {{ storeName ? storeName.substring(0, 2).toUpperCase() : 'HS' }}
+            {{ getStoreInitials(storeName) }}
           </div>
         </div>
         <!-- Online / Cloud Sync Status Dot -->
@@ -711,17 +713,18 @@ const drawerGroups = computed(() => [
 
         <div class="p-4 border-t border-slate-100 text-xs text-slate-500 space-y-2">
           <div>
-            <p class="font-bold text-slate-700">Kasiry by Awanbeo</p>
-            <p class="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
-              <span>Crafted with ❤️ by</span>
+            <div class="flex items-center justify-between gap-2">
+              <p class="font-bold text-[#0a193d]">{{ APP_BRAND_NAME }}</p>
+              <span class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono text-[10px] font-semibold">v{{ appVersion }}</span>
+            </div>
+            <p class="mt-0.5 text-[11px] text-slate-500">
+              {{ APP_BRAND_TAGLINE }} · oleh
               <a
                 href="https://awanbeo.my.id"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="font-bold text-[#0284c7] hover:underline"
-              >
-                awanbeo
-              </a>
+                class="font-semibold text-[#0284c7] hover:underline"
+              >Awanbeo</a>
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-2.5 pt-1 text-[11px] text-slate-400">

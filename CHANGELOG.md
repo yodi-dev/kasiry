@@ -6,6 +6,20 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.2] - 2026-11-28 (Penyelarasan Branding, Dynamic Browser Title, Footer & OG Meta)
+
+### Changed
+- **Dynamic Browser Tab `<title>` & Helper Branding (`src/utils/branding.js`, `src/App.vue`):**
+  - Menambahkan watcher dinamis di `App.vue` agar judul tab peramban otomatis menampilkan `<Nama Toko> — Kasiry by Awanbeo` saat pemilik mengatur nama toko kustom, serta default `Kasiry by Awanbeo — Kasir Warung, Konter & Keuangan UMKM`.
+- **Footer Terpadu & Penghapusan Sisa Inisial `'HS'` (`src/App.vue`, `src/components/TopBar.vue`):**
+  - Mengganti inisial avatar fallback `'HS'` (sisa brand lama) menjadi `'KS'` lewat helper `getStoreInitials`.
+  - Membuka tampilan footer di viewport Tablet (`md+` / `hidden md:flex`) agar tautan **Kebijakan Privasi**, **Ketentuan Layanan**, brand **Kasiry by Awanbeo**, dan badge versi `v2.20.2` dapat diakses di Mobile Drawer, Tablet, maupun Desktop secara seragam.
+- **OG Meta, Gambar Preview (`public/og-image.png`), PWA Manifest & Halaman Legal:**
+  - Memperbarui desain & isi visual `public/og-image.png` (`1200x630`) untuk mencantumkan `Kasiry by Awanbeo`, `kasiry.awanbeo.my.id`, layanan konter (Pulsa/Token PLN & Tarik Tunai/Transfer), dan Manajemen Keuangan 5 Kantong.
+  - Menyelaraskan `<title>`, `meta description`, tag `og:*`, `twitter:*` (plus `twitter:image:alt`), JSON-LD `WebApplication` (`offers` & `featureList`) di `index.html`, PWA manifest di `vite.config.js`, serta meta OG + tanggal pembaruan di `public/privacy.html`, `public/terms.html`, dan `public/sitemap.xml`.
+
+---
+
 ## [2.20.1] - 2026-11-28 (Konsolidasi Dropdown Keuangan TopBar)
 
 ### Changed

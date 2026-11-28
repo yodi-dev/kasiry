@@ -99,6 +99,7 @@ import { exportKasiryExcel } from './utils/excelExport'
 import { computeDailyStats } from './utils/dailyStats'
 import { computeFinanceBalances } from './utils/financeEngine'
 import { buildPricedCartItem, normalizePriceTier, repriceCartItems } from './utils/pricing'
+import { APP_BRAND_TAGLINE, formatDocumentTitle } from './utils/branding'
 import { useGoogleSync } from './composables/useGoogleSync'
 import { useThermalPrinter } from './composables/useThermalPrinter'
 
@@ -183,6 +184,19 @@ const {
   exportBackupJSON,
   importBackupJSON
 } = useKasiryDB()
+
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.2'
+
+// Sinkronkan <title> tab browser secara dinamis mengikuti nama toko aktif
+watch(
+  () => storeProfile.value?.name,
+  (storeName) => {
+    if (typeof document !== 'undefined') {
+      document.title = formatDocumentTitle(storeName)
+    }
+  },
+  { immediate: true }
+)
 
 // Google Drive & Sheets Sync Composable ($0 Cloud Multi-Device Engine)
 const {
@@ -1552,10 +1566,10 @@ onUnmounted(() => {
 
       </div>
 
-      <!-- Bar Info Workstation & Tautan Kepatuhan (Khusus Desktop agar Mobile & Tablet Bebas Gangguan) -->
-      <footer class="hidden lg:flex shrink-0 pt-2.5 items-center justify-between gap-3 text-[11px] text-slate-500">
-        <div class="flex items-center gap-3">
-          <span>
+      <!-- Bar Info Workstation & Tautan Kepatuhan (Tablet & Desktop; Mobile lewat Drawer agar layar HP lega) -->
+      <footer class="hidden md:flex shrink-0 pt-2 items-center justify-between gap-3 text-[11px] text-slate-500">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="truncate">
             <strong class="font-semibold text-[#0a193d]/80">Kasiry</strong>
             by
             <a
@@ -1564,12 +1578,13 @@ onUnmounted(() => {
               rel="noopener noreferrer"
               class="font-semibold text-[#0284c7] hover:underline"
             >Awanbeo</a>
-            — Kasir Warung &amp; Buku Utang
+            — {{ APP_BRAND_TAGLINE }}
+            <span class="ml-1.5 font-mono text-[10px] text-slate-400">v{{ appVersion }}</span>
           </span>
-          <span aria-hidden="true" class="text-slate-300">•</span>
-          <span class="text-slate-400">Pintasan: <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">/</kbd> Cari • <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">F2</kbd> Bayar</span>
+          <span aria-hidden="true" class="hidden lg:inline text-slate-300">•</span>
+          <span class="hidden lg:inline text-slate-400">Pintasan: <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">/</kbd> Cari • <kbd class="px-1 py-0.5 rounded bg-white/80 border border-slate-200 font-mono text-[10px] text-[#0a193d]">F2</kbd> Bayar</span>
         </div>
-        <nav class="flex items-center gap-3" aria-label="Tautan Kepatuhan">
+        <nav class="flex items-center gap-3 shrink-0" aria-label="Tautan Kepatuhan">
           <a href="/privacy" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Kebijakan Privasi</a>
           <span aria-hidden="true" class="text-slate-300">•</span>
           <a href="/terms" class="hover:text-[#0284c7] underline decoration-slate-300 underline-offset-2 transition-colors">Ketentuan Layanan</a>

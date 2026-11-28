@@ -19,6 +19,7 @@ import SettingsModal from '../src/components/SettingsModal.vue'
 import CashServiceModal from '../src/components/CashServiceModal.vue'
 import DigitalProductModal from '../src/components/DigitalProductModal.vue'
 import FinanceModal from '../src/components/FinanceModal.vue'
+import { APP_BRAND_NAME, APP_BRAND_TAGLINE, DEFAULT_DOCUMENT_TITLE, formatDocumentTitle, getStoreInitials } from '../src/utils/branding'
 
 const sampleCustomers = [
   { id: 1, name: 'Umum', phone: '', totalDebt: 0, updatedAt: 1000 },
@@ -1359,5 +1360,27 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await nextTick()
     expect(debtModal.text()).toContain('PLS-BON1')
     expect(debtModal.text()).toContain('Pulsa 20.000')
+  })
+
+  it('formats dynamic document title, uses KS fallback initials instead of HS, and unifies drawer footer branding', async () => {
+    expect(formatDocumentTitle('')).toBe(DEFAULT_DOCUMENT_TITLE)
+    expect(formatDocumentTitle('Warung Kasiry')).toBe(DEFAULT_DOCUMENT_TITLE)
+    expect(formatDocumentTitle('Toko Berkah')).toBe(`Toko Berkah — ${APP_BRAND_NAME}`)
+
+    expect(getStoreInitials('')).toBe('KS')
+    expect(getStoreInitials('Toko Berkah')).toBe('TO')
+
+    const topBarBlank = mount(TopBar, {
+      props: { storeName: '' }
+    })
+    expect(topBarBlank.text()).toContain('KS')
+    expect(topBarBlank.text()).not.toContain('HS')
+
+    await topBarBlank.find('button[aria-label="Buka Menu"]').trigger('click')
+    await nextTick()
+    expect(topBarBlank.text()).toContain(APP_BRAND_NAME)
+    expect(topBarBlank.text()).toContain(APP_BRAND_TAGLINE)
+    expect(topBarBlank.text()).toContain('Kebijakan Privasi')
+    expect(topBarBlank.text()).toContain('Ketentuan Layanan')
   })
 })
