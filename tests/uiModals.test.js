@@ -1507,4 +1507,73 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
 
     receiptModal.unmount()
   })
+
+  it('supports 2-tap customer delete and 2-tap void of goods/digital bon notes in DebtBookModal', async () => {
+    const now = Date.now()
+    const debtModal = mount(DebtBookModal, {
+      props: {
+        isOpen: true,
+        customers: sampleCustomers,
+        transactions: [
+          {
+            id: 701,
+            invoiceNumber: 'UTG-701',
+            createdAt: now,
+            paymentMethod: 'UTANG / BON',
+            customerId: 2,
+            customerName: 'Bu Tejo',
+            totalAmount: 23000,
+            debtAmount: 23000,
+            items: [{ id: 1, name: 'Minyak 1L', qty: 1, sellPrice: 23000 }]
+          }
+        ],
+        digitalProducts: [
+          {
+            id: 702,
+            digitalNumber: 'PLS-702',
+            createdAt: now - 1000,
+            productName: 'Pulsa 20.000',
+            targetNumber: '081234567891',
+            sellPrice: 22000,
+            paymentMethod: 'UTANG / BON',
+            customerId: 2,
+            customerName: 'Bu Tejo',
+            deleted: false
+          }
+        ]
+      }
+    })
+
+    // 1. 2-tap hapus pelanggan dari daftar Buku Utang
+    const delBtn = debtModal.find('button[aria-label="Hapus Bu Tejo"]')
+    await delBtn.trigger('click')
+    expect(debtModal.emitted('deleteCustomer')).toBeFalsy()
+    expect(delBtn.text()).toContain('Hapus Bon?')
+
+    // Buka detail pembayaran bon sebelum hapus untuk uji void nota bon
+    await debtModal.findAll('button').find(b => b.text().trim() === 'Bayar').trigger('click')
+    await nextTick()
+
+    const voidButtons = debtModal.findAll('button').filter(b => b.text().trim() === 'Hapus')
+    expect(voidButtons).toHaveLength(2)
+
+    // Void nota barang (UTG-701) 2-tap
+    await voidButtons[0].trigger('click')
+    expect(debtModal.emitted('deleteTransaction')).toBeFalsy()
+    await voidButtons[0].trigger('click')
+    expect(debtModal.emitted('deleteTransaction')?.[0]?.[0]?.id).toBe(701)
+
+    // Void nota pulsa (PLS-702) 2-tap
+    await voidButtons[1].trigger('click')
+    expect(debtModal.emitted('deleteDigitalProduct')).toBeFalsy()
+    await voidButtons[1].trigger('click')
+    expect(debtModal.emitted('deleteDigitalProduct')?.[0]).toEqual([702])
+
+    // Kembali ke daftar & konfirmasi tap ke-2 hapus pelanggan
+    await debtModal.findAll('button').find(b => b.text().includes('Kembali ke Buku Utang')).trigger('click')
+    await nextTick()
+    const delBtnAgain = debtModal.find('button[aria-label="Hapus Bu Tejo"]')
+    await delBtnAgain.trigger('click')
+    expect(debtModal.emitted('deleteCustomer')?.[0]).toEqual([2])
+  })
 })

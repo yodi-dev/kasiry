@@ -185,7 +185,7 @@ const {
   importBackupJSON
 } = useKasiryDB()
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.9'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.21.0'
 
 // Sinkronkan <title> tab browser secara dinamis mengikuti nama toko aktif
 watch(
@@ -1812,6 +1812,8 @@ onUnmounted(() => {
       @recordPayment="handleRecordDebtPayment"
       @addCustomer="handleSaveCustomer"
       @deleteCustomer="handleDeleteCustomer"
+      @deleteTransaction="handleDeleteTransaction"
+      @deleteDigitalProduct="handleDeleteDigitalProduct"
     />
 
     <!-- Modal Manajemen Data Pelanggan -->

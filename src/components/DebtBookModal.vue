@@ -13,7 +13,8 @@ import {
   Calendar, 
   Receipt,
   Banknote,
-  QrCode
+  QrCode,
+  Trash2
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -43,13 +44,15 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'recordPayment', 'addCustomer', 'deleteCustomer'])
+const emit = defineEmits(['close', 'recordPayment', 'addCustomer', 'deleteCustomer', 'deleteTransaction', 'deleteDigitalProduct'])
 
 // currentView: 'list' | 'add' | 'pay'
 const currentView = ref('list')
 
 const searchQuery = ref('')
 const activeFilter = ref('unpaid') // 'unpaid' | 'all' | 'paid'
+const confirmDeleteCustomerId = ref(null)
+const confirmVoidDebtKey = ref(null)
 
 // State untuk Pembayaran Cicilan / Pelunasan
 const selectedCustomer = ref(null)
@@ -73,8 +76,22 @@ watch(() => props.isOpen, (newVal) => {
     paymentAmount.value = ''
     payMethod.value = 'TUNAI'
     searchQuery.value = ''
+    confirmDeleteCustomerId.value = null
+    confirmVoidDebtKey.value = null
   }
 }, { immediate: true })
+
+watch(
+  () => props.customers,
+  (list) => {
+    if (!selectedCustomer.value?.id) return
+    const updated = (list || []).find(c => c.id === selectedCustomer.value.id)
+    if (updated) {
+      selectedCustomer.value = updated
+    }
+  },
+  { deep: true }
+)
 
 const handleClose = () => {
   currentView.value = 'list'
@@ -165,6 +182,10 @@ const customerDebtTransactions = computed(() => {
       (t.customerId === cid || t.customerName === cname) &&
       (t.paymentMethod === 'UTANG / BON' || Number(t.debtAmount || 0) > 0 || String(t.paymentMethod || '').includes('SEBAGIAN BON'))
     )
+    .map(t => ({
+      ...t,
+      sourceKind: 'transaction'
+    }))
 
   const digitalDebts = (props.digitalProducts || [])
     .filter(d =>
@@ -173,6 +194,8 @@ const customerDebtTransactions = computed(() => {
       ((cid && d.customerId === cid) || (cname && d.customerName === cname))
     )
     .map(d => ({
+      sourceKind: 'digital',
+      digitalId: d.id,
       invoiceNumber: d.digitalNumber || `DIG-${d.id}`,
       createdAt: d.createdAt,
       paymentMethod: 'UTANG / BON',
@@ -192,6 +215,36 @@ const customerDebtTransactions = computed(() => {
   return [...goodsDebts, ...digitalDebts]
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 })
+
+const handleDeleteCustomerTap = (customer) => {
+  if (!customer?.id) return
+  if (confirmDeleteCustomerId.value === customer.id) {
+    confirmDeleteCustomerId.value = null
+    emit('deleteCustomer', customer.id)
+    if (selectedCustomer.value?.id === customer.id) {
+      selectedCustomer.value = null
+      currentView.value = 'list'
+    }
+    return
+  }
+  confirmDeleteCustomerId.value = customer.id
+}
+
+const handleVoidDebtTap = (tx) => {
+  const key = tx?.invoiceNumber || tx?.id || tx?.digitalId
+  if (!key) return
+  if (confirmVoidDebtKey.value === key) {
+    confirmVoidDebtKey.value = null
+    if (tx.sourceKind === 'digital' && tx.digitalId) {
+      emit('deleteDigitalProduct', tx.digitalId)
+    } else if (tx.id) {
+      fullCustomerHistory.value = fullCustomerHistory.value.filter(t => t.id !== tx.id)
+      emit('deleteTransaction', tx)
+    }
+    return
+  }
+  confirmVoidDebtKey.value = key
+}
 
 // Perhitungan sisa utang saat pembayaran
 const remainingDebtPreview = computed(() => {
@@ -569,6 +622,22 @@ const shareWhatsAppReminder = (c) => {
               >
                 Lunas ✓
               </span>
+
+              <button
+                type="button"
+                @click="handleDeleteCustomerTap(c)"
+                :title="(c.totalDebt || 0) > 0 ? 'Hapus pelanggan beserta catatan utang' : 'Hapus pelanggan dari Buku Utang'"
+                :class="[
+                  'h-9 rounded-xl font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shrink-0 border',
+                  confirmDeleteCustomerId === c.id
+                    ? 'px-2.5 bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
+                    : 'w-9 bg-white hover:bg-red-50 text-slate-400 hover:text-red-600 border-slate-200/80 hover:border-red-200'
+                ]"
+                :aria-label="`Hapus ${c.name}`"
+              >
+                <Trash2 class="w-3.5 h-3.5 shrink-0" />
+                <span v-if="confirmDeleteCustomerId === c.id">{{ (c.totalDebt || 0) > 0 ? 'Hapus Bon?' : 'Ya, Hapus' }}</span>
+              </button>
             </div>
 
           </div>
@@ -746,14 +815,30 @@ const shareWhatsAppReminder = (c) => {
               :key="tx.invoiceNumber"
               class="p-2 bg-white rounded-xl border border-slate-200/60 text-xs"
             >
-              <div class="flex items-center justify-between font-semibold text-[#0a193d] mb-1">
-                <span>
+              <div class="flex items-center justify-between gap-2 font-semibold text-[#0a193d] mb-1">
+                <span class="min-w-0 truncate">
                   {{ tx.invoiceNumber }}
                   <span v-if="Number(tx.debtAmount || 0) > 0 && Number(tx.paidAmount || 0) > 0" class="text-[10px] text-amber-700 font-bold ml-1">
                     (Bon Rp {{ tx.debtAmount.toLocaleString('id-ID') }})
                   </span>
                 </span>
-                <span class="font-mono">Rp {{ tx.totalAmount.toLocaleString('id-ID') }}</span>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="font-mono">Rp {{ tx.totalAmount.toLocaleString('id-ID') }}</span>
+                  <button
+                    v-if="tx.id || tx.digitalId"
+                    type="button"
+                    @click="handleVoidDebtTap(tx)"
+                    :class="[
+                      'px-2 py-0.5 rounded-lg text-[10px] font-bold border cursor-pointer transition-colors',
+                      confirmVoidDebtKey === tx.invoiceNumber
+                        ? 'bg-red-600 text-white border-red-600'
+                        : 'bg-white hover:bg-red-50 text-slate-500 hover:text-red-600 border-slate-200'
+                    ]"
+                    title="Batalkan / hapus nota bon ini dan kembalikan saldo utang"
+                  >
+                    {{ confirmVoidDebtKey === tx.invoiceNumber ? 'Ya, Batalkan' : 'Hapus' }}
+                  </button>
+                </div>
               </div>
               <ul class="text-[11px] text-slate-500 space-y-0.5 pl-1">
                 <li v-for="item in tx.items" :key="item.id" class="flex justify-between">

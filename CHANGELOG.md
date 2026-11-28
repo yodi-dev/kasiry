@@ -6,6 +6,15 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.21.0] - 2026-11-28 (Hapus Pelanggan & Void Nota Bon di Buku Utang)
+
+### Added
+- **Aksi Hapus Data di `DebtBookModal.vue` (Tahap 1):**
+  - Menambahkan tombol **Hapus Pelanggan 2-tap** (`Hapus Bon?` / `Ya, Hapus`) langsung pada daftar pelanggan Buku Utang (`deleteCustomer`).
+  - Menambahkan tombol **Hapus / Batalkan Nota Bon 2-tap** (`Hapus` -> `Ya, Batalkan`) pada rincian bon belanja maupun pulsa/token PLN di tampilan detail utang pelanggan sehingga stok dan sisa utang otomatis kembali.
+
+---
+
 ## [2.20.9] - 2026-11-28 (Auto-Pull Multi-Device Ringan & Penghapusan Pengaturan Client ID Teknis)
 
 ### Added
