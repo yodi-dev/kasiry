@@ -821,13 +821,16 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     await unpricedFilterBtn.trigger('click')
     await nextTick()
 
+    const quickBuyInput = prodManage.find('input[aria-label="Harga modal cepat Beras 5kg"]')
+    expect(quickBuyInput.exists()).toBe(true)
+    await quickBuyInput.setValue('60000')
     const quickInput = prodManage.find('input[aria-label="Harga cepat Beras 5kg"]')
     await quickInput.setValue('68000')
     await prodManage.findAll('button').find(b => b.text().trim() === 'Simpan').trigger('click')
     expect(prodManage.emitted('saveProduct')?.[0]?.[0]).toMatchObject({
       id: 1,
       sellPrice: 68000,
-      buyPrice: 54400
+      buyPrice: 60000
     })
 
     // Pindah ke filter Belum Terjual & uji Pilih Semua + Hapus Terpilih

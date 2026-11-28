@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Pen, Check, X } from '@lucide/vue'
+import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Pen, Check, X, PauseCircle } from '@lucide/vue'
 import { PRICE_TIERS } from '../utils/pricing'
 
 const props = defineProps({
@@ -27,6 +27,10 @@ const props = defineProps({
   autoEditProductId: {
     type: Number,
     default: null
+  },
+  heldCount: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -38,7 +42,9 @@ const emit = defineEmits([
   'openPayment',
   'changePriceTier',
   'updateItemPrice',
-  'clearAutoEdit'
+  'clearAutoEdit',
+  'holdCart',
+  'openHeldCarts'
 ])
 
 const totalItemCount = computed(() => {
@@ -151,14 +157,37 @@ const tierPillBadgeClass = (tier) => {
           </div>
         </div>
 
-        <button
-          v-if="cartItems.length > 0"
-          type="button"
-          @click="emit('clearCart')"
-          class="text-xs font-semibold text-slate-400 hover:text-red-600 transition-colors cursor-pointer py-1.5 px-2.5 rounded-lg hover:bg-red-50 shrink-0"
-        >
-          Kosongkan
-        </button>
+        <div class="flex items-center gap-1 shrink-0">
+          <button
+            v-if="heldCount > 0"
+            type="button"
+            @click="emit('openHeldCarts')"
+            class="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 transition-colors cursor-pointer py-1.5 px-2.5 rounded-lg inline-flex items-center gap-1 shrink-0"
+            title="Lihat antrean keranjang yang ditunda"
+          >
+            <PauseCircle aria-hidden="true" class="w-3.5 h-3.5" />
+            <span>Antrean ({{ heldCount }})</span>
+          </button>
+
+          <button
+            v-if="cartItems.length > 0"
+            type="button"
+            @click="emit('holdCart')"
+            class="text-xs font-semibold text-sky-700 hover:bg-sky-50 transition-colors cursor-pointer py-1.5 px-2.5 rounded-lg shrink-0"
+            title="Tunda / simpan keranjang sementara"
+          >
+            Tunda
+          </button>
+
+          <button
+            v-if="cartItems.length > 0"
+            type="button"
+            @click="emit('clearCart')"
+            class="text-xs font-semibold text-slate-400 hover:text-red-600 transition-colors cursor-pointer py-1.5 px-2.5 rounded-lg hover:bg-red-50 shrink-0"
+          >
+            Kosongkan
+          </button>
+        </div>
       </div>
 
       <!-- Saklar Cepat Multi Harga Struk (Ecer / Grosir / Agen) -->

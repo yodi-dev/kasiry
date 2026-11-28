@@ -3,6 +3,8 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, defin
 import TopBar from './components/TopBar.vue'
 import BarcodeInputBar from './components/BarcodeInputBar.vue'
 import CartSection from './components/CartSection.vue'
+import HeldCartsModal from './components/HeldCartsModal.vue'
+import { useHeldCarts } from './composables/useHeldCarts'
 import FrequentProductsSection from './components/FrequentProductsSection.vue'
 import StickyBottomBar from './components/StickyBottomBar.vue'
 import OwnerPinModal from './components/OwnerPinModal.vue'
@@ -188,7 +190,7 @@ const {
   importBackupJSON
 } = useKasiryDB()
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.22.3'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.23.0'
 
 const {
   isPinEnabled: isOwnerPinEnabled,
@@ -452,6 +454,43 @@ const clearCart = () => {
   activeCartCustomer.value = null
   tierAppliedByCustomer.value = false
   ensureKasaFocus()
+}
+
+const { heldCarts, heldCount, holdCart, resumeHeldCart, removeHeldCart } = useHeldCarts()
+const isHeldCartsModalOpen = ref(false)
+
+const handleHoldCart = () => {
+  if (cart.value.length === 0) return
+  const saved = holdCart({
+    items: cart.value,
+    priceTier: cartPriceTier.value,
+    customer: activeCartCustomer.value
+  })
+  if (saved) {
+    clearCart()
+  }
+}
+
+const handleResumeHeldCart = (id) => {
+  if (cart.value.length > 0) {
+    holdCart({
+      items: cart.value,
+      priceTier: cartPriceTier.value,
+      customer: activeCartCustomer.value
+    })
+  }
+  const resumed = resumeHeldCart(id)
+  if (!resumed) return
+  cart.value = resumed.items || []
+  cartPriceTier.value = normalizePriceTier(resumed.priceTier || 'ecer')
+  activeCartCustomer.value = resumed.customer || null
+  tierAppliedByCustomer.value = Boolean(resumed.customer && resumed.customer.priceTier)
+  isHeldCartsModalOpen.value = false
+  ensureKasaFocus()
+}
+
+const handleRemoveHeldCart = (id) => {
+  removeHeldCart(id)
 }
 
 const handleChangeCartPriceTier = (tier) => {
@@ -1648,14 +1687,25 @@ onUnmounted(() => {
             :cartPriceTier="cartPriceTier"
             :selectedCustomerName="activeCartCustomer?.name || ''"
             :autoEditProductId="autoEditProductId"
+            :heldCount="heldCount"
             @clearAutoEdit="autoEditProductId = null"
             @increaseQty="increaseQty"
             @decreaseQty="decreaseQty"
             @removeItem="removeItem"
             @clearCart="clearCart"
+            @holdCart="handleHoldCart"
+            @openHeldCarts="isHeldCartsModalOpen = true"
             @changePriceTier="handleChangeCartPriceTier"
             @updateItemPrice="handleUpdateItemPrice"
             @openPayment="handleAttemptOpenPayment"
+          />
+          <HeldCartsModal
+            :isOpen="isHeldCartsModalOpen"
+            :heldCarts="heldCarts"
+            :hasActiveCart="cart.length > 0"
+            @close="isHeldCartsModalOpen = false"
+            @resume="handleResumeHeldCart"
+            @remove="handleRemoveHeldCart"
           />
         </div>
 

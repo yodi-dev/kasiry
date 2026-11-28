@@ -73,6 +73,7 @@ const selectedIds = ref([])
 const confirmBulkDelete = ref(false)
 const inlineEditId = ref(null)
 const quickPriceDrafts = ref({})
+const quickBuyDrafts = ref({})
 const usageStats = ref({
   byId: {},
   unpricedCount: 0,
@@ -108,6 +109,7 @@ watch(() => props.isOpen, (newVal) => {
     confirmBulkDelete.value = false
     inlineEditId.value = null
     quickPriceDrafts.value = {}
+    quickBuyDrafts.value = {}
     refreshUsageStats()
   }
 }, { immediate: true })
@@ -214,6 +216,9 @@ const startInlineQuickPrice = (p) => {
   if (quickPriceDrafts.value[p.id] === undefined) {
     quickPriceDrafts.value[p.id] = p.sellPrice > 0 ? String(p.sellPrice) : ''
   }
+  if (quickBuyDrafts.value[p.id] === undefined) {
+    quickBuyDrafts.value[p.id] = p.buyPrice > 0 ? String(p.buyPrice) : ''
+  }
 }
 
 const saveInlineQuickPrice = (p) => {
@@ -221,13 +226,20 @@ const saveInlineQuickPrice = (p) => {
   const nextSell = parseInt(digits || '0', 10)
   if (!Number.isFinite(nextSell) || nextSell <= 0) return
 
+  const buyDigits = String(quickBuyDrafts.value[p.id] ?? '').replace(/\D/g, '')
+  const parsedBuy = parseInt(buyDigits || '0', 10)
+  const nextBuy = Number.isFinite(parsedBuy) && parsedBuy > 0
+    ? parsedBuy
+    : (p.buyPrice > 0 ? p.buyPrice : Math.round(nextSell * 0.8))
+
   emit('saveProduct', {
     ...p,
     sellPrice: nextSell,
-    buyPrice: p.buyPrice > 0 ? p.buyPrice : Math.round(nextSell * 0.8)
+    buyPrice: nextBuy
   })
   inlineEditId.value = null
   delete quickPriceDrafts.value[p.id]
+  delete quickBuyDrafts.value[p.id]
 }
 
 const getProductCountByCategory = (cat) => {
@@ -735,25 +747,45 @@ const handleDeleteCategory = (cat) => {
             <!-- Bar Input Harga Cepat Inline (Otomatis muncul di tab Belum Harga atau saat tombol Harga/Promo ditekan) -->
             <div
               v-if="statusFilter === 'unpriced' || !(p.sellPrice > 0) || inlineEditId === p.id"
-              class="pt-2 border-t border-slate-100 flex items-center gap-2 pl-6"
+              class="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2 pl-6"
             >
-              <span class="text-[11px] font-bold text-slate-500 shrink-0">
-                {{ p.sellPrice > 0 ? 'Harga Baru / Promo:' : 'Isi Harga Jual:' }}
-              </span>
-              <div class="relative flex-1 max-w-[180px]">
-                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-[11px] font-bold text-slate-400">
-                  Rp
+              <div class="flex items-center gap-1.5 flex-1 min-w-[130px] max-w-[175px]">
+                <span class="text-[11px] font-bold text-slate-500 shrink-0">Modal:</span>
+                <div class="relative flex-1">
+                  <span class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-[10px] font-bold text-slate-400">
+                    Rp
+                  </span>
+                  <input
+                    :value="formatNominalInput(quickBuyDrafts[p.id])"
+                    @input="quickBuyDrafts[p.id] = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(quickBuyDrafts[p.id])"
+                    type="text"
+                    inputmode="numeric"
+                    :placeholder="p.buyPrice > 0 ? formatNominalInput(p.buyPrice) : 'Opsional'"
+                    @keydown.enter.prevent="saveInlineQuickPrice(p)"
+                    :aria-label="`Harga modal cepat ${p.name}`"
+                    class="w-full h-8 pl-7 pr-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#0284c7] rounded-lg text-xs font-bold font-mono text-right text-[#0a193d] outline-hidden"
+                  />
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 flex-1 min-w-[140px] max-w-[185px]">
+                <span class="text-[11px] font-bold text-slate-500 shrink-0">
+                  {{ p.sellPrice > 0 ? 'Jual:' : 'Jual:' }}
                 </span>
-                <input
-                  :value="formatNominalInput(quickPriceDrafts[p.id])"
-                  @input="quickPriceDrafts[p.id] = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(quickPriceDrafts[p.id])"
-                  type="text"
-                  inputmode="numeric"
-                  :placeholder="p.sellPrice > 0 ? formatNominalInput(p.sellPrice) : 'Misal: 3.500'"
-                  @keydown.enter.prevent="saveInlineQuickPrice(p)"
-                  :aria-label="`Harga cepat ${p.name}`"
-                  class="w-full h-8 pl-8 pr-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#0284c7] rounded-lg text-xs font-bold font-mono text-right text-[#0a193d] outline-hidden"
-                />
+                <div class="relative flex-1">
+                  <span class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-[10px] font-bold text-slate-400">
+                    Rp
+                  </span>
+                  <input
+                    :value="formatNominalInput(quickPriceDrafts[p.id])"
+                    @input="quickPriceDrafts[p.id] = parseNominalInput($event.target.value); $event.target.value = formatNominalInput(quickPriceDrafts[p.id])"
+                    type="text"
+                    inputmode="numeric"
+                    :placeholder="p.sellPrice > 0 ? formatNominalInput(p.sellPrice) : 'Misal: 3.500'"
+                    @keydown.enter.prevent="saveInlineQuickPrice(p)"
+                    :aria-label="`Harga cepat ${p.name}`"
+                    class="w-full h-8 pl-7 pr-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#0284c7] rounded-lg text-xs font-bold font-mono text-right text-[#0a193d] outline-hidden"
+                  />
+                </div>
               </div>
               <button
                 type="button"

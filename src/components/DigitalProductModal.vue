@@ -16,6 +16,7 @@ import {
 } from '@lucide/vue'
 import { recordBelongsToShift } from '../utils/dailyStats'
 import { computeFinanceBalances } from '../utils/financeEngine'
+import { parseFastpayPlnToken } from '../utils/plnTokenParser'
 
 const DIGITAL_PRESETS_STORAGE_KEY = 'kasiry_digital_presets_v1'
 
@@ -154,6 +155,19 @@ const productNameInput = ref('Pulsa 10.000')
 const providerInput = ref('Telkomsel')
 const targetNumberInput = ref('')
 const tokenCodeInput = ref('')
+const parsedPlnSummary = ref('')
+
+watch(tokenCodeInput, (val) => {
+  if (!String(val || '').trim()) {
+    parsedPlnSummary.value = ''
+    return
+  }
+  const parsed = parseFastpayPlnToken(val)
+  if (parsed) {
+    tokenCodeInput.value = parsed.tokenCode
+    parsedPlnSummary.value = parsed.summaryNote
+  }
+})
 const nominalValue = ref(10000)
 const costPriceInput = ref('10500')
 const sellPriceInput = ref('12000')
@@ -637,9 +651,15 @@ const triggerDelete = (id) => {
                 <input
                   type="text"
                   v-model="tokenCodeInput"
-                  :placeholder="selectedCategory === 'TOKEN_LISTRIK' ? 'Tempel 20 digit token di sini agar tercetak di struk & WA' : 'Opsional: Nomor SN transaksi'"
+                  :placeholder="selectedCategory === 'TOKEN_LISTRIK' ? 'Tempel 20 digit token atau format Fastpay (Token/Nama/Daya/kWh)' : 'Opsional: Nomor SN transaksi'"
                   class="w-full h-10 px-3 bg-white border border-sky-200 focus:border-[#0284c7] rounded-xl text-xs sm:text-sm font-bold font-mono text-[#0a193d] outline-hidden"
                 />
+                <p
+                  v-if="parsedPlnSummary"
+                  class="mt-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-lg px-2.5 py-1"
+                >
+                  Info Meter: {{ parsedPlnSummary }}
+                </p>
               </div>
             </div>
 

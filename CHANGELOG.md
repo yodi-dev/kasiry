@@ -6,6 +6,19 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.23.0] - 2026-11-28 (Tunda Checkout, Smart Paste Token PLN & Modal Inline)
+
+### Added
+- **Simpan Keranjang / Tunda Checkout (`useHeldCarts.js`, `HeldCartsModal.vue`, `CartSection.vue`):**
+  - Kasir dapat menunda keranjang aktif sementara (beserta item, tier harga, dan pelanggan aktif) ke `localStorage` dan melanjutkannya kembali lewat modal **Antrean Keranjang**.
+  - Jika keranjang aktif sedang terisi saat melanjutkan antrean lain, keranjang aktif otomatis tersimpan ke antrean agar tidak hilang.
+- **Smart Paste Token PLN Format Fastpay (`plnTokenParser.js`, `DigitalProductModal.vue`):**
+  - Menempelkan format loket Fastpay (contoh `5702-3195-8454-5494-4868/SRI RIDHOAH/R1/000002200VA/125,9kWh`) ke kolom Token PLN otomatis memisahkan 20 digit token dan menampilkan info meter pelanggan (otomatis bersih setelah transaksi).
+- **Input Harga Modal Inline di Tab Belum Harga (`ProductManagementModal.vue`):**
+  - Menambahkan input **Modal** (`quickBuyDrafts`) berdampingan dengan input **Jual** pada baris pengisian harga cepat inline.
+
+---
+
 ## [2.22.3] - 2026-11-28 (Kamera Scanner Siaga 1 Sesi agar Izin Tidak Ditanya Berulang)
 
 ### Improved
