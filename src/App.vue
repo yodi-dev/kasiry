@@ -185,7 +185,7 @@ const {
   importBackupJSON
 } = useKasiryDB()
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.8'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.9'
 
 // Sinkronkan <title> tab browser secara dinamis mengikuti nama toko aktif
 watch(
@@ -204,7 +204,6 @@ const {
   userProfile: googleUser,
   lastSyncTime,
   linkedSheetId,
-  customClientId,
   pendingQueueCount,
   hasPendingDriveBackup,
   isConnecting: isGoogleConnecting,
@@ -212,8 +211,8 @@ const {
   statusMessage: googleSyncStatus,
   connect: connectGoogle,
   disconnect: disconnectGoogle,
-  setCustomClientId,
   syncWithCloud,
+  checkAndPullCloudUpdates,
   uploadArchiveToDrive,
   pushCleanCloudSnapshot,
   scheduleDriveAutoBackup,
@@ -1182,10 +1181,6 @@ const handleOpenGoogleSheet = async () => {
   }
 }
 
-const handleUpdateCustomClientId = (clientId) => {
-  setCustomClientId(clientId)
-}
-
 const handleSaveCustomer = async (custData) => {
   await saveCustomer(custData)
   playBeepSound('success')
@@ -1529,10 +1524,41 @@ onMounted(async () => {
       await importBackupJSON(mergedPayload, 'merge', { honorArchiveCutoff: true })
     }, false)
   }
+
+  // Auto-pull ringan antar-perangkat saat tab kembali aktif atau tiap ~3 menit (cek modifiedTime saja)
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handleVisibilityAutoSync)
+  }
+  const jitterMs = Math.floor(Math.random() * 25000)
+  cloudAutoPullTimer = setInterval(runBackgroundCloudPull, 180000 + jitterMs)
 })
+
+const runBackgroundCloudPull = () => {
+  if (!isGoogleConnected.value || !isOnline.value) return
+  checkAndPullCloudUpdates(
+    getFullDatabasePayload,
+    (mergedPayload) => importBackupJSON(mergedPayload, 'merge', { honorArchiveCutoff: true }),
+    { minIntervalMs: 20000 }
+  ).catch(() => {})
+}
+
+const handleVisibilityAutoSync = () => {
+  if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+    runBackgroundCloudPull()
+  }
+}
+
+let cloudAutoPullTimer = null
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalCheckoutShortcut)
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', handleVisibilityAutoSync)
+  }
+  if (cloudAutoPullTimer) {
+    clearInterval(cloudAutoPullTimer)
+    cloudAutoPullTimer = null
+  }
 })
 </script>
 
@@ -1950,7 +1976,6 @@ onUnmounted(() => {
       :pendingQueueCount="pendingQueueCount"
       :hasPendingDriveBackup="hasPendingDriveBackup"
       :syncStatusMessage="googleSyncStatus"
-      :customClientId="customClientId"
       :totalTransactionCount="totalTransactionCount"
       :olderTransactionCount="olderTransactionCount"
       :productCount="products.length"
@@ -1964,7 +1989,6 @@ onUnmounted(() => {
       @openGoogleSheet="handleOpenGoogleSheet"
       @exportBackup="handleExportBackup"
       @importBackup="handleImportBackup"
-      @updateClientId="handleUpdateCustomClientId"
       @archiveOldData="handleArchiveOldData"
       @resetStoreData="handleResetStoreData"
     />

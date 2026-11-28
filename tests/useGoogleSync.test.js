@@ -424,4 +424,76 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(fetchMock.mock.calls[1][0]).toContain('/drive/v3/files/single-sheet-id')
     expect(fetchMock.mock.calls[1][1].method).toBe('PATCH')
   })
+
+  it('skips download when Drive modifiedTime is unchanged and auto-pulls when remote modifiedTime is newer', async () => {
+    localStorage.setItem('kasiry_gdrive_user', JSON.stringify({ name: 'Kasir' }))
+    localStorage.setItem('kasiry_gdrive_token', 'valid-token')
+    localStorage.setItem('kasiry_gdrive_token_expires', String(Date.now() + 3600000))
+    localStorage.setItem('kasiry_gdrive_remote_mtime', '2026-11-28T10:00:00.000Z')
+
+    const fetchMock = vi.fn()
+      // 1. Cek pertama: modifiedTime sama -> tidak perlu download atau sync
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          files: [{ id: 'backup-1', name: 'kasiry-backup.json', modifiedTime: '2026-11-28T10:00:00.000Z' }]
+        })
+      })
+      // 2. Cek kedua setelah >20 detik: modifiedTime lebih baru -> auto-pull syncWithCloud
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          files: [{ id: 'backup-1', name: 'kasiry-backup.json', modifiedTime: '2026-11-28T10:05:00.000Z' }]
+        })
+      })
+      // syncWithCloud -> findBackupFileId
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          files: [{ id: 'backup-1', name: 'kasiry-backup.json', modifiedTime: '2026-11-28T10:05:00.000Z' }]
+        })
+      })
+      // syncWithCloud -> downloadFromDrive
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          version: '2.4',
+          data: {
+            products: [{ id: 1, name: 'Barang Update HP', sellPrice: 12000, updatedAt: 99999 }],
+            customers: [],
+            transactions: []
+          }
+        })
+      })
+      // syncWithCloud -> uploadToDrive PATCH
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'backup-1' })
+      })
+
+    globalThis.fetch = fetchMock
+
+    const { useGoogleSync } = await import('../src/composables/useGoogleSync')
+    const sync = useGoogleSync()
+
+    const applyMock = vi.fn().mockResolvedValue(undefined)
+    const getLocalMock = vi.fn().mockResolvedValue({
+      version: '2.4',
+      storeProfile: { name: 'Warung Kasiry' },
+      data: { products: [], customers: [], transactions: [] }
+    })
+
+    const firstCheck = await sync.checkAndPullCloudUpdates(getLocalMock, applyMock, { minIntervalMs: 0 })
+    expect(firstCheck).toEqual({ checked: true, updated: false, upToDate: true })
+    expect(applyMock).not.toHaveBeenCalled()
+
+    const secondCheck = await sync.checkAndPullCloudUpdates(getLocalMock, applyMock, { minIntervalMs: 0 })
+    expect(secondCheck).toEqual({ checked: true, updated: true })
+    expect(applyMock).toHaveBeenCalledTimes(1)
+  })
 })

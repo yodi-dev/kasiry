@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   AlertCircle,
   Clock,
-  KeyRound,
   Printer,
   Bluetooth,
   Usb,
@@ -80,10 +79,6 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  customClientId: {
-    type: String,
-    default: ''
-  },
   totalTransactionCount: {
     type: Number,
     default: 0
@@ -115,21 +110,17 @@ const emit = defineEmits([
   'openGoogleSheet', 
   'exportBackup', 
   'importBackup',
-  'updateClientId',
   'archiveOldData',
   'resetStoreData'
 ])
 
 // 3 Tabs: 'profile' (Profil Toko) | 'printer' (Printer Thermal) | 'backup' (Cadangan & Google)
 const activeTab = ref('profile')
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.8'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.9'
 
 const formName = ref(props.storeProfile?.name || 'Warung Kasiry')
 const formOwner = ref(props.storeProfile?.owner || 'Pemilik Toko')
 const formPhone = ref(props.storeProfile?.phone || '')
-const formClientId = ref(props.customClientId || '')
-const showClientIdConfig = ref(false)
-const clientIdSaved = ref(false)
 const fileInputRef = ref(null)
 const isSaved = ref(false)
 const confirmingResetMode = ref(null) // 'empty' | 'starter' | null
@@ -269,8 +260,6 @@ watch(() => props.isOpen, (newVal) => {
     pendingImportPreview.value = null
     importError.value = ''
     confirmingArchive.value = false
-    showClientIdConfig.value = false
-    formClientId.value = props.customClientId || ''
     if (activeTab.value === 'backup') {
       refreshArchivePreview()
     }
@@ -337,14 +326,6 @@ const saveProfile = () => {
   isSaved.value = true
   setTimeout(() => {
     isSaved.value = false
-  }, 2000)
-}
-
-const saveCustomClientId = () => {
-  emit('updateClientId', formClientId.value.trim())
-  clientIdSaved.value = true
-  setTimeout(() => {
-    clientIdSaved.value = false
   }, 2000)
 }
 
@@ -975,42 +956,6 @@ const cancelImport = () => {
                 >
                   Putuskan Sambungan Akun Google
                 </button>
-              </div>
-            </div>
-
-            <!-- Konfigurasi Lanjutan OAuth Client ID (Collapsible agar tidak mengganggu tampilan utama) -->
-            <div class="pt-2 border-t border-slate-200/70">
-              <button 
-                type="button"
-                @click="showClientIdConfig = !showClientIdConfig"
-                class="text-[11px] font-semibold text-slate-500 hover:text-[#0284c7] flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <KeyRound class="w-3.5 h-3.5" />
-                <span>{{ showClientIdConfig ? 'Tutup Pengaturan Client ID Google' : 'Pengaturan Lanjutan (Google Client ID)' }}</span>
-              </button>
-
-              <div v-if="showClientIdConfig" class="mt-2.5 p-3 bg-white rounded-xl border border-slate-200 space-y-2">
-                <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  OAuth Client ID Khusus Kasiry (Opsional)
-                </label>
-                <div class="flex items-center gap-2">
-                  <input 
-                    type="text" 
-                    v-model="formClientId"
-                    placeholder="xxxx.apps.googleusercontent.com"
-                    class="flex-1 h-9 px-3 bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#0284c7] rounded-lg text-xs font-mono text-[#0a193d] outline-hidden"
-                  />
-                  <button 
-                    type="button"
-                    @click="saveCustomClientId"
-                    class="h-9 px-3 bg-[#0a193d] hover:bg-slate-800 text-white font-bold text-xs rounded-lg cursor-pointer transition-colors shrink-0"
-                  >
-                    {{ clientIdSaved ? 'Tersimpan ✓' : 'Simpan' }}
-                  </button>
-                </div>
-                <p class="text-[10px] text-slate-400 leading-snug">
-                  Kosongkan untuk memakai Client ID bawaan atau isi milik Google Cloud Console Kasiry agar login aktif di domain sendiri.
-                </p>
               </div>
             </div>
           </div>

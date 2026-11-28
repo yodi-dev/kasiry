@@ -40,7 +40,7 @@ const userProfile = ref(loadJsonStorage('kasiry_gdrive_user', null))
 const lastSyncTime = ref(localStorage.getItem('kasiry_gdrive_last_sync') || null)
 const linkedSheetId = ref(localStorage.getItem('kasiry_linked_sheet_id') || null)
 const linkedSheetTitle = ref(localStorage.getItem('kasiry_linked_sheet_title') || '')
-const customClientId = ref(localStorage.getItem('kasiry_custom_client_id') || '')
+const lastKnownRemoteMtime = ref(localStorage.getItem('kasiry_gdrive_remote_mtime') || '')
 const pendingSheetQueue = ref(loadJsonStorage('kasiry_pending_sheet_queue', []))
 const hasPendingDriveBackup = ref(localStorage.getItem('kasiry_pending_drive_sync') === 'true')
 
@@ -49,23 +49,14 @@ const isSyncing = ref(false)
 const statusMessage = ref('')
 let driveAutoBackupTimer = null
 let pendingDriveTxBatch = 0
+let lastCloudCheckAt = 0
 const DRIVE_TX_BATCH_THRESHOLD = 10
 const DRIVE_TX_THROTTLE_MS = 180000
 
 export function useGoogleSync() {
   const isConnected = computed(() => !!userProfile.value)
-  const activeClientId = computed(() => customClientId.value.trim() || DEFAULT_CLIENT_ID)
+  const activeClientId = computed(() => DEFAULT_CLIENT_ID)
   const pendingQueueCount = computed(() => pendingSheetQueue.value.length)
-
-  const setCustomClientId = (clientId) => {
-    const clean = (clientId || '').trim()
-    customClientId.value = clean
-    if (clean) {
-      localStorage.setItem('kasiry_custom_client_id', clean)
-    } else {
-      localStorage.removeItem('kasiry_custom_client_id')
-    }
-  }
 
   const persistPendingQueue = (nextQueue) => {
     pendingSheetQueue.value = nextQueue
@@ -235,11 +226,13 @@ export function useGoogleSync() {
     localStorage.removeItem('kasiry_linked_sheet_id')
     localStorage.removeItem('kasiry_linked_sheet_title')
     localStorage.removeItem('kasiry_gdrive_last_sync')
+    localStorage.removeItem('kasiry_gdrive_remote_mtime')
+    lastKnownRemoteMtime.value = ''
     statusMessage.value = 'Akun Google telah diputuskan.'
   }
 
-  // Cari File Backup di Google Drive (cek kasiry-backup.json lalu fallback nama lama)
-  const findBackupFileId = async (interactive = false) => {
+  // Cari metadata File Backup di Google Drive (id + modifiedTime untuk hemat kuota)
+  const findBackupFileMeta = async (interactive = false) => {
     const queryFile = async (fileName) => {
       const q = encodeURIComponent(`name='${fileName}' and trashed=false`)
       const res = await fetchWithAuth(
@@ -253,12 +246,22 @@ export function useGoogleSync() {
         throw new Error(errJson.error?.message || 'Gagal memeriksa file backup di Google Drive.')
       }
       const data = await res.json()
-      return data.files && data.files.length > 0 ? data.files[0].id : null
+      return data.files && data.files.length > 0 ? data.files[0] : null
     }
 
-    const primaryId = await queryFile(BACKUP_FILENAME)
-    if (primaryId) return primaryId
+    const primary = await queryFile(BACKUP_FILENAME)
+    if (primary) return primary
     return await queryFile(LEGACY_BACKUP_FILENAME)
+  }
+
+  // Cari File Backup di Google Drive (cek kasiry-backup.json lalu fallback nama lama)
+  const findBackupFileId = async (interactive = false) => {
+    const meta = await findBackupFileMeta(interactive)
+    if (meta?.modifiedTime) {
+      lastKnownRemoteMtime.value = meta.modifiedTime
+      localStorage.setItem('kasiry_gdrive_remote_mtime', meta.modifiedTime)
+    }
+    return meta?.id || null
   }
 
   // Simpan Snapshot ke Google Drive (JSON ringkas tanpa spasi agar hemat kuota & cepat di HP)
@@ -1125,12 +1128,53 @@ export function useGoogleSync() {
     }, delayMs)
   }
 
+  /**
+   * Cek ringan metadata modifiedTime file backup di Google Drive (tanpa download payload jika tidak ada perubahan).
+   * Jika ada pembaruan dari perangkat lain, langsung jalankan two-way merge secara diam-diam.
+   */
+  const checkAndPullCloudUpdates = async (
+    getLocalDataCallback,
+    applyMergedDataCallback,
+    { minIntervalMs = 20000 } = {}
+  ) => {
+    if (!isConnected.value || isSyncing.value || isConnecting.value) {
+      return { checked: false, updated: false }
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return { checked: false, updated: false }
+    }
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return { checked: false, updated: false }
+    }
+
+    const now = Date.now()
+    if (minIntervalMs > 0 && now - lastCloudCheckAt < minIntervalMs) {
+      return { checked: false, updated: false, throttled: true }
+    }
+    lastCloudCheckAt = now
+
+    try {
+      const meta = await findBackupFileMeta(false)
+      if (!meta?.id) {
+        return { checked: true, updated: false }
+      }
+      if (meta.modifiedTime && meta.modifiedTime === lastKnownRemoteMtime.value) {
+        return { checked: true, updated: false, upToDate: true }
+      }
+
+      const localPayload = await getLocalDataCallback()
+      const res = await syncWithCloud(localPayload, applyMergedDataCallback, false)
+      return { checked: true, updated: Boolean(res?.success) }
+    } catch {
+      return { checked: true, updated: false }
+    }
+  }
+
   return {
     accessToken,
     userProfile,
     lastSyncTime,
     linkedSheetId,
-    customClientId,
     pendingQueueCount,
     hasPendingDriveBackup,
     isConnecting,
@@ -1140,8 +1184,8 @@ export function useGoogleSync() {
     activeClientId,
     connect,
     disconnect,
-    setCustomClientId,
     syncWithCloud,
+    checkAndPullCloudUpdates,
     uploadArchiveToDrive,
     pushCleanCloudSnapshot,
     scheduleDriveAutoBackup,

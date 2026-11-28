@@ -6,6 +6,18 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.9] - 2026-11-28 (Auto-Pull Multi-Device Ringan & Penghapusan Pengaturan Client ID Teknis)
+
+### Added
+- **Sinkronisasi Auto-Pull Multi-Device Tanpa Refresh (`src/composables/useGoogleSync.js`, `src/App.vue`):**
+  - Menambahkan `checkAndPullCloudUpdates()` yang hanya mengecek `modifiedTime` file `kasiry-backup.json` saat tab kembali aktif (`visibilitychange`) serta interval ~3 menit (dengan jitter acak, hanya berjalan saat online & tab aktif). Jika ada update barang/harga dari perangkat lain, kasa otomatis melakukan *two-way merge* diam-diam tanpa perlu `F5`.
+
+### Removed
+- **Penyederhanaan Pengaturan Google untuk Pengguna UMKM (`src/components/SettingsModal.vue`, `src/App.vue`, `src/composables/useGoogleSync.js`):**
+  - Menghapus opsi lanjutan **Custom Google Client ID** dari UI Pengaturan karena terlalu teknis bagi pengguna umum/UMKM.
+
+---
+
 ## [2.20.8] - 2026-11-28 (Paket Pintasan Keyboard Standar POS Lengkap)
 
 ### Added
