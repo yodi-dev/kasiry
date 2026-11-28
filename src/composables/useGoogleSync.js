@@ -39,6 +39,7 @@ const accessToken = ref(getSavedToken())
 const userProfile = ref(loadJsonStorage('kasiry_gdrive_user', null))
 const lastSyncTime = ref(localStorage.getItem('kasiry_gdrive_last_sync') || null)
 const linkedSheetId = ref(localStorage.getItem('kasiry_linked_sheet_id') || null)
+const linkedSheetTitle = ref(localStorage.getItem('kasiry_linked_sheet_title') || '')
 const customClientId = ref(localStorage.getItem('kasiry_custom_client_id') || '')
 const pendingSheetQueue = ref(loadJsonStorage('kasiry_pending_sheet_queue', []))
 const hasPendingDriveBackup = ref(localStorage.getItem('kasiry_pending_drive_sync') === 'true')
@@ -224,6 +225,7 @@ export function useGoogleSync() {
     accessToken.value = null
     userProfile.value = null
     linkedSheetId.value = null
+    linkedSheetTitle.value = ''
     lastSyncTime.value = null
     persistPendingQueue([])
     markDrivePending(false)
@@ -231,6 +233,7 @@ export function useGoogleSync() {
     localStorage.removeItem('kasiry_gdrive_token_expires')
     localStorage.removeItem('kasiry_gdrive_user')
     localStorage.removeItem('kasiry_linked_sheet_id')
+    localStorage.removeItem('kasiry_linked_sheet_title')
     localStorage.removeItem('kasiry_gdrive_last_sync')
     statusMessage.value = 'Akun Google telah diputuskan.'
   }
@@ -328,61 +331,125 @@ export function useGoogleSync() {
     return await res.json()
   }
 
-  // Cari atau Buat Spreadsheet Buku Kas Warung (dinamis sesuai nama toko)
+  const saveLinkedSheet = (id, title = '') => {
+    linkedSheetId.value = id || null
+    linkedSheetTitle.value = title || ''
+    if (id) localStorage.setItem('kasiry_linked_sheet_id', id)
+    else localStorage.removeItem('kasiry_linked_sheet_id')
+    if (title) localStorage.setItem('kasiry_linked_sheet_title', title)
+    else localStorage.removeItem('kasiry_linked_sheet_title')
+  }
+
+  const renameSpreadsheetFile = async (fileId, nextTitle, interactive = false) => {
+    if (!fileId || !nextTitle) return false
+    try {
+      const res = await fetchWithAuth(
+        `https://www.googleapis.com/drive/v3/files/${fileId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: nextTitle })
+        },
+        false,
+        interactive
+      )
+      if (res.ok) {
+        saveLinkedSheet(fileId, nextTitle)
+        return true
+      }
+    } catch {
+      // Abaikan jika gagal rename; ID spreadsheet tetap aktif dipakai
+    }
+    return false
+  }
+
+  // Cari atau Buat 1 Spreadsheet Buku Kas Warung Tunggal (ikut menyesuaikan nama toko tanpa menduplikat)
   const ensureSpreadsheet = async (storeName = 'Toko', interactive = false) => {
+    const sheetTitle = getSheetFilename(storeName)
+
     if (linkedSheetId.value) {
+      if (storeName && storeName !== 'Toko' && linkedSheetTitle.value && linkedSheetTitle.value !== sheetTitle) {
+        await renameSpreadsheetFile(linkedSheetId.value, sheetTitle, interactive)
+      }
       return linkedSheetId.value
     }
 
-    const sheetTitle = getSheetFilename(storeName)
-
     try {
-      // 1. Cek apakah sudah pernah ada
+      // 1. Cari spreadsheet Kasiry yang sudah pernah dibuat (prioritaskan nama persis, lalu fallback nama toko lama)
       const q = encodeURIComponent(
-        `name='${sheetTitle.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`
+        `name contains 'Kasiry - Buku Kas' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`
       )
       const res = await fetchWithAuth(
-        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=5`,
+        `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=modifiedTime desc&fields=files(id,name)&pageSize=10`,
         {},
         false,
         interactive
       )
       if (res.ok) {
         const data = await res.json()
-        if (data.files && data.files.length > 0) {
-          linkedSheetId.value = data.files[0].id
-          localStorage.setItem('kasiry_linked_sheet_id', data.files[0].id)
-          return data.files[0].id
+        const files = data.files || []
+        if (files.length > 0) {
+          const exactMatch = files.find(f => f.name === sheetTitle)
+          const targetFile = exactMatch || files[0]
+          saveLinkedSheet(targetFile.id, targetFile.name)
+          if (targetFile.name !== sheetTitle) {
+            await renameSpreadsheetFile(targetFile.id, sheetTitle, interactive)
+          }
+          return targetFile.id
         }
       }
 
-      // 2. Buat via Sheets API
+      // 2. Buat 1 Spreadsheet baru dengan header beku Midnight Navy, lebar kolom proporsional, & zebra striping
+      const headerLabels = [
+        'Waktu Transaksi',
+        'No. Nota',
+        'Metode / Jenis',
+        'Pelanggan / Keterangan',
+        'Nominal (Rp)',
+        'Dibayar / Masuk (Rp)',
+        'Kembalian / Selisih (Rp)',
+        'Rincian Transaksi'
+      ]
+      const colWidths = [165, 135, 190, 175, 135, 145, 150, 360]
+      const headerFormat = {
+        backgroundColor: { red: 0.039, green: 0.098, blue: 0.239 },
+        textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true, fontSize: 10 },
+        verticalAlignment: 'MIDDLE',
+        wrapStrategy: 'WRAP'
+      }
+
       const body = {
         properties: { title: sheetTitle },
         sheets: [
           {
             properties: {
+              sheetId: 0,
               title: 'Rekap Transaksi Kasir',
-              gridProperties: { rowCount: 1000, columnCount: 10 }
+              gridProperties: { rowCount: 1000, columnCount: 8, frozenRowCount: 1 }
             },
             data: [
               {
                 startRow: 0,
                 startColumn: 0,
+                columnMetadata: colWidths.map(pixelSize => ({ pixelSize })),
                 rowData: [
                   {
-                    values: [
-                      { userEnteredValue: { stringValue: 'Waktu Transaksi' } },
-                      { userEnteredValue: { stringValue: 'No. Nota' } },
-                      { userEnteredValue: { stringValue: 'Metode Bayar' } },
-                      { userEnteredValue: { stringValue: 'Nama Pelanggan' } },
-                      { userEnteredValue: { stringValue: 'Total Belanja (Rp)' } },
-                      { userEnteredValue: { stringValue: 'Uang Diterima (Rp)' } },
-                      { userEnteredValue: { stringValue: 'Kembalian (Rp)' } },
-                      { userEnteredValue: { stringValue: 'Rincian Barang' } }
-                    ]
+                    values: headerLabels.map(label => ({
+                      userEnteredValue: { stringValue: label },
+                      userEnteredFormat: headerFormat
+                    }))
                   }
                 ]
+              }
+            ],
+            bandedRanges: [
+              {
+                range: { sheetId: 0, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: 8 },
+                rowProperties: {
+                  headerColor: { red: 0.039, green: 0.098, blue: 0.239 },
+                  firstBandColor: { red: 1, green: 1, blue: 1 },
+                  secondBandColor: { red: 0.949, green: 0.973, blue: 0.996 }
+                }
               }
             ]
           }
@@ -402,8 +469,7 @@ export function useGoogleSync() {
 
       if (createRes.ok) {
         const createData = await createRes.json()
-        linkedSheetId.value = createData.spreadsheetId
-        localStorage.setItem('kasiry_linked_sheet_id', createData.spreadsheetId)
+        saveLinkedSheet(createData.spreadsheetId, sheetTitle)
         return createData.spreadsheetId
       }
     } catch (e) {
@@ -462,8 +528,7 @@ export function useGoogleSync() {
     if (!res.ok) {
       if ((res.status === 403 || res.status === 404) && allowSheetReset) {
         // Jika sheet terhapus atau berasal dari Client ID lama (batasan drive.file), buat ulang sheet baru milik Kasiry
-        linkedSheetId.value = null
-        localStorage.removeItem('kasiry_linked_sheet_id')
+        saveLinkedSheet(null, '')
         return appendRowsBatch(rows, storeName, interactive, false)
       }
       const errBody = await res.json().catch(() => ({}))

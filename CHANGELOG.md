@@ -6,6 +6,16 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.5] - 2026-11-28 (1 Spreadsheet Tunggal & Format Header Rapi di Google Sheets)
+
+### Changed
+- **1 Spreadsheet Tunggal Lintas Nama Toko & Perangkat (`src/composables/useGoogleSync.js`):**
+  - `ensureSpreadsheet()` kini mencari spreadsheet yang diawali `Kasiry - Buku Kas` (terbaru) terlebih dahulu dan langsung me-rename judul file di Google Drive bila nama toko berubah, sehingga tidak membuat file spreadsheet ganda setiap ganti nama toko atau pindah perangkat.
+- **Format Header & Tata Letak Google Sheets Baru:**
+  - Spreadsheet baru kini memakai **header beku (`frozenRowCount: 1`)**, latar **Midnight Deep Navy (`#0a193d`)** berteks putih tebal, label kolom yang lebih akurat (`Metode / Jenis`, `Pelanggan / Keterangan`, `Nominal (Rp)`, `Dibayar / Masuk (Rp)`, `Kembalian / Selisih (Rp)`, `Rincian Transaksi`), lebar kolom proporsional, serta zebra striping biru lembut (`bandedRanges`).
+
+---
+
 ## [2.20.4] - 2026-11-28 (Auto-Reconnect Hot-Plug Printer USB & Serial)
 
 ### Added

@@ -381,6 +381,47 @@ describe('useGoogleSync (Adaptive Drive Batching, Offline Queue & Two-Way Merge)
     expect(cancelBody.values[0][1]).toBe('BATAL-KSR-001')
     expect(cancelBody.values[0][2]).toBe('BATAL TRANSAKSI')
 
+    // Pastikan pembuatan spreadsheet baru menyertakan frozen header & lebar kolom rapi
+    const createSheetCall = fetchMock.mock.calls.find(c => String(c[0]) === 'https://sheets.googleapis.com/v4/spreadsheets' && c[1]?.method === 'POST')
+    const createSheetPayload = JSON.parse(createSheetCall[1].body)
+    expect(createSheetPayload.sheets[0].properties.gridProperties.frozenRowCount).toBe(1)
+    expect(createSheetPayload.sheets[0].bandedRanges).toHaveLength(1)
+
     delete globalThis.window
+  })
+
+  it('reuses a single Kasiry - Buku Kas spreadsheet across store renames and renames it in Drive instead of duplicating', async () => {
+    localStorage.setItem('kasiry_gdrive_user', JSON.stringify({ name: 'Kasir' }))
+    localStorage.setItem('kasiry_gdrive_token', 'valid-token')
+    localStorage.setItem('kasiry_gdrive_token_expires', String(Date.now() + 3600000))
+
+    const fetchMock = vi.fn()
+      // 1. Cari 'Kasiry - Buku Kas' -> ketemu file lama milik nama toko sebelumnya
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          files: [{ id: 'single-sheet-id', name: 'Kasiry - Buku Kas Toko Lama' }]
+        })
+      })
+      // 2. PATCH rename file di Drive ke nama toko baru
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'single-sheet-id', name: 'Kasiry - Buku Kas Toko Baru' })
+      })
+
+    globalThis.fetch = fetchMock
+
+    const { useGoogleSync } = await import('../src/composables/useGoogleSync')
+    const sync = useGoogleSync()
+
+    const sheetId = await sync.ensureSpreadsheet('Toko Baru', false)
+    expect(sheetId).toBe('single-sheet-id')
+    expect(localStorage.getItem('kasiry_linked_sheet_id')).toBe('single-sheet-id')
+    expect(localStorage.getItem('kasiry_linked_sheet_title')).toBe('Kasiry - Buku Kas Toko Baru')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[1][0]).toContain('/drive/v3/files/single-sheet-id')
+    expect(fetchMock.mock.calls[1][1].method).toBe('PATCH')
   })
 })
