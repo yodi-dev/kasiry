@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { formatNominalInput, parseNominalInput } from '../utils/currencyInput'
 import { 
   X, 
@@ -63,6 +63,8 @@ const handleClose = () => {
 }
 
 const searchQuery = ref('')
+const searchInputRef = ref(null)
+const nameInputRef = ref(null)
 const selectedCategory = ref('Semua')
 // statusFilter: 'all' | 'unpriced' | 'neverSold' | 'slowMoving'
 const statusFilter = ref('all')
@@ -256,7 +258,7 @@ const estimatedProfit = computed(() => {
   return 0
 })
 
-const openAddForm = (prefillQuery = '') => {
+const openAddForm = async (prefillQuery = '') => {
   const cleanPrefill = typeof prefillQuery === 'string' ? prefillQuery.trim() : ''
   const asBarcode = cleanPrefill ? isLikelyBarcode(cleanPrefill) : false
   currentProduct.value = {
@@ -274,6 +276,8 @@ const openAddForm = (prefillQuery = '') => {
   }
   isAddingCategoryInline.value = false
   currentView.value = 'form'
+  await nextTick()
+  nameInputRef.value?.focus()
 }
 
 const handleSearchEnter = (e) => {
@@ -304,13 +308,14 @@ const openEditForm = (p) => {
   currentView.value = 'form'
 }
 
-const handleSave = () => {
+const handleSave = async () => {
   const sell = parseInt(String(currentProduct.value.sellPrice).replace(/\D/g, '') || '0', 10)
   const buy = parseInt(String(currentProduct.value.buyPrice).replace(/\D/g, '') || '0', 10)
   if (!currentProduct.value.name.trim()) return
 
   const rawStock = String(currentProduct.value.stock ?? '').trim()
   const parsedStock = rawStock === '' ? null : Math.max(0, Math.round(Number(rawStock)))
+  const lastCategory = currentProduct.value.category
 
   emit('saveProduct', {
     id: currentProduct.value.id || Date.now(),
@@ -322,11 +327,18 @@ const handleSave = () => {
     agentPrice: sanitizeOptionalPrice(currentProduct.value.agentPrice),
     stock: parsedStock !== null && Number.isFinite(parsedStock) ? parsedStock : null,
     barcode: currentProduct.value.barcode.trim(),
-    category: currentProduct.value.category,
+    category: lastCategory,
     isMacro: currentProduct.value.isMacro || false
   })
 
+  searchQuery.value = ''
+
+  if (sell <= 0) {
+    statusFilter.value = 'unpriced'
+  }
   currentView.value = 'list'
+  await nextTick()
+  searchInputRef.value?.focus()
 }
 
 const handleDelete = (id, name) => {
@@ -422,6 +434,7 @@ const handleDeleteCategory = (cat) => {
             <div class="relative flex-1">
               <Search class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input 
+                ref="searchInputRef"
                 type="text" 
                 v-model="searchQuery"
                 @keydown.enter="handleSearchEnter"
@@ -853,6 +866,7 @@ const handleDeleteCategory = (cat) => {
                 <Package class="w-4 h-4" />
               </span>
               <input 
+                ref="nameInputRef"
                 type="text" 
                 v-model="currentProduct.name"
                 placeholder="Contoh: Beras Ramos 5 Kg"
@@ -866,7 +880,7 @@ const handleDeleteCategory = (cat) => {
             <div>
               <div class="flex items-center justify-between mb-1.5">
                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Harga Ecer / Umum (Rp)
+                  Harga Ecer / Umum (Opsional)
                 </label>
                 <span v-if="estimatedProfit > 0" class="text-[11px] font-bold text-emerald-600 flex items-center gap-0.5">
                   <TrendingUp class="w-3 h-3" /> Untung Rp {{ estimatedProfit.toLocaleString('id-ID') }}
@@ -1065,7 +1079,7 @@ const handleDeleteCategory = (cat) => {
         </div>
 
         <!-- Tombol Aksi Form -->
-        <div class="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
+        <div class="pt-3 flex flex-wrap items-center justify-end gap-2.5 border-t border-slate-100">
           <button 
             @click="currentView = 'list'"
             class="h-11 px-5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200 cursor-pointer transition-colors shadow-2xs"

@@ -6,6 +6,15 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.23.1] - 2026-11-28 (Autofokus Alur Tambah Barang Cepat & Belum Harga)
+
+### Improved
+- **Alur Tambah Barang Cepat di `ProductManagementModal.vue`:**
+  - Saat masuk ke form **Tambah Barang Baru** (termasuk saat scan/cari barcode yang belum terdaftar), kursor otomatis **autofokus ke kolom Nama Barang**.
+  - Harga jual tetap opsional saat tambah barang; setelah klik **Simpan Barang**, kolom pencarian dikosongkan, kursor kembali autofokus ke kolom pencarian, dan otomatis mengarah ke tab **Belum Harga** bila harga jual belum diisi.
+
+---
+
 ## [2.23.0] - 2026-11-28 (Tunda Checkout, Smart Paste Token PLN & Modal Inline)
 
 ### Added
