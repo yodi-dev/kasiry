@@ -6,6 +6,15 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.7] - 2026-11-28 (Shortcut Keyboard Enter & Esc di Modal Pembayaran)
+
+### Added
+- **Dukungan `Enter` & `Esc` pada `PaymentModal.vue`:**
+  - Setelah menekan `F2` dari kasa, kasir dapat langsung menekan **`Enter`** untuk menyelesaikan pembayaran uang pas / QRIS / Utang (otomatis fokus ke tombol konfirmasi dan tetap aman saat sub-form Tambah Pelanggan atau dropdown pencarian pelanggan sedang aktif).
+  - Menekan **`Esc`** secara bertahap menutup form *Tambah Pelanggan Baru* / dropdown pelanggan terlebih dahulu sebelum menutup modal Pembayaran, dilengkapi petunjuk tombol `Esc` & `Enter` di desktop.
+
+---
+
 ## [2.20.6] - 2026-11-28 (Navigasi Keyboard Panah Atas/Bawah di Pencarian Barang Kasa)
 
 ### Added

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { buildCustomerStatsMap } from '../utils/customerStats'
 import { normalizePriceTier, getPriceTierMeta } from '../utils/pricing'
 import { X, CheckCircle, Banknote, QrCode, UserCheck, Plus, AlertCircle, CreditCard, User, Search, ChevronRight } from '@lucide/vue'
@@ -59,6 +59,7 @@ const selectedCustomer = ref(null)
 const customerSearchInputRef = ref(null)
 const quickAddNameInputRef = ref(null)
 const debtCustomerInputRef = ref(null)
+const submitButtonRef = ref(null)
 
 // Buka pencarian pelanggan dan langsung aktifkan kursor
 const openCustomerDropdown = () => {
@@ -122,6 +123,10 @@ watch(() => props.isOpen, (newVal) => {
     isAddingCustomer.value = false
     newCustName.value = ''
     newCustPhone.value = ''
+
+    nextTick(() => {
+      submitButtonRef.value?.focus?.({ preventScroll: true })
+    })
   }
 }, { immediate: true })
 
@@ -471,6 +476,46 @@ const submitPayment = () => {
     })
   }
 }
+
+const handleModalKeydown = (e) => {
+  if (!props.isOpen) return
+  if (e?.isComposing || e?.keyCode === 229) return
+
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    if (isAddingCustomer.value) {
+      cancelQuickAdd()
+    } else if (isCustomerDropdownOpen.value) {
+      isCustomerDropdownOpen.value = false
+    } else {
+      emit('close')
+    }
+    return
+  }
+
+  if (e.key === 'Enter') {
+    if (isAddingCustomer.value || isCustomerDropdownOpen.value) return
+    const activeEl = typeof document !== 'undefined' ? document.activeElement : null
+    // Biarkan tombol lain (selain tombol submit) atau input pencarian utang menjalankan aksi bawaannya
+    if (activeEl && activeEl !== submitButtonRef.value) {
+      if (activeEl.tagName === 'BUTTON' || activeEl === debtCustomerInputRef.value) return
+    }
+    e.preventDefault()
+    submitPayment()
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', handleModalKeydown)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('keydown', handleModalKeydown)
+  }
+})
 </script>
 
 <template>
@@ -1050,13 +1095,17 @@ const submitPayment = () => {
       <!-- Action Buttons Modal Footer -->
       <div class="p-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between gap-3 shrink-0">
         <button 
+          type="button"
           @click="emit('close')"
-          class="h-12 px-5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs sm:text-sm rounded-2xl border border-slate-200 cursor-pointer transition-colors shadow-2xs"
+          class="h-12 px-5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs sm:text-sm rounded-2xl border border-slate-200 cursor-pointer transition-colors shadow-2xs flex items-center gap-1.5"
         >
-          Batal
+          <span>Batal</span>
+          <kbd class="hidden lg:inline-flex px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] text-slate-500">Esc</kbd>
         </button>
 
         <button 
+          ref="submitButtonRef"
+          type="button"
           :disabled="activeTab === 'cash' ? !canSubmitCash : (activeTab === 'qris' ? !canSubmitQris : !isDebtReady)"
           @click="submitPayment"
           :class="[
@@ -1075,6 +1124,7 @@ const submitPayment = () => {
                 : 'Catat ke Buku Utang'
             }}
           </span>
+          <kbd class="hidden lg:inline-flex px-1.5 py-0.5 rounded bg-white/15 border border-white/20 font-mono text-[10px] text-sky-200">Enter</kbd>
         </button>
       </div>
     </div>

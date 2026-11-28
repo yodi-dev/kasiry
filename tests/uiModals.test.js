@@ -1425,4 +1425,41 @@ describe('Vue SFC Modals Integration & Tab Switching', () => {
     expect(bar.emitted('selectProduct')?.[0]?.[0]?.id).toBe(103)
     expect(bar.emitted('update:searchQuery')?.[0]).toEqual([''])
   })
+
+  it('supports Enter (instant uang pas checkout) and Escape (sub-dropdown -> modal close) in PaymentModal', async () => {
+    const payModal = mount(PaymentModal, {
+      attachTo: document.body,
+      props: {
+        isOpen: true,
+        totalAmount: 25000,
+        savedCustomers: sampleCustomers,
+        transactions: []
+      }
+    })
+    await nextTick()
+
+    // 1. Tekan Enter langsung saat modal terbuka -> otomatis bayar uang pas Rp 25.000 pelanggan Umum
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(payModal.emitted('processCashPayment')).toHaveLength(1)
+    expect(payModal.emitted('processCashPayment')[0][0]).toMatchObject({
+      totalAmount: 25000,
+      cashGiven: 25000,
+      changeAmount: 0
+    })
+
+    // 2. Jika form Tambah Pelanggan cepat terbuka, Esc menutup form tersebut dulu, Esc kedua menutup modal
+    await payModal.find('button[title="Daftarkan pelanggan baru langsung di sini"]').trigger('click')
+    await nextTick()
+    expect(payModal.text()).toContain('Tambah Pelanggan Baru')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await nextTick()
+    expect(payModal.text()).not.toContain('Tambah Pelanggan Baru')
+    expect(payModal.emitted('close')).toBeFalsy()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(payModal.emitted('close')).toHaveLength(1)
+
+    payModal.unmount()
+  })
 })
