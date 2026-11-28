@@ -6,6 +6,15 @@ Seluruh perubahan penting, peningkatan fitur, perbaikan bug, dan rilis versi **K
 
 ---
 
+## [2.20.4] - 2026-11-28 (Auto-Reconnect Hot-Plug Printer USB & Serial)
+
+### Added
+- **Hot-Plug Auto-Reconnect WebUSB & Web Serial (`src/composables/useThermalPrinter.js`):**
+  - Menambahkan event listener `connect` pada `navigator.usb` dan `navigator.serial` (disertai pencocokan identitas perangkat `vendorId`/`productId`/`serialNumber` dan retry enumerasi singkat 350ms) agar printer yang sebelumnya sudah pernah dihubungkan otomatis tersambung kembali saat kabel USB dilepas lalu dicolok ulang tanpa klik manual.
+  - Menambahkan `autoReconnectPrinter()` otomatis sebelum cetak ESC/POS di `dispatchPrint()` apabila printer terlepas sementara sebelum tombol cetak ditekan, sekaligus tetap menghormati tombol **Putuskan** manual (`disconnectPrinter()` menghapus preferensi auto-connect).
+
+---
+
 ## [2.20.3] - 2026-11-28 (Perapihan Header Identitas Toko, Status Dot & Shift TopBar)
 
 ### Changed

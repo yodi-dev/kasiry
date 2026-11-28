@@ -369,6 +369,87 @@ describe('useThermalPrinter Composable (Bluetooth, WebUSB, Web Serial & Fallback
     expect(printerError.value).toContain('POS-58')
   })
 
+  it('auto-reconnects USB printer automatically when unplugged and plugged back in via hot-plug connect event or before print', async () => {
+    const usbListeners = {}
+    const transferOut = vi.fn().mockResolvedValue({ status: 'ok', bytesWritten: 64 })
+    const makeMockUsb = (productName, vendorId, productId, serialNumber) => ({
+      productName,
+      vendorId,
+      productId,
+      serialNumber,
+      opened: false,
+      open: vi.fn(async function () { this.opened = true }),
+      close: vi.fn(async function () { this.opened = false }),
+      selectConfiguration: vi.fn(),
+      claimInterface: vi.fn().mockResolvedValue(undefined),
+      transferOut,
+      configuration: {
+        interfaces: [
+          {
+            interfaceNumber: 0,
+            alternates: [{ interfaceClass: 7, alternateSetting: 0, endpoints: [{ direction: 'out', type: 'bulk', endpointNumber: 1 }] }]
+          }
+        ]
+      }
+    })
+
+    const otherUsbDevice = makeMockUsb('USB Barcode Scanner', 0x1111, 0x2222, 'SCAN-1')
+    const printerUsbDevice = makeMockUsb('POS-80 Auto USB', 0x0416, 0x5011, 'PRT-80')
+
+    Object.defineProperty(navigator, 'usb', {
+      configurable: true,
+      value: {
+        requestDevice: vi.fn().mockResolvedValue(printerUsbDevice),
+        getDevices: vi.fn().mockResolvedValue([otherUsbDevice, printerUsbDevice]),
+        addEventListener: vi.fn((event, handler) => {
+          usbListeners[event] = handler
+        })
+      }
+    })
+
+    const {
+      connectionType,
+      isPrinterConnected,
+      connectUsbPrinter,
+      printReceiptThermal,
+      disconnectPrinter
+    } = useThermalPrinter()
+
+    expect(await connectUsbPrinter()).toBe(true)
+    expect(connectionType.value).toBe('usb')
+
+    // 1. Cabut kabel USB (event 'disconnect') -> status terputus, preferensi tetap tersimpan
+    printerUsbDevice.opened = false
+    await usbListeners.disconnect({ device: printerUsbDevice })
+    expect(isPrinterConnected.value).toBe(false)
+
+    // 2. Colok device lain yang bukan printer -> TIDAK boleh auto-connect ke scanner
+    await usbListeners.connect({ device: otherUsbDevice })
+    expect(isPrinterConnected.value).toBe(false)
+
+    // 3. Colok ulang printer yang sama (event 'connect') -> langsung terhubung otomatis tanpa klik manual
+    await usbListeners.connect({ device: printerUsbDevice })
+    expect(isPrinterConnected.value).toBe(true)
+    expect(connectionType.value).toBe('usb')
+
+    // 4. Jika dilepas lagi dan langsung cetak struk setelah tercolok (just-in-time), tetap auto-reconnect & cetak USB
+    printerUsbDevice.opened = false
+    await usbListeners.disconnect({ device: printerUsbDevice })
+    expect(isPrinterConnected.value).toBe(false)
+    const printRes = await printReceiptThermal(
+      { invoiceNumber: 'USB-AUTO-1', totalAmount: 15000, paymentMethod: 'TUNAI', cashGiven: 15000, changeAmount: 0, items: [] },
+      { name: 'Warung Kasiry' }
+    )
+    expect(printRes).toEqual({ ok: true, method: 'usb' })
+    expect(isPrinterConnected.value).toBe(true)
+
+    // 5. Jika user klik Putuskan manual, colok ulang USB tidak otomatis menyambung lagi
+    await disconnectPrinter()
+    printerUsbDevice.opened = false
+    await usbListeners.connect({ device: printerUsbDevice })
+    expect(isPrinterConnected.value).toBe(false)
+  })
+
   it('connects via Web Serial COM port and writes ESC/POS bytes cleanly', async () => {
     const write = vi.fn().mockResolvedValue(undefined)
     const releaseLock = vi.fn()

@@ -83,7 +83,7 @@ const emit = defineEmits([
   'drawerClosed'
 ])
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.3'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.4'
 const isDrawerOpen = ref(false)
 const openMenuKey = ref(null) // 'data' | 'service' | 'finance' | null
 const desktopMenusRef = ref(null)

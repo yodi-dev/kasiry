@@ -21,11 +21,22 @@ const THERMAL_PRINTER_SERVICE_UUIDS = [
   '0000fee7-0000-1000-8000-00805f9b34fb'
 ]
 
+function sanitizePreferredDevice(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const clean = {}
+  if (Number.isFinite(Number(raw.vendorId))) clean.vendorId = Number(raw.vendorId)
+  if (Number.isFinite(Number(raw.productId))) clean.productId = Number(raw.productId)
+  if (typeof raw.serialNumber === 'string' && raw.serialNumber.trim()) clean.serialNumber = raw.serialNumber.trim()
+  if (Number.isFinite(Number(raw.usbVendorId))) clean.usbVendorId = Number(raw.usbVendorId)
+  if (Number.isFinite(Number(raw.usbProductId))) clean.usbProductId = Number(raw.usbProductId)
+  return Object.keys(clean).length > 0 ? clean : null
+}
+
 function loadSavedPrinterSettings() {
   try {
-    if (typeof localStorage === 'undefined') return { ...PRINTER_DEFAULT_SETTINGS, preferredTransport: '', serialBaudRate: 9600 }
+    if (typeof localStorage === 'undefined') return { ...PRINTER_DEFAULT_SETTINGS, preferredTransport: '', preferredDevice: null, serialBaudRate: 9600 }
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...PRINTER_DEFAULT_SETTINGS, preferredTransport: '', serialBaudRate: 9600 }
+    if (!raw) return { ...PRINTER_DEFAULT_SETTINGS, preferredTransport: '', preferredDevice: null, serialBaudRate: 9600 }
     const parsed = JSON.parse(raw)
     return {
       paperWidth: parsed.paperWidth === '80mm' ? '80mm' : '58mm',
@@ -37,12 +48,13 @@ function loadSavedPrinterSettings() {
       preferredTransport: ['bluetooth', 'usb', 'serial'].includes(parsed.preferredTransport)
         ? parsed.preferredTransport
         : '',
+      preferredDevice: sanitizePreferredDevice(parsed.preferredDevice),
       serialBaudRate: [9600, 19200, 38400, 57600, 115200].includes(Number(parsed.serialBaudRate))
         ? Number(parsed.serialBaudRate)
         : 9600
     }
   } catch {
-    return { ...PRINTER_DEFAULT_SETTINGS, preferredTransport: '', serialBaudRate: 9600 }
+    return { ...PRINTER_DEFAULT_SETTINGS, preferredTransport: '', preferredDevice: null, serialBaudRate: 9600 }
   }
 }
 
@@ -61,10 +73,11 @@ let bleDisconnectListenerAttached = false
 let activeUsbDevice = null
 let activeUsbInterfaceNumber = 0
 let activeUsbEndpointOut = 1
-let usbDisconnectListenerAttached = false
+let attachedUsbTarget = null
 
 let activeSerialPort = null
-let serialDisconnectListenerAttached = false
+let attachedSerialTarget = null
+let activeReconnectPromise = null
 
 const isPrinterConnected = computed(() => connectionType.value !== 'none')
 
@@ -168,6 +181,9 @@ export function useThermalPrinter() {
       ...(partial.printerName !== undefined ? { printerName: String(partial.printerName) } : {}),
       ...(partial.preferredTransport !== undefined
         ? { preferredTransport: ['bluetooth', 'usb', 'serial', ''].includes(partial.preferredTransport) ? partial.preferredTransport : '' }
+        : {}),
+      ...(partial.preferredDevice !== undefined
+        ? { preferredDevice: sanitizePreferredDevice(partial.preferredDevice) }
         : {}),
       ...(partial.serialBaudRate !== undefined && [9600, 19200, 38400, 57600, 115200].includes(Number(partial.serialBaudRate))
         ? { serialBaudRate: Number(partial.serialBaudRate) }
@@ -314,6 +330,91 @@ export function useThermalPrinter() {
     throw new Error('Endpoint cetak OUT tidak ditemukan pada perangkat USB ini.')
   }
 
+  const matchesPreferredUsbDevice = (device, prefDevice) => {
+    if (!device) return false
+    if (!prefDevice || (prefDevice.vendorId === undefined && prefDevice.productId === undefined)) return true
+    if (prefDevice.vendorId !== undefined && Number(device.vendorId) !== prefDevice.vendorId) return false
+    if (prefDevice.productId !== undefined && Number(device.productId) !== prefDevice.productId) return false
+    if (prefDevice.serialNumber && device.serialNumber && device.serialNumber !== prefDevice.serialNumber) return false
+    return true
+  }
+
+  const matchesPreferredSerialPort = (port, prefDevice) => {
+    if (!port) return false
+    if (!prefDevice || (prefDevice.usbVendorId === undefined && prefDevice.usbProductId === undefined)) return true
+    const info = typeof port.getInfo === 'function' ? port.getInfo() : {}
+    if (prefDevice.usbVendorId !== undefined && Number(info?.usbVendorId) !== prefDevice.usbVendorId) return false
+    if (prefDevice.usbProductId !== undefined && Number(info?.usbProductId) !== prefDevice.usbProductId) return false
+    return true
+  }
+
+  const retryShortDelay = (ms = 350) => new Promise(resolve => setTimeout(resolve, ms))
+
+  const ensureUsbHotplugListeners = () => {
+    if (typeof navigator === 'undefined' || !navigator.usb?.addEventListener) return
+    if (attachedUsbTarget === navigator.usb) return
+    attachedUsbTarget = navigator.usb
+
+    navigator.usb.addEventListener('disconnect', (ev) => {
+      if (ev?.device && ev.device === activeUsbDevice) {
+        activeUsbDevice = null
+        clearConnectionState('usb')
+      }
+    })
+
+    navigator.usb.addEventListener('connect', async (ev) => {
+      const device = ev?.device
+      if (!device || isPrinterConnected.value) return
+      if (printerSettings.value.preferredTransport !== 'usb') return
+      if (!matchesPreferredUsbDevice(device, printerSettings.value.preferredDevice)) return
+      try {
+        await openAndClaimUsbDevice(device)
+      } catch {
+        // Beri jeda singkat untuk enumerasi ulang USB OS/Android OTG
+        try {
+          await retryShortDelay(350)
+          if (!isPrinterConnected.value && printerSettings.value.preferredTransport === 'usb') {
+            await openAndClaimUsbDevice(device)
+          }
+        } catch {
+          // Abaikan jika gagal; pengguna tetap bisa hubungkan manual / cetak ulang
+        }
+      }
+    })
+  }
+
+  const ensureSerialHotplugListeners = () => {
+    if (typeof navigator === 'undefined' || !navigator.serial?.addEventListener) return
+    if (attachedSerialTarget === navigator.serial) return
+    attachedSerialTarget = navigator.serial
+
+    navigator.serial.addEventListener('disconnect', (ev) => {
+      if (ev?.target === activeSerialPort || ev?.port === activeSerialPort) {
+        activeSerialPort = null
+        clearConnectionState('serial')
+      }
+    })
+
+    navigator.serial.addEventListener('connect', async (ev) => {
+      const port = ev?.port || ev?.target
+      if (!port || isPrinterConnected.value) return
+      if (printerSettings.value.preferredTransport !== 'serial') return
+      if (!matchesPreferredSerialPort(port, printerSettings.value.preferredDevice)) return
+      try {
+        await openSerialPortDevice(port)
+      } catch {
+        try {
+          await retryShortDelay(350)
+          if (!isPrinterConnected.value && printerSettings.value.preferredTransport === 'serial') {
+            await openSerialPortDevice(port)
+          }
+        } catch {
+          // Abaikan jika port masih dipakai proses lain
+        }
+      }
+    })
+  }
+
   const openAndClaimUsbDevice = async (device) => {
     if (!device) throw new Error('Perangkat USB tidak valid.')
     if (!device.opened) {
@@ -331,22 +432,22 @@ export function useThermalPrinter() {
       await device.selectAlternateInterface(interfaceNumber, alternateSetting)
     }
 
-    if (!usbDisconnectListenerAttached && typeof navigator !== 'undefined' && navigator.usb?.addEventListener) {
-      navigator.usb.addEventListener('disconnect', (ev) => {
-        if (ev?.device && ev.device === activeUsbDevice) {
-          activeUsbDevice = null
-          clearConnectionState('usb')
-        }
-      })
-      usbDisconnectListenerAttached = true
-    }
+    ensureUsbHotplugListeners()
 
     activeUsbDevice = device
     activeUsbInterfaceNumber = interfaceNumber
     activeUsbEndpointOut = endpointNumber
     connectionType.value = 'usb'
     connectedPrinterName.value = device.productName || device.manufacturerName || 'Printer USB Thermal'
-    updatePrinterSettings({ printerName: connectedPrinterName.value, preferredTransport: 'usb' })
+    updatePrinterSettings({
+      printerName: connectedPrinterName.value,
+      preferredTransport: 'usb',
+      preferredDevice: {
+        vendorId: device.vendorId,
+        productId: device.productId,
+        serialNumber: device.serialNumber || ''
+      }
+    })
     return connectedPrinterName.value
   }
 
@@ -381,15 +482,7 @@ export function useThermalPrinter() {
       await port.open({ baudRate: Number(printerSettings.value.serialBaudRate) || 9600 })
     }
 
-    if (!serialDisconnectListenerAttached && typeof navigator !== 'undefined' && navigator.serial?.addEventListener) {
-      navigator.serial.addEventListener('disconnect', (ev) => {
-        if (ev?.target === activeSerialPort || ev?.port === activeSerialPort) {
-          activeSerialPort = null
-          clearConnectionState('serial')
-        }
-      })
-      serialDisconnectListenerAttached = true
-    }
+    ensureSerialHotplugListeners()
 
     const info = typeof port.getInfo === 'function' ? port.getInfo() : {}
     activeSerialPort = port
@@ -397,7 +490,14 @@ export function useThermalPrinter() {
     connectedPrinterName.value = info?.usbVendorId
       ? `Serial Printer (${info.usbVendorId.toString(16).toUpperCase()})`
       : 'Printer Serial / COM'
-    updatePrinterSettings({ printerName: connectedPrinterName.value, preferredTransport: 'serial' })
+    updatePrinterSettings({
+      printerName: connectedPrinterName.value,
+      preferredTransport: 'serial',
+      preferredDevice: {
+        usbVendorId: info?.usbVendorId,
+        usbProductId: info?.usbProductId
+      }
+    })
     return connectedPrinterName.value
   }
 
@@ -427,37 +527,52 @@ export function useThermalPrinter() {
 
   const disconnectPrinter = async () => {
     await closeCurrentHandles({ forgetDevice: true })
-    updatePrinterSettings({ preferredTransport: '' })
+    updatePrinterSettings({ preferredTransport: '', preferredDevice: null })
   }
 
   // Alias kompatibilitas dengan pemanggil lama
   const disconnectBluetoothPrinter = disconnectPrinter
 
   /**
-   * Sambung ulang otomatis ke printer USB / Serial yang sebelumnya sudah diizinkan browser.
+   * Sambung ulang otomatis ke printer USB / Serial yang sebelumnya sudah diizinkan browser,
+   * sekaligus memasang listener hot-plug 'connect' agar otomatis tersambung saat kabel dicolok ulang.
    */
   const autoReconnectPrinter = async () => {
+    ensureUsbHotplugListeners()
+    ensureSerialHotplugListeners()
+
     if (isPrinterConnected.value) return true
+    if (activeReconnectPromise) return activeReconnectPromise
+
     const pref = printerSettings.value.preferredTransport
-    try {
-      if (pref === 'usb' && isUsbSupported.value && typeof navigator.usb.getDevices === 'function') {
-        const devices = await navigator.usb.getDevices()
-        if (devices?.length) {
-          await openAndClaimUsbDevice(devices[0])
-          return true
+    const prefDevice = printerSettings.value.preferredDevice
+    activeReconnectPromise = (async () => {
+      try {
+        if (pref === 'usb' && isUsbSupported.value && typeof navigator.usb.getDevices === 'function') {
+          const devices = await navigator.usb.getDevices()
+          const target = devices?.find(d => matchesPreferredUsbDevice(d, prefDevice)) || null
+          if (target) {
+            await openAndClaimUsbDevice(target)
+            return true
+          }
         }
-      }
-      if (pref === 'serial' && isSerialSupported.value && typeof navigator.serial.getPorts === 'function') {
-        const ports = await navigator.serial.getPorts()
-        if (ports?.length) {
-          await openSerialPortDevice(ports[0])
-          return true
+        if (pref === 'serial' && isSerialSupported.value && typeof navigator.serial.getPorts === 'function') {
+          const ports = await navigator.serial.getPorts()
+          const target = ports?.find(p => matchesPreferredSerialPort(p, prefDevice)) || null
+          if (target) {
+            await openSerialPortDevice(target)
+            return true
+          }
         }
+      } catch {
+        // Abaikan jika printer sedang tercabut atau interface dipakai driver OS
+      } finally {
+        activeReconnectPromise = null
       }
-    } catch {
-      // Abaikan jika printer sedang tercabut atau interface dipakai driver OS
-    }
-    return false
+      return false
+    })()
+
+    return activeReconnectPromise
   }
 
   // -------------------- PENGIRIMAN PAYLOAD ESC/POS --------------------
@@ -540,7 +655,11 @@ export function useThermalPrinter() {
     fallbackToBrowserOnError = true
   }) => {
     printerError.value = ''
-    const activeTransport = forceBrowser ? 'none' : resolveActiveEscPosTransport()
+    let activeTransport = forceBrowser ? 'none' : resolveActiveEscPosTransport()
+    if (!forceBrowser && activeTransport === 'none' && ['usb', 'serial'].includes(printerSettings.value.preferredTransport)) {
+      await autoReconnectPrinter()
+      activeTransport = resolveActiveEscPosTransport()
+    }
 
     if (activeTransport !== 'none') {
       isPrinting.value = true

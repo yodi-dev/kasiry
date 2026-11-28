@@ -185,7 +185,7 @@ const {
   importBackupJSON
 } = useKasiryDB()
 
-const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.3'
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.20.4'
 
 // Sinkronkan <title> tab browser secara dinamis mengikuti nama toko aktif
 watch(
